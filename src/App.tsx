@@ -1,0 +1,1666 @@
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
+import type { User } from '@supabase/supabase-js'
+import { supabase } from './lib/supabase'
+import type {
+  Comment,
+  CommentLike,
+  Profile,
+  ProgressUpdate,
+  ReadingSession,
+  SessionJoinRequest,
+  SessionMembership,
+} from './types'
+import './App.css'
+
+type AuthMode = 'sign-in' | 'sign-up'
+
+interface SessionFormState {
+  bookTitle: string
+  bookAuthor: string
+  totalChapters: number
+  description: string
+  visibility: 'public' | 'private'
+  joinPolicy: 'open' | 'request'
+}
+
+const defaultSessionForm: SessionFormState = {
+  bookTitle: '',
+  bookAuthor: '',
+  totalChapters: 12,
+  description: '',
+  visibility: 'public',
+  joinPolicy: 'open',
+}
+
+const AVATAR_BUCKET = 'avatars'
+const MAX_AVATAR_BYTES = 2 * 1024 * 1024
+const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+function isRemoteUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value)
+}
+
+function getInitials(label: string | null | undefined): string {
+  if (!label?.trim()) {
+    return 'ME'
+  }
+
+  const words = label
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+
+  return words.map((word) => word[0]?.toUpperCase() ?? '').join('') || 'ME'
+}
+
+function getAvatarExtension(file: File): string {
+  const fromType: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+  }
+
+  if (fromType[file.type]) {
+    return fromType[file.type]
+  }
+
+  const fromName = file.name.split('.').pop()?.toLowerCase()
+  return fromName && /^[a-z0-9]+$/.test(fromName) ? fromName : 'jpg'
+}
+
+async function resolveAvatarUrl(pathOrUrl: string | null): Promise<string | null> {
+  if (!pathOrUrl) {
+    return null
+  }
+
+  if (isRemoteUrl(pathOrUrl)) {
+    return pathOrUrl
+  }
+
+  const signedResult = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(pathOrUrl, 60 * 60)
+  if (!signedResult.error && signedResult.data?.signedUrl) {
+    return signedResult.data.signedUrl
+  }
+
+  const publicResult = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(pathOrUrl)
+  return publicResult.data.publicUrl
+}
+
+async function resolveAvatarUrlMap(paths: string[]): Promise<Record<string, string>> {
+  const uniquePaths = Array.from(new Set(paths.filter((path) => path && !isRemoteUrl(path))))
+
+  if (uniquePaths.length === 0) {
+    return {}
+  }
+
+  const signedResults = await Promise.all(
+    uniquePaths.map(async (path) => {
+      const signedResult = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(path, 60 * 60)
+      if (!signedResult.error && signedResult.data?.signedUrl) {
+        return [path, signedResult.data.signedUrl] as const
+      }
+
+      const publicResult = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
+      return [path, publicResult.data.publicUrl] as const
+    }),
+  )
+
+  return Object.fromEntries(signedResults)
+}
+
+function App() {
+  const [user, setUser] = useState<User | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [authBusy, setAuthBusy] = useState(false)
+
+  const [sessions, setSessions] = useState<ReadingSession[]>([])
+  const [memberships, setMemberships] = useState<Record<string, SessionMembership>>({})
+  const [latestProgress, setLatestProgress] = useState<Record<string, number>>({})
+  const [screenError, setScreenError] = useState<string | null>(null)
+  const [loadingSessions, setLoadingSessions] = useState(false)
+  const [sessionForm, setSessionForm] = useState<SessionFormState>(defaultSessionForm)
+  const [busySessionId, setBusySessionId] = useState<string | null>(null)
+  const [creatingSession, setCreatingSession] = useState(false)
+  const [progressDrafts, setProgressDrafts] = useState<Record<string, number>>({})
+
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [sessionComments, setSessionComments] = useState<Comment[]>([])
+  const [sessionLikes, setSessionLikes] = useState<CommentLike[]>([])
+  const [sessionMembers, setSessionMembers] = useState<SessionMembership[]>([])
+  const [sessionProgress, setSessionProgress] = useState<ProgressUpdate[]>([])
+  const [sessionProfiles, setSessionProfiles] = useState<Record<string, Profile>>({})
+  const [loadingSessionDetail, setLoadingSessionDetail] = useState(false)
+  const [commentDraft, setCommentDraft] = useState('')
+  const [postingComment, setPostingComment] = useState(false)
+  const [likingCommentId, setLikingCommentId] = useState<string | null>(null)
+  const [sessionJoinRequests, setSessionJoinRequests] = useState<SessionJoinRequest[]>([])
+  const [requestBusyId, setRequestBusyId] = useState<string | null>(null)
+
+  const [sessionView, setSessionView] = useState<'active' | 'archived'>('active')
+  const [sessionSearch, setSessionSearch] = useState('')
+  const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all')
+  const [myJoinRequestStatus, setMyJoinRequestStatus] = useState<Record<string, SessionJoinRequest['status']>>({})
+
+  const [myProfile, setMyProfile] = useState<Profile | null>(null)
+  const [profileNameDraft, setProfileNameDraft] = useState('')
+  const [profileSaving, setProfileSaving] = useState(false)
+  const [avatarUploadBusy, setAvatarUploadBusy] = useState(false)
+  const [profileNotice, setProfileNotice] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
+  const [myAvatarRenderUrl, setMyAvatarRenderUrl] = useState<string | null>(null)
+  const [avatarInputKey, setAvatarInputKey] = useState(0)
+
+  const loadAppData = useCallback(async (activeUser: User) => {
+    setLoadingSessions(true)
+    setScreenError(null)
+
+    const [sessionsResult, membershipsResult, progressResult, requestsResult] = await Promise.all([
+      supabase.from('reading_sessions').select('*').in('status', ['active', 'archived']).order('created_at', { ascending: false }),
+      supabase.from('session_members').select('session_id,user_id,role').eq('user_id', activeUser.id),
+      supabase
+        .from('progress_updates')
+        .select('session_id,user_id,chapter_number,created_at')
+        .eq('user_id', activeUser.id)
+        .order('created_at', { ascending: false }),
+      supabase.from('session_join_requests').select('id,session_id,user_id,status,created_at').eq('user_id', activeUser.id),
+    ])
+
+    if (sessionsResult.error) {
+      setScreenError(sessionsResult.error.message)
+      setLoadingSessions(false)
+      return
+    }
+
+    if (membershipsResult.error) {
+      setScreenError(membershipsResult.error.message)
+      setLoadingSessions(false)
+      return
+    }
+
+    if (progressResult.error || requestsResult.error) {
+      setScreenError(progressResult.error?.message || requestsResult.error?.message || 'Failed to load data')
+      setLoadingSessions(false)
+      return
+    }
+
+    const membershipLookup: Record<string, SessionMembership> = {}
+    for (const membership of membershipsResult.data as SessionMembership[]) {
+      membershipLookup[membership.session_id] = membership
+    }
+
+    const progressLookup: Record<string, number> = {}
+    for (const update of progressResult.data as ProgressUpdate[]) {
+      if (!(update.session_id in progressLookup)) {
+        progressLookup[update.session_id] = update.chapter_number
+      }
+    }
+
+    const requestLookup: Record<string, SessionJoinRequest['status']> = {}
+    for (const request of (requestsResult.data ?? []) as SessionJoinRequest[]) {
+      requestLookup[request.session_id] = request.status
+    }
+
+    setSessions((sessionsResult.data ?? []) as ReadingSession[])
+    setMemberships(membershipLookup)
+    setLatestProgress(progressLookup)
+    setProgressDrafts(progressLookup)
+    setMyJoinRequestStatus(requestLookup)
+    setLoadingSessions(false)
+  }, [])
+
+  const loadMyProfile = useCallback(async (activeUser: User) => {
+    const upsertResult = await supabase.from('profiles').upsert({ id: activeUser.id }, { onConflict: 'id' })
+    if (upsertResult.error) {
+      setScreenError(upsertResult.error.message)
+      return
+    }
+
+    const profileResult = await supabase
+      .from('profiles')
+      .select('id,display_name,avatar_url')
+      .eq('id', activeUser.id)
+      .maybeSingle()
+
+    if (profileResult.error) {
+      setScreenError(profileResult.error.message)
+      return
+    }
+
+    const profile = (profileResult.data ?? { id: activeUser.id, display_name: null, avatar_url: null }) as Profile
+    const avatarUrl = await resolveAvatarUrl(profile.avatar_url)
+
+    setMyProfile(profile)
+    setProfileNameDraft(profile.display_name ?? '')
+    setMyAvatarRenderUrl(avatarUrl)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl)
+      }
+    }
+  }, [avatarPreviewUrl])
+
+  const loadSessionDetail = useCallback(async (sessionId: string) => {
+    setLoadingSessionDetail(true)
+
+    const [commentsResult, membersResult, progressResult, requestsResult] = await Promise.all([
+      supabase.from('comments').select('id,session_id,user_id,body,is_deleted,created_at').eq('session_id', sessionId).order('created_at'),
+      supabase.from('session_members').select('session_id,user_id,role').eq('session_id', sessionId),
+      supabase
+        .from('progress_updates')
+        .select('session_id,user_id,chapter_number,created_at')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('session_join_requests')
+        .select('id,session_id,user_id,status,created_at')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false }),
+    ])
+
+    if (commentsResult.error || membersResult.error || progressResult.error || requestsResult.error) {
+      setScreenError(
+        commentsResult.error?.message ||
+          membersResult.error?.message ||
+          progressResult.error?.message ||
+          requestsResult.error?.message ||
+          'Failed to load session details',
+      )
+      setLoadingSessionDetail(false)
+      return
+    }
+
+    const commentsData = (commentsResult.data ?? []) as Comment[]
+    const membersData = (membersResult.data ?? []) as SessionMembership[]
+    const progressData = (progressResult.data ?? []) as ProgressUpdate[]
+    const requestsData = (requestsResult.data ?? []) as SessionJoinRequest[]
+
+    let likesData: CommentLike[] = []
+    if (commentsData.length > 0) {
+      const commentIds = commentsData.map((comment) => comment.id)
+      const likesResult = await supabase
+        .from('comment_likes')
+        .select('id,comment_id,user_id,created_at')
+        .in('comment_id', commentIds)
+
+      if (likesResult.error) {
+        setScreenError(likesResult.error.message)
+        setLoadingSessionDetail(false)
+        return
+      }
+
+      likesData = (likesResult.data ?? []) as CommentLike[]
+    }
+
+    const profileUserIds = Array.from(
+      new Set([
+        ...membersData.map((member) => member.user_id),
+        ...commentsData.map((comment) => comment.user_id),
+        ...requestsData.map((request) => request.user_id),
+      ]),
+    )
+
+    const profileLookup: Record<string, Profile> = {}
+    if (profileUserIds.length > 0) {
+      const profilesResult = await supabase
+        .from('profiles')
+        .select('id,display_name,avatar_url')
+        .in('id', profileUserIds)
+
+      if (profilesResult.error) {
+        setScreenError(profilesResult.error.message)
+        setLoadingSessionDetail(false)
+        return
+      }
+
+      const profiles = (profilesResult.data ?? []) as Profile[]
+      const resolvedAvatars = await resolveAvatarUrlMap(
+        profiles.map((profile) => profile.avatar_url).filter((avatarUrl): avatarUrl is string => Boolean(avatarUrl)),
+      )
+
+      for (const profile of profiles) {
+        profileLookup[profile.id] = profile
+        if (profile.avatar_url && !isRemoteUrl(profile.avatar_url) && resolvedAvatars[profile.avatar_url]) {
+          profileLookup[profile.id] = { ...profile, avatar_url: resolvedAvatars[profile.avatar_url] }
+        }
+      }
+    }
+
+    setSessionComments(commentsData)
+    setSessionMembers(membersData)
+    setSessionProgress(progressData)
+    setSessionLikes(likesData)
+    setSessionJoinRequests(requestsData)
+    setSessionProfiles(profileLookup)
+    setLoadingSessionDetail(false)
+  }, [])
+
+  useEffect(() => {
+    let alive = true
+
+    async function bootstrap() {
+      const { data, error } = await supabase.auth.getSession()
+      if (error) {
+        setScreenError(error.message)
+      }
+
+      if (!alive) {
+        return
+      }
+
+      const activeUser = data.session?.user ?? null
+      setUser(activeUser)
+      setAuthLoading(false)
+
+      if (activeUser) {
+        await Promise.all([loadAppData(activeUser), loadMyProfile(activeUser)])
+      }
+    }
+
+    bootstrap().catch((error: unknown) => {
+      setScreenError(error instanceof Error ? error.message : 'Unexpected authentication error')
+      setAuthLoading(false)
+    })
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      const activeUser = session?.user ?? null
+      setUser(activeUser)
+      setAuthLoading(false)
+      if (activeUser) {
+        Promise.all([loadAppData(activeUser), loadMyProfile(activeUser)]).catch((error: unknown) => {
+          setScreenError(error instanceof Error ? error.message : 'Failed to load sessions')
+        })
+      } else {
+        setSessions([])
+        setMemberships({})
+        setLatestProgress({})
+        setProgressDrafts({})
+        setSelectedSessionId(null)
+        setSessionComments([])
+        setSessionLikes([])
+        setSessionMembers([])
+        setSessionProgress([])
+        setSessionProfiles({})
+        setSessionJoinRequests([])
+        setMyJoinRequestStatus({})
+        setMyProfile(null)
+        setProfileNameDraft('')
+        setMyAvatarRenderUrl(null)
+        setAvatarFile(null)
+        if (avatarPreviewUrl) {
+          URL.revokeObjectURL(avatarPreviewUrl)
+        }
+        setAvatarPreviewUrl(null)
+        setAvatarInputKey((current) => current + 1)
+      }
+    })
+
+    return () => {
+      alive = false
+      authListener.subscription.unsubscribe()
+    }
+  }, [avatarPreviewUrl, loadAppData, loadMyProfile])
+
+  useEffect(() => {
+    if (sessions.length === 0) {
+      setSelectedSessionId(null)
+      return
+    }
+
+    if (selectedSessionId && sessions.some((session) => session.id === selectedSessionId)) {
+      return
+    }
+
+    const joinedSession = sessions.find((session) => memberships[session.id] && session.status === sessionView)
+    const firstInView = sessions.find((session) => session.status === sessionView)
+    setSelectedSessionId(joinedSession?.id ?? firstInView?.id ?? sessions[0].id)
+  }, [memberships, selectedSessionId, sessionView, sessions])
+
+  useEffect(() => {
+    if (!selectedSessionId) {
+      return
+    }
+
+    loadSessionDetail(selectedSessionId).catch((error: unknown) => {
+      setScreenError(error instanceof Error ? error.message : 'Failed to load session detail')
+      setLoadingSessionDetail(false)
+    })
+  }, [loadSessionDetail, selectedSessionId])
+
+  useEffect(() => {
+    if (!user || !selectedSessionId) {
+      return
+    }
+
+    const channel = supabase
+      .channel(`session-live-${selectedSessionId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'comments', filter: `session_id=eq.${selectedSessionId}` },
+        () => {
+          void loadSessionDetail(selectedSessionId)
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'progress_updates', filter: `session_id=eq.${selectedSessionId}` },
+        () => {
+          void loadSessionDetail(selectedSessionId)
+          void loadAppData(user)
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'session_members', filter: `session_id=eq.${selectedSessionId}` },
+        () => {
+          void loadSessionDetail(selectedSessionId)
+          void loadAppData(user)
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'comment_likes' },
+        () => {
+          void loadSessionDetail(selectedSessionId)
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'session_join_requests', filter: `session_id=eq.${selectedSessionId}` },
+        () => {
+          void loadSessionDetail(selectedSessionId)
+          void loadAppData(user)
+        },
+      )
+
+    channel.subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [loadAppData, loadSessionDetail, selectedSessionId, user])
+
+  const joinedSessionCount = useMemo(
+    () => sessions.filter((session) => memberships[session.id] && session.status === 'active').length,
+    [sessions, memberships],
+  )
+
+  async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setAuthBusy(true)
+    setAuthError(null)
+
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setAuthError('Please enter both email and password.')
+      setAuthBusy(false)
+      return
+    }
+
+    const response =
+      authMode === 'sign-in'
+        ? await supabase.auth.signInWithPassword({ email: authEmail.trim(), password: authPassword })
+        : await supabase.auth.signUp({ email: authEmail.trim(), password: authPassword })
+
+    if (response.error) {
+      setAuthError(response.error.message)
+      setAuthBusy(false)
+      return
+    }
+
+    if (authMode === 'sign-up') {
+      setAuthError('Account created. Please check your email if confirmation is enabled.')
+    }
+
+    setAuthBusy(false)
+  }
+
+  async function handleSignOut() {
+    setScreenError(null)
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      setScreenError(error.message)
+    }
+  }
+
+  async function handleCreateSession(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!user) {
+      return
+    }
+
+    if (!sessionForm.bookTitle.trim() || !sessionForm.bookAuthor.trim()) {
+      setScreenError('Book title and author are required.')
+      return
+    }
+
+    setCreatingSession(true)
+    setScreenError(null)
+
+    // Ensure profile exists for the current auth user before FK insert.
+    const profileUpsert = await supabase.from('profiles').upsert({ id: user.id }, { onConflict: 'id' })
+    if (profileUpsert.error) {
+      setScreenError(profileUpsert.error.message)
+      setCreatingSession(false)
+      return
+    }
+
+    const createResult = await supabase.rpc('create_reading_session', {
+      p_book_title: sessionForm.bookTitle.trim(),
+      p_book_author: sessionForm.bookAuthor.trim(),
+      p_total_chapters: sessionForm.totalChapters,
+      p_description: sessionForm.description.trim() || null,
+      p_visibility: sessionForm.visibility,
+      p_join_policy: sessionForm.joinPolicy,
+    })
+
+    if (createResult.error) {
+      setScreenError(createResult.error.message)
+      setCreatingSession(false)
+      return
+    }
+
+    const createdSession = createResult.data as ReadingSession
+    const membershipResult = await supabase.from('session_members').insert({
+      session_id: createdSession.id,
+      user_id: user.id,
+      role: 'owner',
+    })
+
+    if (membershipResult.error) {
+      setScreenError(membershipResult.error.message)
+      setCreatingSession(false)
+      return
+    }
+
+    setSessionForm(defaultSessionForm)
+    await loadAppData(user)
+    setCreatingSession(false)
+  }
+
+  async function handleJoinSession(sessionId: string) {
+    if (!user) {
+      return
+    }
+
+    const targetSession = sessions.find((session) => session.id === sessionId)
+    if (targetSession?.join_policy === 'request') {
+      setBusySessionId(sessionId)
+      const { error } = await supabase.from('session_join_requests').upsert(
+        {
+          session_id: sessionId,
+          user_id: user.id,
+          status: 'pending',
+        },
+        { onConflict: 'session_id,user_id' },
+      )
+
+      if (error) {
+        setScreenError(error.message)
+      }
+
+      await loadAppData(user)
+      if (selectedSessionId === sessionId) {
+        await loadSessionDetail(sessionId)
+      }
+      setBusySessionId(null)
+      return
+    }
+
+    setBusySessionId(sessionId)
+    setScreenError(null)
+
+    const { error } = await supabase.from('session_members').insert({
+      session_id: sessionId,
+      user_id: user.id,
+      role: 'member',
+    })
+
+    if (error) {
+      setScreenError(error.message)
+      setBusySessionId(null)
+      return
+    }
+
+    await loadAppData(user)
+    setBusySessionId(null)
+  }
+
+  async function handleLeaveSession(sessionId: string) {
+    if (!user) {
+      return
+    }
+
+    setBusySessionId(sessionId)
+    setScreenError(null)
+
+    const { error } = await supabase
+      .from('session_members')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('user_id', user.id)
+
+    if (error) {
+      setScreenError(error.message)
+      setBusySessionId(null)
+      return
+    }
+
+    await loadAppData(user)
+    if (selectedSessionId === sessionId) {
+      setSelectedSessionId(null)
+    }
+    setBusySessionId(null)
+  }
+
+  async function handleArchiveSelected() {
+    if (!user || !selectedSessionId) {
+      return
+    }
+
+    setBusySessionId(selectedSessionId)
+    const { error } = await supabase
+      .from('reading_sessions')
+      .update({ status: 'archived' })
+      .eq('id', selectedSessionId)
+      .eq('creator_id', user.id)
+
+    if (error) {
+      setScreenError(error.message)
+      setBusySessionId(null)
+      return
+    }
+
+    await loadAppData(user)
+    if (selectedSession) {
+      setSessionView('archived')
+      setSelectedSessionId(selectedSession.id)
+    }
+    setBusySessionId(null)
+  }
+
+  async function handleRestoreSelected() {
+    if (!user || !selectedSessionId) {
+      return
+    }
+
+    setBusySessionId(selectedSessionId)
+    const { error } = await supabase
+      .from('reading_sessions')
+      .update({ status: 'active' })
+      .eq('id', selectedSessionId)
+      .eq('creator_id', user.id)
+
+    if (error) {
+      setScreenError(error.message)
+      setBusySessionId(null)
+      return
+    }
+
+    await loadAppData(user)
+    setSessionView('active')
+    setBusySessionId(null)
+  }
+
+  async function handleApproveJoinRequest(request: SessionJoinRequest) {
+    if (!selectedSessionId || !user) {
+      return
+    }
+
+    setRequestBusyId(request.id)
+    const updateResult = await supabase
+      .from('session_join_requests')
+      .update({ status: 'approved' })
+      .eq('id', request.id)
+
+    if (updateResult.error) {
+      setScreenError(updateResult.error.message)
+      setRequestBusyId(null)
+      return
+    }
+
+    const membershipResult = await supabase.from('session_members').insert({
+      session_id: selectedSessionId,
+      user_id: request.user_id,
+      role: 'member',
+    })
+
+    if (membershipResult.error && !membershipResult.error.message.toLowerCase().includes('duplicate')) {
+      setScreenError(membershipResult.error.message)
+      setRequestBusyId(null)
+      return
+    }
+
+    await loadAppData(user)
+    await loadSessionDetail(selectedSessionId)
+    setRequestBusyId(null)
+  }
+
+  async function handleRejectJoinRequest(request: SessionJoinRequest) {
+    if (!selectedSessionId || !user) {
+      return
+    }
+
+    setRequestBusyId(request.id)
+    const { error } = await supabase
+      .from('session_join_requests')
+      .update({ status: 'rejected' })
+      .eq('id', request.id)
+
+    if (error) {
+      setScreenError(error.message)
+      setRequestBusyId(null)
+      return
+    }
+
+    await loadAppData(user)
+    await loadSessionDetail(selectedSessionId)
+    setRequestBusyId(null)
+  }
+
+  async function handleSubmitComment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!user || !selectedSessionId) {
+      return
+    }
+
+    if (!commentDraft.trim()) {
+      return
+    }
+
+    setPostingComment(true)
+    setScreenError(null)
+    const { error } = await supabase.from('comments').insert({
+      session_id: selectedSessionId,
+      user_id: user.id,
+      body: commentDraft.trim(),
+    })
+
+    if (error) {
+      setScreenError(error.message)
+      setPostingComment(false)
+      return
+    }
+
+    setCommentDraft('')
+    await loadSessionDetail(selectedSessionId)
+    setPostingComment(false)
+  }
+
+  async function handleToggleLike(commentId: string) {
+    if (!user || !selectedSessionId) {
+      return
+    }
+
+    setLikingCommentId(commentId)
+    const existingLike = sessionLikes.find((like) => like.comment_id === commentId && like.user_id === user.id)
+
+    if (existingLike) {
+      const { error } = await supabase.from('comment_likes').delete().eq('id', existingLike.id)
+      if (error) {
+        setScreenError(error.message)
+        setLikingCommentId(null)
+        return
+      }
+    } else {
+      const { error } = await supabase.from('comment_likes').insert({
+        comment_id: commentId,
+        user_id: user.id,
+      })
+
+      if (error) {
+        setScreenError(error.message)
+        setLikingCommentId(null)
+        return
+      }
+    }
+
+    await loadSessionDetail(selectedSessionId)
+    setLikingCommentId(null)
+  }
+
+  async function handleSaveProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!user || profileSaving) {
+      return
+    }
+
+    setProfileSaving(true)
+    setProfileNotice(null)
+
+    const trimmedName = profileNameDraft.trim()
+    const { error } = await supabase
+      .from('profiles')
+      .update({ display_name: trimmedName.length > 0 ? trimmedName : null })
+      .eq('id', user.id)
+
+    if (error) {
+      setScreenError(error.message)
+      setProfileSaving(false)
+      return
+    }
+
+    const nextProfile: Profile = {
+      id: user.id,
+      display_name: trimmedName.length > 0 ? trimmedName : null,
+      avatar_url: myProfile?.avatar_url ?? null,
+    }
+
+    setMyProfile(nextProfile)
+    setProfileNotice('Profile name saved.')
+    setProfileSaving(false)
+
+    if (selectedSessionId) {
+      await loadSessionDetail(selectedSessionId)
+    }
+  }
+
+  function handleAvatarFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    setProfileNotice(null)
+
+    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+      setScreenError('Avatar must be a JPG, PNG, or WEBP image.')
+      event.target.value = ''
+      return
+    }
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      setScreenError('Avatar must be 2 MB or smaller.')
+      event.target.value = ''
+      return
+    }
+
+    if (avatarPreviewUrl) {
+      URL.revokeObjectURL(avatarPreviewUrl)
+    }
+
+    setScreenError(null)
+    setAvatarFile(file)
+    setAvatarPreviewUrl(URL.createObjectURL(file))
+  }
+
+  async function handleUploadAvatar() {
+    if (!user || !avatarFile || avatarUploadBusy) {
+      return
+    }
+
+    setAvatarUploadBusy(true)
+    setProfileNotice(null)
+    setScreenError(null)
+
+    const extension = getAvatarExtension(avatarFile)
+    const nextPath = `${user.id}/${crypto.randomUUID()}.${extension}`
+    const previousPath = myProfile?.avatar_url && !isRemoteUrl(myProfile.avatar_url) ? myProfile.avatar_url : null
+
+    const uploadResult = await supabase.storage.from(AVATAR_BUCKET).upload(nextPath, avatarFile, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: avatarFile.type,
+    })
+
+    if (uploadResult.error) {
+      setScreenError(uploadResult.error.message)
+      setAvatarUploadBusy(false)
+      return
+    }
+
+    const updateResult = await supabase.from('profiles').update({ avatar_url: nextPath }).eq('id', user.id)
+    if (updateResult.error) {
+      setScreenError(updateResult.error.message)
+      setAvatarUploadBusy(false)
+      return
+    }
+
+    if (previousPath && previousPath !== nextPath) {
+      await supabase.storage.from(AVATAR_BUCKET).remove([previousPath])
+    }
+
+    const nextRenderUrl = await resolveAvatarUrl(nextPath)
+    const updatedProfile: Profile = {
+      id: user.id,
+      display_name: myProfile?.display_name ?? null,
+      avatar_url: nextPath,
+    }
+
+    setMyProfile(updatedProfile)
+    setMyAvatarRenderUrl(nextRenderUrl)
+    setAvatarFile(null)
+    if (avatarPreviewUrl) {
+      URL.revokeObjectURL(avatarPreviewUrl)
+    }
+    setAvatarPreviewUrl(null)
+    setAvatarInputKey((current) => current + 1)
+    setProfileNotice('Avatar updated.')
+    setAvatarUploadBusy(false)
+
+    if (selectedSessionId) {
+      await loadSessionDetail(selectedSessionId)
+    }
+  }
+
+  const selectedSession = useMemo(
+    () => sessions.find((session) => session.id === selectedSessionId) ?? null,
+    [selectedSessionId, sessions],
+  )
+
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((session) => {
+      if (session.status !== sessionView) {
+        return false
+      }
+
+      if (visibilityFilter !== 'all' && session.visibility !== visibilityFilter) {
+        return false
+      }
+
+      if (!sessionSearch.trim()) {
+        return true
+      }
+
+      const query = sessionSearch.toLowerCase()
+      return session.book_title.toLowerCase().includes(query) || session.book_author.toLowerCase().includes(query)
+    })
+  }, [sessionSearch, sessionView, sessions, visibilityFilter])
+
+  const activeUserId = user?.id ?? ''
+  const myDisplayName = myProfile?.display_name?.trim() || user?.email || activeUserId.slice(0, 8)
+  const myAvatarLabel = myProfile?.display_name || user?.email || 'Me'
+  const myAvatarImage = avatarPreviewUrl || myAvatarRenderUrl
+
+  const selectedMembership = selectedSessionId ? memberships[selectedSessionId] : undefined
+  const selectedIsMember = Boolean(selectedMembership)
+  const selectedIsOwner = Boolean(selectedSession && selectedSession.creator_id === activeUserId)
+
+  const memberLatestProgress = useMemo(() => {
+    const lookup: Record<string, number> = {}
+    for (const update of sessionProgress) {
+      if (!(update.user_id in lookup)) {
+        lookup[update.user_id] = update.chapter_number
+      }
+    }
+    return lookup
+  }, [sessionProgress])
+
+  const commentMeta = useMemo(() => {
+    const likeCounts: Record<string, number> = {}
+    const likedByMe: Record<string, boolean> = {}
+
+    for (const like of sessionLikes) {
+      likeCounts[like.comment_id] = (likeCounts[like.comment_id] ?? 0) + 1
+      if (like.user_id === activeUserId) {
+        likedByMe[like.comment_id] = true
+      }
+    }
+
+    return { likeCounts, likedByMe }
+  }, [activeUserId, sessionLikes])
+
+  const pendingRequests = useMemo(
+    () => sessionJoinRequests.filter((request) => request.status === 'pending'),
+    [sessionJoinRequests],
+  )
+
+  async function handleUpdateProgress(session: ReadingSession) {
+    if (!user) {
+      return
+    }
+
+    const chapter = progressDrafts[session.id]
+    if (!chapter || chapter < 1 || chapter > session.total_chapters) {
+      setScreenError(`Chapter must be between 1 and ${session.total_chapters}.`)
+      return
+    }
+
+    setBusySessionId(session.id)
+    setScreenError(null)
+
+    const { error } = await supabase.from('progress_updates').insert({
+      session_id: session.id,
+      user_id: user.id,
+      chapter_number: chapter,
+    })
+
+    if (error) {
+      setScreenError(error.message)
+      setBusySessionId(null)
+      return
+    }
+
+    await loadAppData(user)
+    setBusySessionId(null)
+  }
+
+  if (authLoading) {
+    return (
+      <main className="shell">
+        <section className="card centered">
+          <h1>Books and Friends</h1>
+          <p>Checking your session...</p>
+        </section>
+      </main>
+    )
+  }
+
+  if (!user) {
+    return (
+      <main className="shell">
+        <section className="card auth-card">
+          <div>
+            <p className="eyebrow">Books and Friends</p>
+            <h1>Welcome to Books &amp; Friends</h1>
+            <p className="subtle">Log in to join sessions or create your own.</p>
+          </div>
+
+          <form className="stack" onSubmit={handleAuthSubmit}>
+            <div className="auth-switch" role="tablist" aria-label="Authentication mode">
+              <button
+                type="button"
+                className={`auth-switch-option ${authMode === 'sign-in' ? 'auth-switch-option-active' : ''}`}
+                onClick={() => {
+                  setAuthMode('sign-in')
+                  setAuthError(null)
+                }}
+              >
+                Sign in
+              </button>
+              <button
+                type="button"
+                className={`auth-switch-option ${authMode === 'sign-up' ? 'auth-switch-option-active' : ''}`}
+                onClick={() => {
+                  setAuthMode('sign-up')
+                  setAuthError(null)
+                }}
+              >
+                Sign up
+              </button>
+            </div>
+
+            <label className="field">
+              <span>Email</span>
+              <input
+                type="email"
+                value={authEmail}
+                onChange={(event) => setAuthEmail(event.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+              />
+            </label>
+
+            <label className="field">
+              <span>Password</span>
+              <input
+                type="password"
+                value={authPassword}
+                onChange={(event) => setAuthPassword(event.target.value)}
+                placeholder="At least 6 characters"
+                autoComplete={authMode === 'sign-in' ? 'current-password' : 'new-password'}
+              />
+            </label>
+
+            {authError ? <p className="error">{authError}</p> : null}
+
+            <button type="submit" className="primary" disabled={authBusy}>
+              {authBusy ? 'Please wait...' : authMode === 'sign-in' ? 'Sign in' : 'Create account'}
+            </button>
+          </form>
+        </section>
+      </main>
+    )
+  }
+
+  return (
+    <main className="shell dashboard-shell">
+      <header className="card header-card">
+        <div>
+          <p className="eyebrow">Welcome back</p>
+          <h1>Books and Friends</h1>
+          <p className="subtle">{joinedSessionCount} joined sessions. Keep your chapter streak alive.</p>
+        </div>
+
+        <div className="header-actions">
+          <div className="header-identity">
+            {myAvatarImage ? (
+              <img className="avatar avatar-md" src={myAvatarImage} alt={`${myAvatarLabel} avatar`} />
+            ) : (
+              <span className="avatar avatar-md avatar-fallback" aria-hidden="true">
+                {getInitials(myAvatarLabel)}
+              </span>
+            )}
+            <div>
+              <p className="subtle">Signed in as</p>
+              <strong>{myDisplayName}</strong>
+            </div>
+          </div>
+
+          <button type="button" className="secondary" onClick={handleSignOut}>
+            Sign out
+          </button>
+        </div>
+      </header>
+
+      <section className="grid">
+        <article className="card stack">
+          <div>
+            <h2>Your Profile</h2>
+            <p className="subtle">Set your display name and upload an avatar.</p>
+          </div>
+
+          <div className="profile-card stack">
+            <div className="profile-row">
+              {myAvatarImage ? (
+                <img className="avatar avatar-lg" src={myAvatarImage} alt={`${myAvatarLabel} avatar`} />
+              ) : (
+                <span className="avatar avatar-lg avatar-fallback" aria-hidden="true">
+                  {getInitials(myAvatarLabel)}
+                </span>
+              )}
+              <div className="stack gap-sm profile-upload-stack">
+                <label className="field">
+                  <span>Avatar image</span>
+                  <input
+                    key={avatarInputKey}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={handleAvatarFileChange}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!avatarFile || avatarUploadBusy}
+                  onClick={() => {
+                    void handleUploadAvatar()
+                  }}
+                >
+                  {avatarUploadBusy ? 'Uploading...' : 'Upload avatar'}
+                </button>
+                <p className="muted">JPG, PNG, or WEBP. Max 2 MB.</p>
+              </div>
+            </div>
+
+            <form className="stack" onSubmit={handleSaveProfile}>
+              <label className="field">
+                <span>Display name</span>
+                <input
+                  type="text"
+                  value={profileNameDraft}
+                  onChange={(event) => setProfileNameDraft(event.target.value)}
+                  placeholder="How others should see your name"
+                  maxLength={80}
+                />
+              </label>
+              <button type="submit" className="primary" disabled={profileSaving}>
+                {profileSaving ? 'Saving...' : 'Save profile'}
+              </button>
+            </form>
+
+            {profileNotice ? <p className="subtle">{profileNotice}</p> : null}
+          </div>
+
+          <div>
+            <h2>Create Reading Session</h2>
+            <p className="subtle">Set up a book, chapter count, and visibility.</p>
+          </div>
+
+          <form className="stack" onSubmit={handleCreateSession}>
+            <label className="field">
+              <span>Book title</span>
+              <input
+                type="text"
+                value={sessionForm.bookTitle}
+                onChange={(event) => setSessionForm((current) => ({ ...current, bookTitle: event.target.value }))}
+                placeholder="The Alchemist"
+              />
+            </label>
+
+            <label className="field">
+              <span>Author</span>
+              <input
+                type="text"
+                value={sessionForm.bookAuthor}
+                onChange={(event) => setSessionForm((current) => ({ ...current, bookAuthor: event.target.value }))}
+                placeholder="Paulo Coelho"
+              />
+            </label>
+
+            <label className="field">
+              <span>Total chapters</span>
+              <input
+                type="number"
+                min={1}
+                max={999}
+                value={sessionForm.totalChapters}
+                onChange={(event) =>
+                  setSessionForm((current) => ({
+                    ...current,
+                    totalChapters: Number.isNaN(Number(event.target.value)) ? 1 : Number(event.target.value),
+                  }))
+                }
+              />
+            </label>
+
+            <label className="field">
+              <span>Description</span>
+              <textarea
+                value={sessionForm.description}
+                onChange={(event) => setSessionForm((current) => ({ ...current, description: event.target.value }))}
+                placeholder="Why this book, and what pace should members follow?"
+              />
+            </label>
+
+            <div className="split">
+              <label className="field">
+                <span>Visibility</span>
+                <select
+                  value={sessionForm.visibility}
+                  onChange={(event) =>
+                    setSessionForm((current) => ({
+                      ...current,
+                      visibility: event.target.value as 'public' | 'private',
+                    }))
+                  }
+                >
+                  <option value="public">Public</option>
+                  <option value="private">Private</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Join policy</span>
+                <select
+                  value={sessionForm.joinPolicy}
+                  onChange={(event) =>
+                    setSessionForm((current) => ({
+                      ...current,
+                      joinPolicy: event.target.value as 'open' | 'request',
+                    }))
+                  }
+                >
+                  <option value="open">Open join</option>
+                  <option value="request">Request required</option>
+                </select>
+              </label>
+            </div>
+
+            <button type="submit" className="primary" disabled={creatingSession}>
+              {creatingSession ? 'Creating...' : 'Create session'}
+            </button>
+          </form>
+        </article>
+
+        <article className="card stack">
+          <div>
+            <h2>{sessionView === 'active' ? 'Find Sessions' : 'Archived Sessions'}</h2>
+            <p className="subtle">
+              {sessionView === 'active'
+                ? 'Search, filter, join, and track your sessions.'
+                : 'Browse archived sessions and restore your own.'}
+            </p>
+          </div>
+
+          <div className="stack gap-sm">
+            <div className="auth-switch" role="tablist" aria-label="Session view">
+              <button
+                type="button"
+                className={`auth-switch-option ${sessionView === 'active' ? 'auth-switch-option-active' : ''}`}
+                onClick={() => setSessionView('active')}
+              >
+                Active
+              </button>
+              <button
+                type="button"
+                className={`auth-switch-option ${sessionView === 'archived' ? 'auth-switch-option-active' : ''}`}
+                onClick={() => setSessionView('archived')}
+              >
+                Archived
+              </button>
+            </div>
+
+            <label className="field">
+              <span>Search by title or author</span>
+              <input
+                type="text"
+                value={sessionSearch}
+                onChange={(event) => setSessionSearch(event.target.value)}
+                placeholder="Search sessions"
+              />
+            </label>
+
+            <label className="field">
+              <span>Visibility</span>
+              <select
+                value={visibilityFilter}
+                onChange={(event) => setVisibilityFilter(event.target.value as 'all' | 'public' | 'private')}
+              >
+                <option value="all">All</option>
+                <option value="public">Public</option>
+                <option value="private">Private</option>
+              </select>
+            </label>
+          </div>
+
+          {screenError ? <p className="error">{screenError}</p> : null}
+          {loadingSessions ? <p className="subtle">Loading sessions...</p> : null}
+
+          {!loadingSessions && filteredSessions.length === 0 ? (
+            <p className="subtle">No sessions found for current filters.</p>
+          ) : null}
+
+          <ul className="session-list">
+            {filteredSessions.map((session) => {
+              const membership = memberships[session.id]
+              const chapter = latestProgress[session.id] ?? 0
+              const ratio = Math.min(100, Math.round((chapter / session.total_chapters) * 100))
+              const isSelected = selectedSessionId === session.id
+              const requestStatus = myJoinRequestStatus[session.id]
+
+              return (
+                <li key={session.id} className={`session-item ${isSelected ? 'session-item-selected' : ''}`}>
+                  <div className="stack gap-sm">
+                    <div className="session-heading">
+                      <h3>{session.book_title}</h3>
+                      <span className="pill">{session.visibility}</span>
+                    </div>
+
+                    <p className="subtle">by {session.book_author}</p>
+                    <p className="muted">{session.description || 'No description yet.'}</p>
+
+                    <div className="progress-row" aria-label={`Progress for ${session.book_title}`}>
+                      <div className="progress-track">
+                        <span className="progress-fill" style={{ width: `${ratio}%` }} />
+                      </div>
+                      <span className="progress-label">Chapter {chapter || '-'} / {session.total_chapters}</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="tertiary"
+                      onClick={() => setSelectedSessionId(session.id)}
+                    >
+                      {isSelected ? 'Viewing details' : 'Open details'}
+                    </button>
+
+                    {membership ? (
+                      <div className="split compact">
+                        <label className="field">
+                          <span>Update chapter</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={session.total_chapters}
+                            value={progressDrafts[session.id] ?? 1}
+                            onChange={(event) =>
+                              setProgressDrafts((current) => ({
+                                ...current,
+                                [session.id]: Number.isNaN(Number(event.target.value))
+                                  ? 1
+                                  : Number(event.target.value),
+                              }))
+                            }
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busySessionId === session.id}
+                          onClick={() => {
+                            void handleUpdateProgress(session)
+                          }}
+                        >
+                          {busySessionId === session.id ? 'Saving...' : 'Save progress'}
+                        </button>
+
+                        <button
+                          type="button"
+                          className="ghost"
+                          disabled={busySessionId === session.id || (membership.role === 'owner' && sessions.length === 1)}
+                          onClick={() => {
+                            void handleLeaveSession(session.id)
+                          }}
+                        >
+                          {busySessionId === session.id ? 'Working...' : 'Leave'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busySessionId === session.id || session.status === 'archived' || requestStatus === 'pending'}
+                        onClick={() => {
+                          void handleJoinSession(session.id)
+                        }}
+                      >
+                        {session.join_policy === 'request'
+                          ? requestStatus === 'pending'
+                            ? 'Request pending'
+                            : 'Request to join'
+                          : busySessionId === session.id
+                            ? 'Joining...'
+                            : 'Join session'}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </article>
+
+        <article className="card stack span-full">
+          {!selectedSession ? (
+            <p className="subtle">Select a session to open discussion and member progress details.</p>
+          ) : (
+            <>
+              <div className="detail-header">
+                <div>
+                  <h2>{selectedSession.book_title}</h2>
+                  <p className="subtle">Single thread discussion for all members</p>
+                </div>
+                {selectedIsOwner ? (
+                  <button
+                    type="button"
+                    className="ghost"
+                    disabled={busySessionId === selectedSession.id}
+                    onClick={() => {
+                      if (selectedSession.status === 'active') {
+                        void handleArchiveSelected()
+                      } else {
+                        void handleRestoreSelected()
+                      }
+                    }}
+                  >
+                    {busySessionId === selectedSession.id
+                      ? selectedSession.status === 'active'
+                        ? 'Archiving...'
+                        : 'Restoring...'
+                      : selectedSession.status === 'active'
+                        ? 'Archive session'
+                        : 'Restore session'}
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="detail-grid">
+                <section className="detail-pane stack">
+                  <h3>Member Progress</h3>
+                  {loadingSessionDetail ? <p className="subtle">Loading session detail...</p> : null}
+                  <ul className="member-list">
+                    {sessionMembers.map((member) => {
+                      const profile = sessionProfiles[member.user_id]
+                      const chapter = memberLatestProgress[member.user_id] ?? 0
+                      const ratio = Math.min(
+                        100,
+                        Math.round((chapter / Math.max(1, selectedSession.total_chapters)) * 100),
+                      )
+
+                      return (
+                        <li key={member.user_id} className="member-item">
+                          <div className="member-head">
+                            <div className="identity-row">
+                              {profile?.avatar_url ? (
+                                <img
+                                  className="avatar avatar-sm"
+                                  src={profile.avatar_url}
+                                  alt={`${profile.display_name || member.user_id.slice(0, 8)} avatar`}
+                                />
+                              ) : (
+                                <span className="avatar avatar-sm avatar-fallback" aria-hidden="true">
+                                  {getInitials(profile?.display_name || member.user_id.slice(0, 8))}
+                                </span>
+                              )}
+                              <strong>{profile?.display_name || member.user_id.slice(0, 8)}</strong>
+                            </div>
+                            <span className="pill">{member.role}</span>
+                          </div>
+                          <div className="progress-track">
+                            <span className="progress-fill" style={{ width: `${ratio}%` }} />
+                          </div>
+                          <span className="progress-label">Chapter {chapter} / {selectedSession.total_chapters}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </section>
+
+                <section className="detail-pane stack">
+                  {selectedIsOwner ? (
+                    <>
+                      <h3>Join Requests</h3>
+                      {pendingRequests.length === 0 ? <p className="subtle">No pending requests.</p> : null}
+                      <ul className="member-list">
+                        {pendingRequests.map((request) => {
+                          const profile = sessionProfiles[request.user_id]
+                          return (
+                            <li key={request.id} className="member-item stack gap-sm">
+                              <div className="member-head">
+                                <div className="identity-row">
+                                  {profile?.avatar_url ? (
+                                    <img
+                                      className="avatar avatar-sm"
+                                      src={profile.avatar_url}
+                                      alt={`${profile.display_name || request.user_id.slice(0, 8)} avatar`}
+                                    />
+                                  ) : (
+                                    <span className="avatar avatar-sm avatar-fallback" aria-hidden="true">
+                                      {getInitials(profile?.display_name || request.user_id.slice(0, 8))}
+                                    </span>
+                                  )}
+                                  <strong>{profile?.display_name || request.user_id.slice(0, 8)}</strong>
+                                </div>
+                                <span className="subtle">{new Date(request.created_at).toLocaleString()}</span>
+                              </div>
+                              <div className="split compact">
+                                <button
+                                  type="button"
+                                  className="secondary"
+                                  disabled={requestBusyId === request.id}
+                                  onClick={() => {
+                                    void handleApproveJoinRequest(request)
+                                  }}
+                                >
+                                  {requestBusyId === request.id ? 'Processing...' : 'Approve'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ghost"
+                                  disabled={requestBusyId === request.id}
+                                  onClick={() => {
+                                    void handleRejectJoinRequest(request)
+                                  }}
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </>
+                  ) : null}
+
+                  <h3>Discussion</h3>
+                  {!selectedIsMember ? (
+                    <p className="subtle">Join this session to read and post in the discussion thread.</p>
+                  ) : (
+                    <>
+                      <form className="stack" onSubmit={handleSubmitComment}>
+                        <label className="field">
+                          <span>Your comment</span>
+                          <textarea
+                            value={commentDraft}
+                            onChange={(event) => setCommentDraft(event.target.value)}
+                            placeholder="Share your thoughts about this chapter..."
+                          />
+                        </label>
+                        <button type="submit" className="primary" disabled={postingComment}>
+                          {postingComment ? 'Posting...' : 'Post comment'}
+                        </button>
+                      </form>
+
+                      <ul className="comment-list">
+                        {sessionComments.map((comment) => {
+                          const profile = sessionProfiles[comment.user_id]
+                          const likes = commentMeta.likeCounts[comment.id] ?? 0
+                          const likedByMe = Boolean(commentMeta.likedByMe[comment.id])
+
+                          return (
+                            <li key={comment.id} className="comment-item">
+                              <div className="comment-head">
+                                <div className="identity-row">
+                                  {profile?.avatar_url ? (
+                                    <img
+                                      className="avatar avatar-sm"
+                                      src={profile.avatar_url}
+                                      alt={`${profile.display_name || comment.user_id.slice(0, 8)} avatar`}
+                                    />
+                                  ) : (
+                                    <span className="avatar avatar-sm avatar-fallback" aria-hidden="true">
+                                      {getInitials(profile?.display_name || comment.user_id.slice(0, 8))}
+                                    </span>
+                                  )}
+                                  <strong>{profile?.display_name || comment.user_id.slice(0, 8)}</strong>
+                                </div>
+                                <span className="subtle">{new Date(comment.created_at).toLocaleString()}</span>
+                              </div>
+                              <p className="comment-body">{comment.is_deleted ? '[deleted]' : comment.body}</p>
+                              <button
+                                type="button"
+                                className={`like-button ${likedByMe ? 'like-button-active' : ''}`}
+                                disabled={likingCommentId === comment.id}
+                                onClick={() => {
+                                  void handleToggleLike(comment.id)
+                                }}
+                              >
+                                {likingCommentId === comment.id ? 'Updating...' : likedByMe ? `Liked (${likes})` : `Like (${likes})`}
+                              </button>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </>
+                  )}
+                </section>
+              </div>
+            </>
+          )}
+        </article>
+      </section>
+    </main>
+  )
+}
+
+export default App
