@@ -138,7 +138,7 @@ export default function App() {
         setLanguage(saved)
       }
     })
-  }, [])
+  }, [t.errors.failedLoadData])
 
   useEffect(() => {
     void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, language)
@@ -194,7 +194,7 @@ export default function App() {
     setProgressDrafts(progressLookup)
     setMyJoinRequestStatus(requestLookup)
     setLoadingSessions(false)
-  }, [])
+  }, [t.errors.failedLoadData])
 
   const loadMyProfile = useCallback(async (activeUser: User) => {
     const upsertResult = await supabase.from('profiles').upsert({ id: activeUser.id }, { onConflict: 'id' })
@@ -299,7 +299,7 @@ export default function App() {
     setSessionJoinRequests(requestsData)
     setSessionProfiles(profileLookup)
     setLoadingSessionDetail(false)
-  }, [])
+  }, [t.errors.failedLoadDetails])
 
   useEffect(() => {
     let alive = true
@@ -360,7 +360,7 @@ export default function App() {
       alive = false
       authListener.subscription.unsubscribe()
     }
-  }, [loadAppData, loadMyProfile])
+  }, [loadAppData, loadMyProfile, t.errors.failedLoadAppData, t.errors.unexpectedAuthError])
 
   useEffect(() => {
     if (sessions.length === 0) {
@@ -386,7 +386,7 @@ export default function App() {
       setScreenError(error instanceof Error ? error.message : t.errors.failedLoadDetail)
       setLoadingSessionDetail(false)
     })
-  }, [loadSessionDetail, selectedSessionId])
+  }, [loadSessionDetail, selectedSessionId, t.errors.failedLoadDetail])
 
   useEffect(() => {
     if (!user || !selectedSessionId) {

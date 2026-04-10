@@ -13,6 +13,12 @@ import type {
   SessionJoinRequest,
   SessionMembership,
 } from './types'
+import {
+  buildCommentMeta,
+  buildLatestChapterByUser,
+  filterSessions,
+  getPreferredSelectedSessionId,
+} from './lib/sessionState'
 import './App.css'
 
 type AuthMode = 'sign-in' | 'sign-up'
@@ -423,18 +429,10 @@ function App() {
   }, [avatarPreviewUrl, loadAppData, loadMyProfile])
 
   useEffect(() => {
-    if (sessions.length === 0) {
-      setSelectedSessionId(null)
-      return
+    const nextSelectedSessionId = getPreferredSelectedSessionId(sessions, memberships, sessionView, selectedSessionId)
+    if (nextSelectedSessionId !== selectedSessionId) {
+      setSelectedSessionId(nextSelectedSessionId)
     }
-
-    if (selectedSessionId && sessions.some((session) => session.id === selectedSessionId)) {
-      return
-    }
-
-    const joinedSession = sessions.find((session) => memberships[session.id] && session.status === sessionView)
-    const firstInView = sessions.find((session) => session.status === sessionView)
-    setSelectedSessionId(joinedSession?.id ?? firstInView?.id ?? sessions[0].id)
   }, [memberships, selectedSessionId, sessionView, sessions])
 
   useEffect(() => {
@@ -963,29 +961,12 @@ function App() {
     }
   }
 
-  const selectedSession = useMemo(
-    () => sessions.find((session) => session.id === selectedSessionId) ?? null,
-    [selectedSessionId, sessions],
+  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null
+
+  const filteredSessions = useMemo(
+    () => filterSessions(sessions, sessionView, visibilityFilter, sessionSearch),
+    [sessionSearch, sessionView, sessions, visibilityFilter],
   )
-
-  const filteredSessions = useMemo(() => {
-    return sessions.filter((session) => {
-      if (session.status !== sessionView) {
-        return false
-      }
-
-      if (visibilityFilter !== 'all' && session.visibility !== visibilityFilter) {
-        return false
-      }
-
-      if (!sessionSearch.trim()) {
-        return true
-      }
-
-      const query = sessionSearch.toLowerCase()
-      return session.book_title.toLowerCase().includes(query) || session.book_author.toLowerCase().includes(query)
-    })
-  }, [sessionSearch, sessionView, sessions, visibilityFilter])
 
   const activeUserId = user?.id ?? ''
   const myDisplayName = myProfile?.display_name?.trim() || user?.email || activeUserId.slice(0, 8)
@@ -996,29 +977,9 @@ function App() {
   const selectedIsMember = Boolean(selectedMembership)
   const selectedIsOwner = Boolean(selectedSession && selectedSession.creator_id === activeUserId)
 
-  const memberLatestProgress = useMemo(() => {
-    const lookup: Record<string, number> = {}
-    for (const update of sessionProgress) {
-      if (!(update.user_id in lookup)) {
-        lookup[update.user_id] = update.chapter_number
-      }
-    }
-    return lookup
-  }, [sessionProgress])
+  const memberLatestProgress = useMemo(() => buildLatestChapterByUser(sessionProgress), [sessionProgress])
 
-  const commentMeta = useMemo(() => {
-    const likeCounts: Record<string, number> = {}
-    const likedByMe: Record<string, boolean> = {}
-
-    for (const like of sessionLikes) {
-      likeCounts[like.comment_id] = (likeCounts[like.comment_id] ?? 0) + 1
-      if (like.user_id === activeUserId) {
-        likedByMe[like.comment_id] = true
-      }
-    }
-
-    return { likeCounts, likedByMe }
-  }, [activeUserId, sessionLikes])
+  const commentMeta = useMemo(() => buildCommentMeta(sessionLikes, activeUserId), [activeUserId, sessionLikes])
 
   const pendingRequests = useMemo(
     () => sessionJoinRequests.filter((request) => request.status === 'pending'),
