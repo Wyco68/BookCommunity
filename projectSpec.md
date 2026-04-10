@@ -119,7 +119,7 @@
 
 - Web app: MVP-level core features implemented.
 - Supabase: schema and RLS strategy updated to support search/filter, archive/restore, and request approvals.
-- Mobile app: still pending implementation.
+- Mobile app: Expo + React Native client implemented with MVP parity for auth, sessions, membership, progress, discussion, likes, archive/restore, and join request approval flow.
 
 ## 8) Next Steps
 
@@ -127,4 +127,4 @@
 2. When schema changes are made, update both:
 	 - supabase/schema.sql
 	 - this project spec (setup notes and known issues sections)
-3. Add mobile implementation plan once web parity is stable.
+3. Add mobile EAS build/release pipeline and test on both Android and iOS devices.
