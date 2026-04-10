@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import {
   ActivityIndicator,
   Pressable,
@@ -12,6 +13,8 @@ import {
 import type { User } from '@supabase/supabase-js'
 import { StatusBar } from 'expo-status-bar'
 import { supabase } from './src/lib/supabase'
+import { translations } from './src/i18n'
+import type { Language } from './src/i18n'
 import type {
   Comment,
   CommentLike,
@@ -41,6 +44,8 @@ const defaultSessionForm: SessionFormState = {
   visibility: 'public',
   joinPolicy: 'open',
 }
+
+const LANGUAGE_STORAGE_KEY = 'books-friends-mobile-language'
 
 function labelForProfile(userId: string, profiles: Record<string, Profile>): string {
   return profiles[userId]?.display_name?.trim() || userId.slice(0, 8)
@@ -84,6 +89,8 @@ function ActionButton({
 }
 
 export default function App() {
+  const [language, setLanguage] = useState<Language>('en')
+  const t = translations[language]
   const [user, setUser] = useState<User | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
@@ -125,6 +132,18 @@ export default function App() {
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileNotice, setProfileNotice] = useState<string | null>(null)
 
+  useEffect(() => {
+    void AsyncStorage.getItem(LANGUAGE_STORAGE_KEY).then((saved) => {
+      if (saved === 'en' || saved === 'my') {
+        setLanguage(saved)
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, language)
+  }, [language])
+
   const loadAppData = useCallback(async (activeUser: User) => {
     setLoadingSessions(true)
     setScreenError(null)
@@ -146,7 +165,7 @@ export default function App() {
           membershipsResult.error?.message ||
           progressResult.error?.message ||
           requestsResult.error?.message ||
-          'Failed to load data',
+          t.errors.failedLoadData,
       )
       setLoadingSessions(false)
       return
@@ -224,7 +243,7 @@ export default function App() {
           membersResult.error?.message ||
           progressResult.error?.message ||
           requestsResult.error?.message ||
-          'Failed to load session details',
+          t.errors.failedLoadDetails,
       )
       setLoadingSessionDetail(false)
       return
@@ -305,7 +324,7 @@ export default function App() {
     }
 
     bootstrap().catch((error: unknown) => {
-      setScreenError(error instanceof Error ? error.message : 'Unexpected auth error')
+      setScreenError(error instanceof Error ? error.message : t.errors.unexpectedAuthError)
       setAuthLoading(false)
     })
 
@@ -333,7 +352,7 @@ export default function App() {
       }
 
       Promise.all([loadAppData(activeUser), loadMyProfile(activeUser)]).catch((error: unknown) => {
-        setScreenError(error instanceof Error ? error.message : 'Failed to load app data')
+        setScreenError(error instanceof Error ? error.message : t.errors.failedLoadAppData)
       })
     })
 
@@ -364,7 +383,7 @@ export default function App() {
     }
 
     loadSessionDetail(selectedSessionId).catch((error: unknown) => {
-      setScreenError(error instanceof Error ? error.message : 'Failed to load details')
+      setScreenError(error instanceof Error ? error.message : t.errors.failedLoadDetail)
       setLoadingSessionDetail(false)
     })
   }, [loadSessionDetail, selectedSessionId])
@@ -490,7 +509,7 @@ export default function App() {
     setAuthError(null)
 
     if (!authEmail.trim() || !authPassword.trim()) {
-      setAuthError('Please enter email and password.')
+      setAuthError(t.auth.enterEmailPassword)
       setAuthBusy(false)
       return
     }
@@ -507,7 +526,7 @@ export default function App() {
     }
 
     if (authMode === 'sign-up') {
-      setAuthError('Account created. Confirm email if required by project settings.')
+      setAuthError(t.auth.accountCreated)
     }
 
     setAuthBusy(false)
@@ -526,7 +545,7 @@ export default function App() {
     }
 
     if (!sessionForm.bookTitle.trim() || !sessionForm.bookAuthor.trim()) {
-      setScreenError('Book title and author are required.')
+      setScreenError(t.sessionForm.bookAuthorRequired)
       return
     }
 
@@ -647,7 +666,7 @@ export default function App() {
 
     const chapter = progressDrafts[session.id]
     if (!chapter || chapter < 1 || chapter > session.total_chapters) {
-      setScreenError(`Chapter must be between 1 and ${session.total_chapters}.`)
+      setScreenError(t.errors.chapterRange(session.total_chapters))
       return
     }
 
@@ -845,7 +864,7 @@ export default function App() {
       display_name: trimmedName.length > 0 ? trimmedName : null,
       avatar_url: myProfile?.avatar_url ?? null,
     })
-    setProfileNotice('Profile saved.')
+    setProfileNotice(t.profile.profileSaved)
     setProfileSaving(false)
 
     if (selectedSessionId) {
@@ -859,7 +878,7 @@ export default function App() {
         <StatusBar style="dark" />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#2a5bd7" />
-          <Text style={styles.subtle}>Checking your session...</Text>
+          <Text style={styles.subtle}>{t.auth.checkingSession}</Text>
         </View>
       </SafeAreaView>
     )
@@ -870,19 +889,32 @@ export default function App() {
       <SafeAreaView style={styles.root}>
         <StatusBar style="dark" />
         <View style={styles.authCard}>
-          <Text style={styles.title}>Books and Friends</Text>
-          <Text style={styles.subtle}>Sign in to continue.</Text>
+          <Text style={styles.title}>{t.header.title}</Text>
+          <Text style={styles.subtle}>{t.auth.subtitle}</Text>
 
           <View style={styles.segmentedRow}>
-            <ActionButton title="Sign in" onPress={() => setAuthMode('sign-in')} variant={authMode === 'sign-in' ? 'primary' : 'secondary'} />
-            <ActionButton title="Sign up" onPress={() => setAuthMode('sign-up')} variant={authMode === 'sign-up' ? 'primary' : 'secondary'} />
+            <ActionButton
+              title={t.language.english}
+              onPress={() => setLanguage('en')}
+              variant={language === 'en' ? 'primary' : 'secondary'}
+            />
+            <ActionButton
+              title={t.language.burmese}
+              onPress={() => setLanguage('my')}
+              variant={language === 'my' ? 'primary' : 'secondary'}
+            />
+          </View>
+
+          <View style={styles.segmentedRow}>
+            <ActionButton title={t.auth.signIn} onPress={() => setAuthMode('sign-in')} variant={authMode === 'sign-in' ? 'primary' : 'secondary'} />
+            <ActionButton title={t.auth.signUp} onPress={() => setAuthMode('sign-up')} variant={authMode === 'sign-up' ? 'primary' : 'secondary'} />
           </View>
 
           <TextInput
             style={styles.input}
             value={authEmail}
             onChangeText={setAuthEmail}
-            placeholder="Email"
+            placeholder={t.auth.email}
             autoCapitalize="none"
             keyboardType="email-address"
           />
@@ -890,14 +922,14 @@ export default function App() {
             style={styles.input}
             value={authPassword}
             onChangeText={setAuthPassword}
-            placeholder="Password"
+            placeholder={t.auth.password}
             secureTextEntry
           />
 
           {authError ? <Text style={styles.error}>{authError}</Text> : null}
 
           <ActionButton
-            title={authBusy ? 'Please wait...' : authMode === 'sign-in' ? 'Sign in' : 'Create account'}
+            title={authBusy ? t.common.pleaseWait : authMode === 'sign-in' ? t.auth.signIn : t.auth.createAccount}
             onPress={() => {
               void handleAuthSubmit()
             }}
@@ -913,23 +945,35 @@ export default function App() {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.title}>Books and Friends</Text>
-          <Text style={styles.subtle}>{joinedSessionCount} active joined sessions</Text>
-          <Text style={styles.subtle}>Signed in as {myProfile?.display_name?.trim() || user.email || user.id.slice(0, 8)}</Text>
-          <ActionButton title="Sign out" onPress={() => void handleSignOut()} variant="ghost" />
+          <Text style={styles.title}>{t.header.title}</Text>
+          <Text style={styles.subtle}>{t.header.activeJoinedSessions(joinedSessionCount)}</Text>
+          <Text style={styles.subtle}>{t.header.signedInAs(myProfile?.display_name?.trim() || user.email || user.id.slice(0, 8))}</Text>
+          <View style={styles.segmentedRow}>
+            <ActionButton
+              title={t.language.english}
+              onPress={() => setLanguage('en')}
+              variant={language === 'en' ? 'primary' : 'secondary'}
+            />
+            <ActionButton
+              title={t.language.burmese}
+              onPress={() => setLanguage('my')}
+              variant={language === 'my' ? 'primary' : 'secondary'}
+            />
+          </View>
+          <ActionButton title={t.header.signOut} onPress={() => void handleSignOut()} variant="ghost" />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Your Profile</Text>
+          <Text style={styles.sectionTitle}>{t.profile.title}</Text>
           <TextInput
             style={styles.input}
             value={profileNameDraft}
             onChangeText={setProfileNameDraft}
-            placeholder="Display name"
+            placeholder={t.profile.displayName}
             maxLength={80}
           />
           <ActionButton
-            title={profileSaving ? 'Saving...' : 'Save profile'}
+            title={profileSaving ? t.common.saving : t.profile.saveProfile}
             onPress={() => {
               void handleSaveProfile()
             }}
@@ -939,18 +983,18 @@ export default function App() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Create Session</Text>
+          <Text style={styles.sectionTitle}>{t.sessionForm.title}</Text>
           <TextInput
             style={styles.input}
             value={sessionForm.bookTitle}
             onChangeText={(value) => setSessionForm((current) => ({ ...current, bookTitle: value }))}
-            placeholder="Book title"
+            placeholder={t.sessionForm.bookTitle}
           />
           <TextInput
             style={styles.input}
             value={sessionForm.bookAuthor}
             onChangeText={(value) => setSessionForm((current) => ({ ...current, bookAuthor: value }))}
-            placeholder="Author"
+            placeholder={t.sessionForm.author}
           />
           <TextInput
             style={styles.input}
@@ -961,47 +1005,47 @@ export default function App() {
                 totalChapters: Number.isNaN(Number(value)) ? 1 : Math.max(1, Number(value)),
               }))
             }
-            placeholder="Total chapters"
+            placeholder={t.sessionForm.totalChapters}
             keyboardType="number-pad"
           />
           <TextInput
             style={[styles.input, styles.textArea]}
             value={sessionForm.description}
             onChangeText={(value) => setSessionForm((current) => ({ ...current, description: value }))}
-            placeholder="Description"
+            placeholder={t.sessionForm.description}
             multiline
           />
 
-          <Text style={styles.smallLabel}>Visibility</Text>
+          <Text style={styles.smallLabel}>{t.sessionForm.visibility}</Text>
           <View style={styles.segmentedRow}>
             <ActionButton
-              title="Public"
+              title={t.sessionForm.public}
               onPress={() => setSessionForm((current) => ({ ...current, visibility: 'public' }))}
               variant={sessionForm.visibility === 'public' ? 'primary' : 'secondary'}
             />
             <ActionButton
-              title="Private"
+              title={t.sessionForm.private}
               onPress={() => setSessionForm((current) => ({ ...current, visibility: 'private' }))}
               variant={sessionForm.visibility === 'private' ? 'primary' : 'secondary'}
             />
           </View>
 
-          <Text style={styles.smallLabel}>Join Policy</Text>
+          <Text style={styles.smallLabel}>{t.sessionForm.joinPolicy}</Text>
           <View style={styles.segmentedRow}>
             <ActionButton
-              title="Open"
+              title={t.sessionForm.open}
               onPress={() => setSessionForm((current) => ({ ...current, joinPolicy: 'open' }))}
               variant={sessionForm.joinPolicy === 'open' ? 'primary' : 'secondary'}
             />
             <ActionButton
-              title="Request"
+              title={t.sessionForm.request}
               onPress={() => setSessionForm((current) => ({ ...current, joinPolicy: 'request' }))}
               variant={sessionForm.joinPolicy === 'request' ? 'primary' : 'secondary'}
             />
           </View>
 
           <ActionButton
-            title={creatingSession ? 'Creating...' : 'Create session'}
+            title={creatingSession ? t.sessionForm.creating : t.sessionForm.createSession}
             onPress={() => {
               void handleCreateSession()
             }}
@@ -1010,15 +1054,15 @@ export default function App() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Find Sessions</Text>
+          <Text style={styles.sectionTitle}>{t.sessions.title}</Text>
           <View style={styles.segmentedRow}>
             <ActionButton
-              title="Active"
+              title={t.sessions.active}
               onPress={() => setSessionView('active')}
               variant={sessionView === 'active' ? 'primary' : 'secondary'}
             />
             <ActionButton
-              title="Archived"
+              title={t.sessions.archived}
               onPress={() => setSessionView('archived')}
               variant={sessionView === 'archived' ? 'primary' : 'secondary'}
             />
@@ -1028,23 +1072,23 @@ export default function App() {
             style={styles.input}
             value={sessionSearch}
             onChangeText={setSessionSearch}
-            placeholder="Search title or author"
+            placeholder={t.sessions.searchPlaceholder}
           />
 
-          <Text style={styles.smallLabel}>Visibility filter</Text>
+          <Text style={styles.smallLabel}>{t.sessions.visibilityFilter}</Text>
           <View style={styles.segmentedWrap}>
             <ActionButton
-              title="All"
+              title={t.sessions.all}
               onPress={() => setVisibilityFilter('all')}
               variant={visibilityFilter === 'all' ? 'primary' : 'secondary'}
             />
             <ActionButton
-              title="Public"
+              title={t.sessionForm.public}
               onPress={() => setVisibilityFilter('public')}
               variant={visibilityFilter === 'public' ? 'primary' : 'secondary'}
             />
             <ActionButton
-              title="Private"
+              title={t.sessionForm.private}
               onPress={() => setVisibilityFilter('private')}
               variant={visibilityFilter === 'private' ? 'primary' : 'secondary'}
             />
@@ -1063,17 +1107,22 @@ export default function App() {
             return (
               <View key={session.id} style={[styles.sessionCard, isSelected && styles.sessionCardSelected]}>
                 <Text style={styles.sessionTitle}>{session.book_title}</Text>
-                <Text style={styles.subtle}>by {session.book_author}</Text>
-                <Text style={styles.subtle}>Visibility: {session.visibility} | Join: {session.join_policy}</Text>
-                <Text style={styles.subtle}>{session.description || 'No description yet.'}</Text>
+                <Text style={styles.subtle}>{t.sessions.byAuthor(session.book_author)}</Text>
+                <Text style={styles.subtle}>
+                  {t.sessions.visibilityJoin(
+                    t.sessions.visibilityLabel(session.visibility),
+                    t.sessions.joinPolicyLabel(session.join_policy),
+                  )}
+                </Text>
+                <Text style={styles.subtle}>{session.description || t.sessions.noDescription}</Text>
 
                 <View style={styles.progressTrack}>
                   <View style={[styles.progressFill, { width: `${Math.round(progressRatio * 100)}%` }]} />
                 </View>
-                <Text style={styles.subtle}>Chapter {chapter || '-'} / {session.total_chapters}</Text>
+                <Text style={styles.subtle}>{t.sessions.chapterProgress(chapter || '-', session.total_chapters)}</Text>
 
                 <ActionButton
-                  title={isSelected ? 'Viewing details' : 'Open details'}
+                  title={isSelected ? t.sessions.viewingDetails : t.sessions.openDetails}
                   onPress={() => setSelectedSessionId(session.id)}
                   variant="ghost"
                 />
@@ -1090,10 +1139,10 @@ export default function App() {
                         }))
                       }
                       keyboardType="number-pad"
-                      placeholder="Current chapter"
+                      placeholder={t.sessions.currentChapter}
                     />
                     <ActionButton
-                      title={busySessionId === session.id ? 'Saving...' : 'Save progress'}
+                      title={busySessionId === session.id ? t.common.saving : t.sessions.saveProgress}
                       onPress={() => {
                         void handleUpdateProgress(session)
                       }}
@@ -1101,7 +1150,7 @@ export default function App() {
                       variant="secondary"
                     />
                     <ActionButton
-                      title={busySessionId === session.id ? 'Working...' : 'Leave'}
+                      title={busySessionId === session.id ? t.common.working : t.sessions.leave}
                       onPress={() => {
                         void handleLeaveSession(session.id)
                       }}
@@ -1114,11 +1163,11 @@ export default function App() {
                     title={
                       session.join_policy === 'request'
                         ? requestStatus === 'pending'
-                          ? 'Request pending'
-                          : 'Request to join'
+                          ? t.sessions.requestPending
+                          : t.sessions.requestToJoin
                         : busySessionId === session.id
-                          ? 'Joining...'
-                          : 'Join session'
+                          ? t.common.joining
+                          : t.sessions.joinSession
                     }
                     onPress={() => {
                       void handleJoinSession(session.id)
@@ -1131,27 +1180,27 @@ export default function App() {
             )
           })}
 
-          {!loadingSessions && filteredSessions.length === 0 ? <Text style={styles.subtle}>No sessions found.</Text> : null}
+          {!loadingSessions && filteredSessions.length === 0 ? <Text style={styles.subtle}>{t.sessions.noSessionsFound}</Text> : null}
         </View>
 
         <View style={styles.card}>
           {!selectedSession ? (
-            <Text style={styles.subtle}>Select a session to see details and discussion.</Text>
+            <Text style={styles.subtle}>{t.details.selectPrompt}</Text>
           ) : (
             <>
               <Text style={styles.sectionTitle}>{selectedSession.book_title}</Text>
-              <Text style={styles.subtle}>Single-thread discussion and member progress</Text>
+              <Text style={styles.subtle}>{t.details.singleThread}</Text>
 
               {selectedIsOwner ? (
                 <ActionButton
                   title={
                     busySessionId === selectedSession.id
                       ? selectedSession.status === 'active'
-                        ? 'Archiving...'
-                        : 'Restoring...'
+                        ? t.details.archiving
+                        : t.details.restoring
                       : selectedSession.status === 'active'
-                        ? 'Archive session'
-                        : 'Restore session'
+                        ? t.details.archiveSession
+                        : t.details.restoreSession
                   }
                   onPress={() => {
                     if (selectedSession.status === 'active') {
@@ -1165,7 +1214,7 @@ export default function App() {
                 />
               ) : null}
 
-              <Text style={styles.sectionTitle}>Member Progress</Text>
+              <Text style={styles.sectionTitle}>{t.details.memberProgress}</Text>
               {loadingSessionDetail ? <ActivityIndicator color="#2a5bd7" /> : null}
               {sessionMembers.map((member) => {
                 const chapter = memberLatestProgress[member.user_id] ?? 0
@@ -1174,19 +1223,19 @@ export default function App() {
 
                 return (
                   <View key={member.user_id} style={styles.memberCard}>
-                    <Text style={styles.memberTitle}>{name} ({member.role})</Text>
+                    <Text style={styles.memberTitle}>{name} ({t.sessions.roleLabel(member.role)})</Text>
                     <View style={styles.progressTrack}>
                       <View style={[styles.progressFill, { width: `${Math.round(ratio * 100)}%` }]} />
                     </View>
-                    <Text style={styles.subtle}>Chapter {chapter} / {selectedSession.total_chapters}</Text>
+                    <Text style={styles.subtle}>{t.sessions.chapterProgress(chapter, selectedSession.total_chapters)}</Text>
                   </View>
                 )
               })}
 
               {selectedIsOwner ? (
                 <>
-                  <Text style={styles.sectionTitle}>Join Requests</Text>
-                  {pendingRequests.length === 0 ? <Text style={styles.subtle}>No pending requests.</Text> : null}
+                  <Text style={styles.sectionTitle}>{t.details.joinRequests}</Text>
+                  {pendingRequests.length === 0 ? <Text style={styles.subtle}>{t.details.noPendingRequests}</Text> : null}
                   {pendingRequests.map((request) => {
                     const requester = labelForProfile(request.user_id, sessionProfiles)
                     return (
@@ -1194,7 +1243,7 @@ export default function App() {
                         <Text style={styles.memberTitle}>{requester}</Text>
                         <Text style={styles.subtle}>{new Date(request.created_at).toLocaleString()}</Text>
                         <ActionButton
-                          title={requestBusyId === request.id ? 'Processing...' : 'Approve'}
+                          title={requestBusyId === request.id ? t.common.processing : t.details.approve}
                           onPress={() => {
                             void handleApproveJoinRequest(request)
                           }}
@@ -1202,7 +1251,7 @@ export default function App() {
                           variant="secondary"
                         />
                         <ActionButton
-                          title="Reject"
+                          title={t.details.reject}
                           onPress={() => {
                             void handleRejectJoinRequest(request)
                           }}
@@ -1215,20 +1264,20 @@ export default function App() {
                 </>
               ) : null}
 
-              <Text style={styles.sectionTitle}>Discussion</Text>
+              <Text style={styles.sectionTitle}>{t.details.discussion}</Text>
               {!selectedIsMember ? (
-                <Text style={styles.subtle}>Join this session to read and post comments.</Text>
+                <Text style={styles.subtle}>{t.details.joinToReadPost}</Text>
               ) : (
                 <>
                   <TextInput
                     style={[styles.input, styles.textArea]}
                     value={commentDraft}
                     onChangeText={setCommentDraft}
-                    placeholder="Share your thoughts..."
+                    placeholder={t.details.shareThoughts}
                     multiline
                   />
                   <ActionButton
-                    title={postingComment ? 'Posting...' : 'Post comment'}
+                    title={postingComment ? t.common.posting : t.details.postComment}
                     onPress={() => {
                       void handleSubmitComment()
                     }}
@@ -1244,14 +1293,14 @@ export default function App() {
                       <View key={comment.id} style={styles.commentCard}>
                         <Text style={styles.memberTitle}>{author}</Text>
                         <Text style={styles.subtle}>{new Date(comment.created_at).toLocaleString()}</Text>
-                        <Text style={styles.commentBody}>{comment.is_deleted ? '[deleted]' : comment.body}</Text>
+                        <Text style={styles.commentBody}>{comment.is_deleted ? t.details.deleted : comment.body}</Text>
                         <ActionButton
                           title={
                             likingCommentId === comment.id
-                              ? 'Updating...'
+                              ? t.common.updating
                               : likedByMe
-                                ? `Liked (${likes})`
-                                : `Like (${likes})`
+                                ? t.details.liked(likes)
+                                : t.details.like(likes)
                           }
                           onPress={() => {
                             void handleToggleLike(comment.id)

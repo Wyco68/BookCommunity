@@ -21,6 +21,8 @@
   width: min(500px, 100%);
   margin: 5vh auto;
   padding: 1.4rem;
+  padding-bottom: 4rem;
+  position: relative;
   box-shadow: 0 20px 44px rgba(28, 85, 245, 0.16);
 }
 
@@ -284,6 +286,24 @@ button:disabled {
   background: #fff;
   color: #1a2e63;
   box-shadow: 0 4px 10px rgba(42, 86, 209, 0.2);
+}
+
+.auth-switch-corner {
+  position: absolute;
+  right: 1rem;
+  bottom: 1rem;
+  width: auto;
+  grid-template-columns: auto auto;
+  gap: 0.15rem;
+  padding: 0.15rem;
+}
+
+.auth-switch-option-mini {
+  min-width: 2.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  padding-block: 0.35rem;
+  padding-inline: 0.4rem;
 }
 
 .compact {

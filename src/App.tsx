@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
+import { translations } from './i18n'
+import type { Language } from './i18n'
 import type {
   Comment,
   CommentLike,
@@ -36,6 +38,7 @@ const defaultSessionForm: SessionFormState = {
 const AVATAR_BUCKET = 'avatars'
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024
 const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const LANGUAGE_STORAGE_KEY = 'books-friends-language'
 
 function isRemoteUrl(value: string): boolean {
   return /^https?:\/\//i.test(value)
@@ -112,6 +115,11 @@ async function resolveAvatarUrlMap(paths: string[]): Promise<Record<string, stri
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
+    return saved === 'my' ? 'my' : 'en'
+  })
+  const t = translations[language]
   const [authLoading, setAuthLoading] = useState(true)
   const [authMode, setAuthMode] = useState<AuthMode>('sign-in')
   const [authEmail, setAuthEmail] = useState('')
@@ -156,6 +164,10 @@ function App() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
   const [myAvatarRenderUrl, setMyAvatarRenderUrl] = useState<string | null>(null)
   const [avatarInputKey, setAvatarInputKey] = useState(0)
+
+  useEffect(() => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
+  }, [language])
 
   const loadAppData = useCallback(async (activeUser: User) => {
     setLoadingSessions(true)
@@ -500,7 +512,7 @@ function App() {
     setAuthError(null)
 
     if (!authEmail.trim() || !authPassword.trim()) {
-      setAuthError('Please enter both email and password.')
+      setAuthError(t.auth.enterEmailPassword)
       setAuthBusy(false)
       return
     }
@@ -517,7 +529,7 @@ function App() {
     }
 
     if (authMode === 'sign-up') {
-      setAuthError('Account created. Please check your email if confirmation is enabled.')
+      setAuthError(t.auth.accountCreated)
     }
 
     setAuthBusy(false)
@@ -538,7 +550,7 @@ function App() {
     }
 
     if (!sessionForm.bookTitle.trim() || !sessionForm.bookAuthor.trim()) {
-      setScreenError('Book title and author are required.')
+      setScreenError(t.sessionForm.requiredBookAuthor)
       return
     }
 
@@ -855,7 +867,7 @@ function App() {
     }
 
     setMyProfile(nextProfile)
-    setProfileNotice('Profile name saved.')
+    setProfileNotice(t.profile.profileNameSaved)
     setProfileSaving(false)
 
     if (selectedSessionId) {
@@ -872,13 +884,13 @@ function App() {
     setProfileNotice(null)
 
     if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
-      setScreenError('Avatar must be a JPG, PNG, or WEBP image.')
+      setScreenError(t.profile.avatarInvalidType)
       event.target.value = ''
       return
     }
 
     if (file.size > MAX_AVATAR_BYTES) {
-      setScreenError('Avatar must be 2 MB or smaller.')
+      setScreenError(t.profile.avatarTooLarge)
       event.target.value = ''
       return
     }
@@ -943,7 +955,7 @@ function App() {
     }
     setAvatarPreviewUrl(null)
     setAvatarInputKey((current) => current + 1)
-    setProfileNotice('Avatar updated.')
+    setProfileNotice(t.profile.avatarUpdated)
     setAvatarUploadBusy(false)
 
     if (selectedSessionId) {
@@ -977,7 +989,7 @@ function App() {
 
   const activeUserId = user?.id ?? ''
   const myDisplayName = myProfile?.display_name?.trim() || user?.email || activeUserId.slice(0, 8)
-  const myAvatarLabel = myProfile?.display_name || user?.email || 'Me'
+  const myAvatarLabel = myProfile?.display_name || user?.email || t.auth.signedInAs
   const myAvatarImage = avatarPreviewUrl || myAvatarRenderUrl
 
   const selectedMembership = selectedSessionId ? memberships[selectedSessionId] : undefined
@@ -1020,7 +1032,7 @@ function App() {
 
     const chapter = progressDrafts[session.id]
     if (!chapter || chapter < 1 || chapter > session.total_chapters) {
-      setScreenError(`Chapter must be between 1 and ${session.total_chapters}.`)
+      setScreenError(t.errors.chapterRange(session.total_chapters))
       return
     }
 
@@ -1048,7 +1060,7 @@ function App() {
       <main className="shell">
         <section className="card centered">
           <h1>Books and Friends</h1>
-          <p>Checking your session...</p>
+          <p>{t.auth.checkingSession}</p>
         </section>
       </main>
     )
@@ -1060,12 +1072,12 @@ function App() {
         <section className="card auth-card">
           <div>
             <p className="eyebrow">Books and Friends</p>
-            <h1>Welcome to Books &amp; Friends</h1>
-            <p className="subtle">Log in to join sessions or create your own.</p>
+            <h1>{t.auth.welcome}</h1>
+            <p className="subtle">{t.auth.subtitle}</p>
           </div>
 
           <form className="stack" onSubmit={handleAuthSubmit}>
-            <div className="auth-switch" role="tablist" aria-label="Authentication mode">
+            <div className="auth-switch" role="tablist" aria-label={t.auth.modeAriaLabel}>
               <button
                 type="button"
                 className={`auth-switch-option ${authMode === 'sign-in' ? 'auth-switch-option-active' : ''}`}
@@ -1074,7 +1086,7 @@ function App() {
                   setAuthError(null)
                 }}
               >
-                Sign in
+                {t.auth.signIn}
               </button>
               <button
                 type="button"
@@ -1084,28 +1096,28 @@ function App() {
                   setAuthError(null)
                 }}
               >
-                Sign up
+                {t.auth.signUp}
               </button>
             </div>
 
             <label className="field">
-              <span>Email</span>
+              <span>{t.auth.email}</span>
               <input
                 type="email"
                 value={authEmail}
                 onChange={(event) => setAuthEmail(event.target.value)}
-                placeholder="you@example.com"
+                placeholder={t.auth.emailPlaceholder}
                 autoComplete="email"
               />
             </label>
 
             <label className="field">
-              <span>Password</span>
+              <span>{t.auth.password}</span>
               <input
                 type="password"
                 value={authPassword}
                 onChange={(event) => setAuthPassword(event.target.value)}
-                placeholder="At least 6 characters"
+                placeholder={t.auth.passwordPlaceholder}
                 autoComplete={authMode === 'sign-in' ? 'current-password' : 'new-password'}
               />
             </label>
@@ -1113,9 +1125,26 @@ function App() {
             {authError ? <p className="error">{authError}</p> : null}
 
             <button type="submit" className="primary" disabled={authBusy}>
-              {authBusy ? 'Please wait...' : authMode === 'sign-in' ? 'Sign in' : 'Create account'}
+              {authBusy ? t.common.pleaseWait : authMode === 'sign-in' ? t.auth.signIn : t.auth.createAccount}
             </button>
           </form>
+
+          <div className="auth-switch auth-switch-corner" role="tablist" aria-label={t.language.switchLabel}>
+            <button
+              type="button"
+              className={`auth-switch-option auth-switch-option-mini ${language === 'en' ? 'auth-switch-option-active' : ''}`}
+              onClick={() => setLanguage('en')}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              className={`auth-switch-option auth-switch-option-mini ${language === 'my' ? 'auth-switch-option-active' : ''}`}
+              onClick={() => setLanguage('my')}
+            >
+              MY
+            </button>
+          </div>
         </section>
       </main>
     )
@@ -1125,12 +1154,29 @@ function App() {
     <main className="shell dashboard-shell">
       <header className="card header-card">
         <div>
-          <p className="eyebrow">Welcome back</p>
+          <p className="eyebrow">{t.auth.welcomeBack}</p>
           <h1>Books and Friends</h1>
-          <p className="subtle">{joinedSessionCount} joined sessions. Keep your chapter streak alive.</p>
+          <p className="subtle">{t.auth.joinedSessionsSummary(joinedSessionCount)}</p>
         </div>
 
         <div className="header-actions">
+          <div className="auth-switch" role="tablist" aria-label={t.language.switchLabel}>
+            <button
+              type="button"
+              className={`auth-switch-option ${language === 'en' ? 'auth-switch-option-active' : ''}`}
+              onClick={() => setLanguage('en')}
+            >
+              {t.language.english}
+            </button>
+            <button
+              type="button"
+              className={`auth-switch-option ${language === 'my' ? 'auth-switch-option-active' : ''}`}
+              onClick={() => setLanguage('my')}
+            >
+              {t.language.burmese}
+            </button>
+          </div>
+
           <div className="header-identity">
             {myAvatarImage ? (
               <img className="avatar avatar-md" src={myAvatarImage} alt={`${myAvatarLabel} avatar`} />
@@ -1140,13 +1186,13 @@ function App() {
               </span>
             )}
             <div>
-              <p className="subtle">Signed in as</p>
+              <p className="subtle">{t.auth.signedInAs}</p>
               <strong>{myDisplayName}</strong>
             </div>
           </div>
 
           <button type="button" className="secondary" onClick={handleSignOut}>
-            Sign out
+            {t.auth.signOut}
           </button>
         </div>
       </header>
@@ -1154,8 +1200,8 @@ function App() {
       <section className="grid">
         <article className="card stack">
           <div>
-            <h2>Your Profile</h2>
-            <p className="subtle">Set your display name and upload an avatar.</p>
+            <h2>{t.profile.title}</h2>
+            <p className="subtle">{t.profile.subtitle}</p>
           </div>
 
           <div className="profile-card stack">
@@ -1169,7 +1215,7 @@ function App() {
               )}
               <div className="stack gap-sm profile-upload-stack">
                 <label className="field">
-                  <span>Avatar image</span>
+                  <span>{t.profile.avatarImage}</span>
                   <input
                     key={avatarInputKey}
                     type="file"
@@ -1185,25 +1231,25 @@ function App() {
                     void handleUploadAvatar()
                   }}
                 >
-                  {avatarUploadBusy ? 'Uploading...' : 'Upload avatar'}
+                  {avatarUploadBusy ? t.common.uploading : t.profile.uploadAvatar}
                 </button>
-                <p className="muted">JPG, PNG, or WEBP. Max 2 MB.</p>
+                <p className="muted">{t.profile.avatarHelp}</p>
               </div>
             </div>
 
             <form className="stack" onSubmit={handleSaveProfile}>
               <label className="field">
-                <span>Display name</span>
+                <span>{t.profile.displayName}</span>
                 <input
                   type="text"
                   value={profileNameDraft}
                   onChange={(event) => setProfileNameDraft(event.target.value)}
-                  placeholder="How others should see your name"
+                  placeholder={t.profile.displayNamePlaceholder}
                   maxLength={80}
                 />
               </label>
               <button type="submit" className="primary" disabled={profileSaving}>
-                {profileSaving ? 'Saving...' : 'Save profile'}
+                {profileSaving ? t.common.saving : t.profile.saveProfile}
               </button>
             </form>
 
@@ -1211,33 +1257,33 @@ function App() {
           </div>
 
           <div>
-            <h2>Create Reading Session</h2>
-            <p className="subtle">Set up a book, chapter count, and visibility.</p>
+            <h2>{t.sessionForm.title}</h2>
+            <p className="subtle">{t.sessionForm.subtitle}</p>
           </div>
 
           <form className="stack" onSubmit={handleCreateSession}>
             <label className="field">
-              <span>Book title</span>
+              <span>{t.sessionForm.bookTitle}</span>
               <input
                 type="text"
                 value={sessionForm.bookTitle}
                 onChange={(event) => setSessionForm((current) => ({ ...current, bookTitle: event.target.value }))}
-                placeholder="The Alchemist"
+                placeholder={t.sessionForm.bookTitlePlaceholder}
               />
             </label>
 
             <label className="field">
-              <span>Author</span>
+              <span>{t.sessionForm.author}</span>
               <input
                 type="text"
                 value={sessionForm.bookAuthor}
                 onChange={(event) => setSessionForm((current) => ({ ...current, bookAuthor: event.target.value }))}
-                placeholder="Paulo Coelho"
+                placeholder={t.sessionForm.authorPlaceholder}
               />
             </label>
 
             <label className="field">
-              <span>Total chapters</span>
+              <span>{t.sessionForm.totalChapters}</span>
               <input
                 type="number"
                 min={1}
@@ -1253,17 +1299,17 @@ function App() {
             </label>
 
             <label className="field">
-              <span>Description</span>
+              <span>{t.sessionForm.description}</span>
               <textarea
                 value={sessionForm.description}
                 onChange={(event) => setSessionForm((current) => ({ ...current, description: event.target.value }))}
-                placeholder="Why this book, and what pace should members follow?"
+                placeholder={t.sessionForm.descriptionPlaceholder}
               />
             </label>
 
             <div className="split">
               <label className="field">
-                <span>Visibility</span>
+                <span>{t.sessionForm.visibility}</span>
                 <select
                   value={sessionForm.visibility}
                   onChange={(event) =>
@@ -1273,13 +1319,13 @@ function App() {
                     }))
                   }
                 >
-                  <option value="public">Public</option>
-                  <option value="private">Private</option>
+                  <option value="public">{t.sessionForm.public}</option>
+                  <option value="private">{t.sessionForm.private}</option>
                 </select>
               </label>
 
               <label className="field">
-                <span>Join policy</span>
+                <span>{t.sessionForm.joinPolicy}</span>
                 <select
                   value={sessionForm.joinPolicy}
                   onChange={(event) =>
@@ -1289,74 +1335,74 @@ function App() {
                     }))
                   }
                 >
-                  <option value="open">Open join</option>
-                  <option value="request">Request required</option>
+                  <option value="open">{t.sessionForm.openJoin}</option>
+                  <option value="request">{t.sessionForm.requestRequired}</option>
                 </select>
               </label>
             </div>
 
             <button type="submit" className="primary" disabled={creatingSession}>
-              {creatingSession ? 'Creating...' : 'Create session'}
+              {creatingSession ? t.sessionForm.creating : t.sessionForm.createSession}
             </button>
           </form>
         </article>
 
         <article className="card stack">
           <div>
-            <h2>{sessionView === 'active' ? 'Find Sessions' : 'Archived Sessions'}</h2>
+            <h2>{sessionView === 'active' ? t.sessions.findSessions : t.sessions.archivedSessions}</h2>
             <p className="subtle">
               {sessionView === 'active'
-                ? 'Search, filter, join, and track your sessions.'
-                : 'Browse archived sessions and restore your own.'}
+                ? t.sessions.activeSummary
+                : t.sessions.archivedSummary}
             </p>
           </div>
 
           <div className="stack gap-sm">
-            <div className="auth-switch" role="tablist" aria-label="Session view">
+            <div className="auth-switch" role="tablist" aria-label={t.sessions.viewAriaLabel}>
               <button
                 type="button"
                 className={`auth-switch-option ${sessionView === 'active' ? 'auth-switch-option-active' : ''}`}
                 onClick={() => setSessionView('active')}
               >
-                Active
+                {t.sessions.active}
               </button>
               <button
                 type="button"
                 className={`auth-switch-option ${sessionView === 'archived' ? 'auth-switch-option-active' : ''}`}
                 onClick={() => setSessionView('archived')}
               >
-                Archived
+                {t.sessions.archived}
               </button>
             </div>
 
             <label className="field">
-              <span>Search by title or author</span>
+              <span>{t.sessions.searchLabel}</span>
               <input
                 type="text"
                 value={sessionSearch}
                 onChange={(event) => setSessionSearch(event.target.value)}
-                placeholder="Search sessions"
+                placeholder={t.sessions.searchPlaceholder}
               />
             </label>
 
             <label className="field">
-              <span>Visibility</span>
+              <span>{t.sessions.visibility}</span>
               <select
                 value={visibilityFilter}
                 onChange={(event) => setVisibilityFilter(event.target.value as 'all' | 'public' | 'private')}
               >
-                <option value="all">All</option>
-                <option value="public">Public</option>
-                <option value="private">Private</option>
+                <option value="all">{t.sessions.all}</option>
+                <option value="public">{t.enums.visibility.public}</option>
+                <option value="private">{t.enums.visibility.private}</option>
               </select>
             </label>
           </div>
 
           {screenError ? <p className="error">{screenError}</p> : null}
-          {loadingSessions ? <p className="subtle">Loading sessions...</p> : null}
+          {loadingSessions ? <p className="subtle">{t.sessions.loading}</p> : null}
 
           {!loadingSessions && filteredSessions.length === 0 ? (
-            <p className="subtle">No sessions found for current filters.</p>
+            <p className="subtle">{t.sessions.noResults}</p>
           ) : null}
 
           <ul className="session-list">
@@ -1372,17 +1418,17 @@ function App() {
                   <div className="stack gap-sm">
                     <div className="session-heading">
                       <h3>{session.book_title}</h3>
-                      <span className="pill">{session.visibility}</span>
+                      <span className="pill">{t.enums.visibility[session.visibility]}</span>
                     </div>
 
-                    <p className="subtle">by {session.book_author}</p>
-                    <p className="muted">{session.description || 'No description yet.'}</p>
+                    <p className="subtle">{t.sessions.byAuthor(session.book_author)}</p>
+                    <p className="muted">{session.description || t.sessions.noDescription}</p>
 
-                    <div className="progress-row" aria-label={`Progress for ${session.book_title}`}>
+                    <div className="progress-row" aria-label={t.sessions.progressAria(session.book_title)}>
                       <div className="progress-track">
                         <span className="progress-fill" style={{ width: `${ratio}%` }} />
                       </div>
-                      <span className="progress-label">Chapter {chapter || '-'} / {session.total_chapters}</span>
+                      <span className="progress-label">{t.sessions.chapterProgress(chapter || '-', session.total_chapters)}</span>
                     </div>
 
                     <button
@@ -1390,13 +1436,13 @@ function App() {
                       className="tertiary"
                       onClick={() => setSelectedSessionId(session.id)}
                     >
-                      {isSelected ? 'Viewing details' : 'Open details'}
+                      {isSelected ? t.sessions.viewingDetails : t.sessions.openDetails}
                     </button>
 
                     {membership ? (
                       <div className="split compact">
                         <label className="field">
-                          <span>Update chapter</span>
+                          <span>{t.sessions.updateChapter}</span>
                           <input
                             type="number"
                             min={1}
@@ -1421,7 +1467,7 @@ function App() {
                             void handleUpdateProgress(session)
                           }}
                         >
-                          {busySessionId === session.id ? 'Saving...' : 'Save progress'}
+                          {busySessionId === session.id ? t.common.saving : t.sessions.saveProgress}
                         </button>
 
                         <button
@@ -1432,7 +1478,7 @@ function App() {
                             void handleLeaveSession(session.id)
                           }}
                         >
-                          {busySessionId === session.id ? 'Working...' : 'Leave'}
+                          {busySessionId === session.id ? t.common.working : t.sessions.leave}
                         </button>
                       </div>
                     ) : (
@@ -1446,11 +1492,11 @@ function App() {
                       >
                         {session.join_policy === 'request'
                           ? requestStatus === 'pending'
-                            ? 'Request pending'
-                            : 'Request to join'
+                            ? t.sessions.requestPending
+                            : t.sessions.requestToJoin
                           : busySessionId === session.id
-                            ? 'Joining...'
-                            : 'Join session'}
+                            ? t.sessions.joining
+                            : t.sessions.joinSession}
                       </button>
                     )}
                   </div>
@@ -1462,13 +1508,13 @@ function App() {
 
         <article className="card stack span-full">
           {!selectedSession ? (
-            <p className="subtle">Select a session to open discussion and member progress details.</p>
+            <p className="subtle">{t.sessions.selectSessionPrompt}</p>
           ) : (
             <>
               <div className="detail-header">
                 <div>
                   <h2>{selectedSession.book_title}</h2>
-                  <p className="subtle">Single thread discussion for all members</p>
+                  <p className="subtle">{t.sessions.singleThread}</p>
                 </div>
                 {selectedIsOwner ? (
                   <button
@@ -1485,19 +1531,19 @@ function App() {
                   >
                     {busySessionId === selectedSession.id
                       ? selectedSession.status === 'active'
-                        ? 'Archiving...'
-                        : 'Restoring...'
+                        ? t.sessions.archiving
+                        : t.sessions.restoring
                       : selectedSession.status === 'active'
-                        ? 'Archive session'
-                        : 'Restore session'}
+                        ? t.sessions.archiveSession
+                        : t.sessions.restoreSession}
                   </button>
                 ) : null}
               </div>
 
               <div className="detail-grid">
                 <section className="detail-pane stack">
-                  <h3>Member Progress</h3>
-                  {loadingSessionDetail ? <p className="subtle">Loading session detail...</p> : null}
+                  <h3>{t.sessions.memberProgress}</h3>
+                  {loadingSessionDetail ? <p className="subtle">{t.sessions.loadingDetail}</p> : null}
                   <ul className="member-list">
                     {sessionMembers.map((member) => {
                       const profile = sessionProfiles[member.user_id]
@@ -1524,12 +1570,12 @@ function App() {
                               )}
                               <strong>{profile?.display_name || member.user_id.slice(0, 8)}</strong>
                             </div>
-                            <span className="pill">{member.role}</span>
+                            <span className="pill">{t.enums.role[member.role]}</span>
                           </div>
                           <div className="progress-track">
                             <span className="progress-fill" style={{ width: `${ratio}%` }} />
                           </div>
-                          <span className="progress-label">Chapter {chapter} / {selectedSession.total_chapters}</span>
+                          <span className="progress-label">{t.sessions.chapterProgress(chapter, selectedSession.total_chapters)}</span>
                         </li>
                       )
                     })}
@@ -1539,8 +1585,8 @@ function App() {
                 <section className="detail-pane stack">
                   {selectedIsOwner ? (
                     <>
-                      <h3>Join Requests</h3>
-                      {pendingRequests.length === 0 ? <p className="subtle">No pending requests.</p> : null}
+                      <h3>{t.sessions.joinRequests}</h3>
+                      {pendingRequests.length === 0 ? <p className="subtle">{t.sessions.noPendingRequests}</p> : null}
                       <ul className="member-list">
                         {pendingRequests.map((request) => {
                           const profile = sessionProfiles[request.user_id]
@@ -1572,7 +1618,7 @@ function App() {
                                     void handleApproveJoinRequest(request)
                                   }}
                                 >
-                                  {requestBusyId === request.id ? 'Processing...' : 'Approve'}
+                                  {requestBusyId === request.id ? t.common.processing : t.sessions.approve}
                                 </button>
                                 <button
                                   type="button"
@@ -1582,7 +1628,7 @@ function App() {
                                     void handleRejectJoinRequest(request)
                                   }}
                                 >
-                                  Reject
+                                  {t.sessions.reject}
                                 </button>
                               </div>
                             </li>
@@ -1592,22 +1638,22 @@ function App() {
                     </>
                   ) : null}
 
-                  <h3>Discussion</h3>
+                  <h3>{t.sessions.discussion}</h3>
                   {!selectedIsMember ? (
-                    <p className="subtle">Join this session to read and post in the discussion thread.</p>
+                    <p className="subtle">{t.sessions.joinToDiscuss}</p>
                   ) : (
                     <>
                       <form className="stack" onSubmit={handleSubmitComment}>
                         <label className="field">
-                          <span>Your comment</span>
+                          <span>{t.sessions.yourComment}</span>
                           <textarea
                             value={commentDraft}
                             onChange={(event) => setCommentDraft(event.target.value)}
-                            placeholder="Share your thoughts about this chapter..."
+                            placeholder={t.sessions.commentPlaceholder}
                           />
                         </label>
                         <button type="submit" className="primary" disabled={postingComment}>
-                          {postingComment ? 'Posting...' : 'Post comment'}
+                          {postingComment ? t.common.posting : t.sessions.postComment}
                         </button>
                       </form>
 
@@ -1636,7 +1682,7 @@ function App() {
                                 </div>
                                 <span className="subtle">{new Date(comment.created_at).toLocaleString()}</span>
                               </div>
-                              <p className="comment-body">{comment.is_deleted ? '[deleted]' : comment.body}</p>
+                              <p className="comment-body">{comment.is_deleted ? t.sessions.deleted : comment.body}</p>
                               <button
                                 type="button"
                                 className={`like-button ${likedByMe ? 'like-button-active' : ''}`}
@@ -1645,7 +1691,7 @@ function App() {
                                   void handleToggleLike(comment.id)
                                 }}
                               >
-                                {likingCommentId === comment.id ? 'Updating...' : likedByMe ? `Liked (${likes})` : `Like (${likes})`}
+                                {likingCommentId === comment.id ? t.common.updating : likedByMe ? t.sessions.liked(likes) : t.sessions.like(likes)}
                               </button>
                             </li>
                           )
