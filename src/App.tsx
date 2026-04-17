@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
@@ -14,11 +14,26 @@ import type {
   SessionMembership,
 } from './types'
 import {
-  buildCommentMeta,
-  buildLatestChapterByUser,
-  filterSessions,
-  getPreferredSelectedSessionId,
-} from './lib/sessionState'
+  ALLOWED_AVATAR_TYPES,
+  AVATAR_BUCKET,
+  MAX_AVATAR_BYTES,
+  getAvatarExtension,
+  isRemoteUrl,
+  resolveAvatarUrl,
+  resolveAvatarUrlMap,
+} from './lib/avatar'
+import { Avatar } from './components/Avatar'
+import { AuthLoadingView, AuthView } from './components/AuthView'
+import { DashboardHeader } from './components/DashboardHeader'
+import { SessionDetailPanel } from './components/SessionDetailPanel'
+import { SessionListPanel } from './components/SessionListPanel'
+import { useSessionDerivedState } from './hooks/useSessionDerivedState'
+import {
+  buildJoinRequestStatusLookup,
+  buildLatestProgressBySession,
+  buildMembershipLookup,
+} from './lib/sessionData'
+import { getPreferredSelectedSessionId } from './lib/sessionState'
 import './App.css'
 
 type AuthMode = 'sign-in' | 'sign-up'
@@ -41,83 +56,7 @@ const defaultSessionForm: SessionFormState = {
   joinPolicy: 'open',
 }
 
-const AVATAR_BUCKET = 'avatars'
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024
-const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const LANGUAGE_STORAGE_KEY = 'books-friends-language'
-
-function isRemoteUrl(value: string): boolean {
-  return /^https?:\/\//i.test(value)
-}
-
-function getInitials(label: string | null | undefined): string {
-  if (!label?.trim()) {
-    return 'ME'
-  }
-
-  const words = label
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-
-  return words.map((word) => word[0]?.toUpperCase() ?? '').join('') || 'ME'
-}
-
-function getAvatarExtension(file: File): string {
-  const fromType: Record<string, string> = {
-    'image/jpeg': 'jpg',
-    'image/png': 'png',
-    'image/webp': 'webp',
-  }
-
-  if (fromType[file.type]) {
-    return fromType[file.type]
-  }
-
-  const fromName = file.name.split('.').pop()?.toLowerCase()
-  return fromName && /^[a-z0-9]+$/.test(fromName) ? fromName : 'jpg'
-}
-
-async function resolveAvatarUrl(pathOrUrl: string | null): Promise<string | null> {
-  if (!pathOrUrl) {
-    return null
-  }
-
-  if (isRemoteUrl(pathOrUrl)) {
-    return pathOrUrl
-  }
-
-  const signedResult = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(pathOrUrl, 60 * 60)
-  if (!signedResult.error && signedResult.data?.signedUrl) {
-    return signedResult.data.signedUrl
-  }
-
-  const publicResult = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(pathOrUrl)
-  return publicResult.data.publicUrl
-}
-
-async function resolveAvatarUrlMap(paths: string[]): Promise<Record<string, string>> {
-  const uniquePaths = Array.from(new Set(paths.filter((path) => path && !isRemoteUrl(path))))
-
-  if (uniquePaths.length === 0) {
-    return {}
-  }
-
-  const signedResults = await Promise.all(
-    uniquePaths.map(async (path) => {
-      const signedResult = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(path, 60 * 60)
-      if (!signedResult.error && signedResult.data?.signedUrl) {
-        return [path, signedResult.data.signedUrl] as const
-      }
-
-      const publicResult = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
-      return [path, publicResult.data.publicUrl] as const
-    }),
-  )
-
-  return Object.fromEntries(signedResults)
-}
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -208,22 +147,9 @@ function App() {
       return
     }
 
-    const membershipLookup: Record<string, SessionMembership> = {}
-    for (const membership of membershipsResult.data as SessionMembership[]) {
-      membershipLookup[membership.session_id] = membership
-    }
-
-    const progressLookup: Record<string, number> = {}
-    for (const update of progressResult.data as ProgressUpdate[]) {
-      if (!(update.session_id in progressLookup)) {
-        progressLookup[update.session_id] = update.chapter_number
-      }
-    }
-
-    const requestLookup: Record<string, SessionJoinRequest['status']> = {}
-    for (const request of (requestsResult.data ?? []) as SessionJoinRequest[]) {
-      requestLookup[request.session_id] = request.status
-    }
+    const membershipLookup = buildMembershipLookup((membershipsResult.data ?? []) as SessionMembership[])
+    const progressLookup = buildLatestProgressBySession((progressResult.data ?? []) as ProgressUpdate[])
+    const requestLookup = buildJoinRequestStatusLookup((requestsResult.data ?? []) as SessionJoinRequest[])
 
     setSessions((sessionsResult.data ?? []) as ReadingSession[])
     setMemberships(membershipLookup)
@@ -498,11 +424,6 @@ function App() {
       void supabase.removeChannel(channel)
     }
   }, [loadAppData, loadSessionDetail, selectedSessionId, user])
-
-  const joinedSessionCount = useMemo(
-    () => sessions.filter((session) => memberships[session.id] && session.status === 'active').length,
-    [sessions, memberships],
-  )
 
   async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -961,30 +882,31 @@ function App() {
     }
   }
 
-  const selectedSession = sessions.find((session) => session.id === selectedSessionId) ?? null
-
-  const filteredSessions = useMemo(
-    () => filterSessions(sessions, sessionView, visibilityFilter, sessionSearch),
-    [sessionSearch, sessionView, sessions, visibilityFilter],
-  )
-
   const activeUserId = user?.id ?? ''
   const myDisplayName = myProfile?.display_name?.trim() || user?.email || activeUserId.slice(0, 8)
   const myAvatarLabel = myProfile?.display_name || user?.email || t.auth.signedInAs
   const myAvatarImage = avatarPreviewUrl || myAvatarRenderUrl
-
-  const selectedMembership = selectedSessionId ? memberships[selectedSessionId] : undefined
-  const selectedIsMember = Boolean(selectedMembership)
-  const selectedIsOwner = Boolean(selectedSession && selectedSession.creator_id === activeUserId)
-
-  const memberLatestProgress = useMemo(() => buildLatestChapterByUser(sessionProgress), [sessionProgress])
-
-  const commentMeta = useMemo(() => buildCommentMeta(sessionLikes, activeUserId), [activeUserId, sessionLikes])
-
-  const pendingRequests = useMemo(
-    () => sessionJoinRequests.filter((request) => request.status === 'pending'),
-    [sessionJoinRequests],
-  )
+  const {
+    joinedSessionCount,
+    selectedSession,
+    filteredSessions,
+    selectedIsMember,
+    selectedIsOwner,
+    memberLatestProgress,
+    commentMeta,
+    pendingRequests,
+  } = useSessionDerivedState({
+    activeUserId,
+    sessions,
+    memberships,
+    selectedSessionId,
+    sessionProgress,
+    sessionLikes,
+    sessionJoinRequests,
+    sessionView,
+    visibilityFilter,
+    sessionSearch,
+  })
 
   async function handleUpdateProgress(session: ReadingSession) {
     if (!user) {
@@ -1017,146 +939,43 @@ function App() {
   }
 
   if (authLoading) {
-    return (
-      <main className="shell">
-        <section className="card centered">
-          <h1>Books and Friends</h1>
-          <p>{t.auth.checkingSession}</p>
-        </section>
-      </main>
-    )
+    return <AuthLoadingView message={t.auth.checkingSession} />
   }
 
   if (!user) {
     return (
-      <main className="shell">
-        <section className="card auth-card">
-          <div>
-            <p className="eyebrow">Books and Friends</p>
-            <h1>{t.auth.welcome}</h1>
-            <p className="subtle">{t.auth.subtitle}</p>
-          </div>
-
-          <form className="stack" onSubmit={handleAuthSubmit}>
-            <div className="auth-switch" role="tablist" aria-label={t.auth.modeAriaLabel}>
-              <button
-                type="button"
-                className={`auth-switch-option ${authMode === 'sign-in' ? 'auth-switch-option-active' : ''}`}
-                onClick={() => {
-                  setAuthMode('sign-in')
-                  setAuthError(null)
-                }}
-              >
-                {t.auth.signIn}
-              </button>
-              <button
-                type="button"
-                className={`auth-switch-option ${authMode === 'sign-up' ? 'auth-switch-option-active' : ''}`}
-                onClick={() => {
-                  setAuthMode('sign-up')
-                  setAuthError(null)
-                }}
-              >
-                {t.auth.signUp}
-              </button>
-            </div>
-
-            <label className="field">
-              <span>{t.auth.email}</span>
-              <input
-                type="email"
-                value={authEmail}
-                onChange={(event) => setAuthEmail(event.target.value)}
-                placeholder={t.auth.emailPlaceholder}
-                autoComplete="email"
-              />
-            </label>
-
-            <label className="field">
-              <span>{t.auth.password}</span>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(event) => setAuthPassword(event.target.value)}
-                placeholder={t.auth.passwordPlaceholder}
-                autoComplete={authMode === 'sign-in' ? 'current-password' : 'new-password'}
-              />
-            </label>
-
-            {authError ? <p className="error">{authError}</p> : null}
-
-            <button type="submit" className="primary" disabled={authBusy}>
-              {authBusy ? t.common.pleaseWait : authMode === 'sign-in' ? t.auth.signIn : t.auth.createAccount}
-            </button>
-          </form>
-
-          <div className="auth-switch auth-switch-corner" role="tablist" aria-label={t.language.switchLabel}>
-            <button
-              type="button"
-              className={`auth-switch-option auth-switch-option-mini ${language === 'en' ? 'auth-switch-option-active' : ''}`}
-              onClick={() => setLanguage('en')}
-            >
-              EN
-            </button>
-            <button
-              type="button"
-              className={`auth-switch-option auth-switch-option-mini ${language === 'my' ? 'auth-switch-option-active' : ''}`}
-              onClick={() => setLanguage('my')}
-            >
-              MY
-            </button>
-          </div>
-        </section>
-      </main>
+      <AuthView
+        t={t}
+        language={language}
+        authMode={authMode}
+        authEmail={authEmail}
+        authPassword={authPassword}
+        authError={authError}
+        authBusy={authBusy}
+        onSubmit={handleAuthSubmit}
+        onAuthModeChange={(mode) => {
+          setAuthMode(mode)
+          setAuthError(null)
+        }}
+        onAuthEmailChange={setAuthEmail}
+        onAuthPasswordChange={setAuthPassword}
+        onLanguageChange={setLanguage}
+      />
     )
   }
 
   return (
     <main className="shell dashboard-shell">
-      <header className="card header-card">
-        <div>
-          <p className="eyebrow">{t.auth.welcomeBack}</p>
-          <h1>Books and Friends</h1>
-          <p className="subtle">{t.auth.joinedSessionsSummary(joinedSessionCount)}</p>
-        </div>
-
-        <div className="header-actions">
-          <div className="auth-switch" role="tablist" aria-label={t.language.switchLabel}>
-            <button
-              type="button"
-              className={`auth-switch-option ${language === 'en' ? 'auth-switch-option-active' : ''}`}
-              onClick={() => setLanguage('en')}
-            >
-              {t.language.english}
-            </button>
-            <button
-              type="button"
-              className={`auth-switch-option ${language === 'my' ? 'auth-switch-option-active' : ''}`}
-              onClick={() => setLanguage('my')}
-            >
-              {t.language.burmese}
-            </button>
-          </div>
-
-          <div className="header-identity">
-            {myAvatarImage ? (
-              <img className="avatar avatar-md" src={myAvatarImage} alt={`${myAvatarLabel} avatar`} />
-            ) : (
-              <span className="avatar avatar-md avatar-fallback" aria-hidden="true">
-                {getInitials(myAvatarLabel)}
-              </span>
-            )}
-            <div>
-              <p className="subtle">{t.auth.signedInAs}</p>
-              <strong>{myDisplayName}</strong>
-            </div>
-          </div>
-
-          <button type="button" className="secondary" onClick={handleSignOut}>
-            {t.auth.signOut}
-          </button>
-        </div>
-      </header>
+      <DashboardHeader
+        t={t}
+        language={language}
+        joinedSessionCount={joinedSessionCount}
+        myAvatarImage={myAvatarImage}
+        myAvatarLabel={myAvatarLabel}
+        myDisplayName={myDisplayName}
+        onLanguageChange={setLanguage}
+        onSignOut={handleSignOut}
+      />
 
       <section className="grid">
         <article className="card stack">
@@ -1167,13 +986,7 @@ function App() {
 
           <div className="profile-card stack">
             <div className="profile-row">
-              {myAvatarImage ? (
-                <img className="avatar avatar-lg" src={myAvatarImage} alt={`${myAvatarLabel} avatar`} />
-              ) : (
-                <span className="avatar avatar-lg avatar-fallback" aria-hidden="true">
-                  {getInitials(myAvatarLabel)}
-                </span>
-              )}
+              <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="lg" />
               <div className="stack gap-sm profile-upload-stack">
                 <label className="field">
                   <span>{t.profile.avatarImage}</span>
@@ -1308,363 +1121,55 @@ function App() {
           </form>
         </article>
 
-        <article className="card stack">
-          <div>
-            <h2>{sessionView === 'active' ? t.sessions.findSessions : t.sessions.archivedSessions}</h2>
-            <p className="subtle">
-              {sessionView === 'active'
-                ? t.sessions.activeSummary
-                : t.sessions.archivedSummary}
-            </p>
-          </div>
+        <SessionListPanel
+          t={t}
+          sessionView={sessionView}
+          sessionSearch={sessionSearch}
+          visibilityFilter={visibilityFilter}
+          screenError={screenError}
+          loadingSessions={loadingSessions}
+          filteredSessions={filteredSessions}
+          memberships={memberships}
+          latestProgress={latestProgress}
+          selectedSessionId={selectedSessionId}
+          myJoinRequestStatus={myJoinRequestStatus}
+          progressDrafts={progressDrafts}
+          busySessionId={busySessionId}
+          totalSessionCount={sessions.length}
+          onSessionViewChange={setSessionView}
+          onSessionSearchChange={setSessionSearch}
+          onVisibilityFilterChange={setVisibilityFilter}
+          onSelectSession={setSelectedSessionId}
+          onProgressDraftsChange={setProgressDrafts}
+          onUpdateProgress={handleUpdateProgress}
+          onLeaveSession={handleLeaveSession}
+          onJoinSession={handleJoinSession}
+        />
 
-          <div className="stack gap-sm">
-            <div className="auth-switch" role="tablist" aria-label={t.sessions.viewAriaLabel}>
-              <button
-                type="button"
-                className={`auth-switch-option ${sessionView === 'active' ? 'auth-switch-option-active' : ''}`}
-                onClick={() => setSessionView('active')}
-              >
-                {t.sessions.active}
-              </button>
-              <button
-                type="button"
-                className={`auth-switch-option ${sessionView === 'archived' ? 'auth-switch-option-active' : ''}`}
-                onClick={() => setSessionView('archived')}
-              >
-                {t.sessions.archived}
-              </button>
-            </div>
-
-            <label className="field">
-              <span>{t.sessions.searchLabel}</span>
-              <input
-                type="text"
-                value={sessionSearch}
-                onChange={(event) => setSessionSearch(event.target.value)}
-                placeholder={t.sessions.searchPlaceholder}
-              />
-            </label>
-
-            <label className="field">
-              <span>{t.sessions.visibility}</span>
-              <select
-                value={visibilityFilter}
-                onChange={(event) => setVisibilityFilter(event.target.value as 'all' | 'public' | 'private')}
-              >
-                <option value="all">{t.sessions.all}</option>
-                <option value="public">{t.enums.visibility.public}</option>
-                <option value="private">{t.enums.visibility.private}</option>
-              </select>
-            </label>
-          </div>
-
-          {screenError ? <p className="error">{screenError}</p> : null}
-          {loadingSessions ? <p className="subtle">{t.sessions.loading}</p> : null}
-
-          {!loadingSessions && filteredSessions.length === 0 ? (
-            <p className="subtle">{t.sessions.noResults}</p>
-          ) : null}
-
-          <ul className="session-list">
-            {filteredSessions.map((session) => {
-              const membership = memberships[session.id]
-              const chapter = latestProgress[session.id] ?? 0
-              const ratio = Math.min(100, Math.round((chapter / session.total_chapters) * 100))
-              const isSelected = selectedSessionId === session.id
-              const requestStatus = myJoinRequestStatus[session.id]
-
-              return (
-                <li key={session.id} className={`session-item ${isSelected ? 'session-item-selected' : ''}`}>
-                  <div className="stack gap-sm">
-                    <div className="session-heading">
-                      <h3>{session.book_title}</h3>
-                      <span className="pill">{t.enums.visibility[session.visibility]}</span>
-                    </div>
-
-                    <p className="subtle">{t.sessions.byAuthor(session.book_author)}</p>
-                    <p className="muted">{session.description || t.sessions.noDescription}</p>
-
-                    <div className="progress-row" aria-label={t.sessions.progressAria(session.book_title)}>
-                      <div className="progress-track">
-                        <span className="progress-fill" style={{ width: `${ratio}%` }} />
-                      </div>
-                      <span className="progress-label">{t.sessions.chapterProgress(chapter || '-', session.total_chapters)}</span>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="tertiary"
-                      onClick={() => setSelectedSessionId(session.id)}
-                    >
-                      {isSelected ? t.sessions.viewingDetails : t.sessions.openDetails}
-                    </button>
-
-                    {membership ? (
-                      <div className="split compact">
-                        <label className="field">
-                          <span>{t.sessions.updateChapter}</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={session.total_chapters}
-                            value={progressDrafts[session.id] ?? 1}
-                            onChange={(event) =>
-                              setProgressDrafts((current) => ({
-                                ...current,
-                                [session.id]: Number.isNaN(Number(event.target.value))
-                                  ? 1
-                                  : Number(event.target.value),
-                              }))
-                            }
-                          />
-                        </label>
-
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={busySessionId === session.id}
-                          onClick={() => {
-                            void handleUpdateProgress(session)
-                          }}
-                        >
-                          {busySessionId === session.id ? t.common.saving : t.sessions.saveProgress}
-                        </button>
-
-                        <button
-                          type="button"
-                          className="ghost"
-                          disabled={busySessionId === session.id || (membership.role === 'owner' && sessions.length === 1)}
-                          onClick={() => {
-                            void handleLeaveSession(session.id)
-                          }}
-                        >
-                          {busySessionId === session.id ? t.common.working : t.sessions.leave}
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busySessionId === session.id || session.status === 'archived' || requestStatus === 'pending'}
-                        onClick={() => {
-                          void handleJoinSession(session.id)
-                        }}
-                      >
-                        {session.join_policy === 'request'
-                          ? requestStatus === 'pending'
-                            ? t.sessions.requestPending
-                            : t.sessions.requestToJoin
-                          : busySessionId === session.id
-                            ? t.sessions.joining
-                            : t.sessions.joinSession}
-                      </button>
-                    )}
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-        </article>
-
-        <article className="card stack span-full">
-          {!selectedSession ? (
-            <p className="subtle">{t.sessions.selectSessionPrompt}</p>
-          ) : (
-            <>
-              <div className="detail-header">
-                <div>
-                  <h2>{selectedSession.book_title}</h2>
-                  <p className="subtle">{t.sessions.singleThread}</p>
-                </div>
-                {selectedIsOwner ? (
-                  <button
-                    type="button"
-                    className="ghost"
-                    disabled={busySessionId === selectedSession.id}
-                    onClick={() => {
-                      if (selectedSession.status === 'active') {
-                        void handleArchiveSelected()
-                      } else {
-                        void handleRestoreSelected()
-                      }
-                    }}
-                  >
-                    {busySessionId === selectedSession.id
-                      ? selectedSession.status === 'active'
-                        ? t.sessions.archiving
-                        : t.sessions.restoring
-                      : selectedSession.status === 'active'
-                        ? t.sessions.archiveSession
-                        : t.sessions.restoreSession}
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="detail-grid">
-                <section className="detail-pane stack">
-                  <h3>{t.sessions.memberProgress}</h3>
-                  {loadingSessionDetail ? <p className="subtle">{t.sessions.loadingDetail}</p> : null}
-                  <ul className="member-list">
-                    {sessionMembers.map((member) => {
-                      const profile = sessionProfiles[member.user_id]
-                      const chapter = memberLatestProgress[member.user_id] ?? 0
-                      const ratio = Math.min(
-                        100,
-                        Math.round((chapter / Math.max(1, selectedSession.total_chapters)) * 100),
-                      )
-
-                      return (
-                        <li key={member.user_id} className="member-item">
-                          <div className="member-head">
-                            <div className="identity-row">
-                              {profile?.avatar_url ? (
-                                <img
-                                  className="avatar avatar-sm"
-                                  src={profile.avatar_url}
-                                  alt={`${profile.display_name || member.user_id.slice(0, 8)} avatar`}
-                                />
-                              ) : (
-                                <span className="avatar avatar-sm avatar-fallback" aria-hidden="true">
-                                  {getInitials(profile?.display_name || member.user_id.slice(0, 8))}
-                                </span>
-                              )}
-                              <strong>{profile?.display_name || member.user_id.slice(0, 8)}</strong>
-                            </div>
-                            <span className="pill">{t.enums.role[member.role]}</span>
-                          </div>
-                          <div className="progress-track">
-                            <span className="progress-fill" style={{ width: `${ratio}%` }} />
-                          </div>
-                          <span className="progress-label">{t.sessions.chapterProgress(chapter, selectedSession.total_chapters)}</span>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </section>
-
-                <section className="detail-pane stack">
-                  {selectedIsOwner ? (
-                    <>
-                      <h3>{t.sessions.joinRequests}</h3>
-                      {pendingRequests.length === 0 ? <p className="subtle">{t.sessions.noPendingRequests}</p> : null}
-                      <ul className="member-list">
-                        {pendingRequests.map((request) => {
-                          const profile = sessionProfiles[request.user_id]
-                          return (
-                            <li key={request.id} className="member-item stack gap-sm">
-                              <div className="member-head">
-                                <div className="identity-row">
-                                  {profile?.avatar_url ? (
-                                    <img
-                                      className="avatar avatar-sm"
-                                      src={profile.avatar_url}
-                                      alt={`${profile.display_name || request.user_id.slice(0, 8)} avatar`}
-                                    />
-                                  ) : (
-                                    <span className="avatar avatar-sm avatar-fallback" aria-hidden="true">
-                                      {getInitials(profile?.display_name || request.user_id.slice(0, 8))}
-                                    </span>
-                                  )}
-                                  <strong>{profile?.display_name || request.user_id.slice(0, 8)}</strong>
-                                </div>
-                                <span className="subtle">{new Date(request.created_at).toLocaleString()}</span>
-                              </div>
-                              <div className="split compact">
-                                <button
-                                  type="button"
-                                  className="secondary"
-                                  disabled={requestBusyId === request.id}
-                                  onClick={() => {
-                                    void handleApproveJoinRequest(request)
-                                  }}
-                                >
-                                  {requestBusyId === request.id ? t.common.processing : t.sessions.approve}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="ghost"
-                                  disabled={requestBusyId === request.id}
-                                  onClick={() => {
-                                    void handleRejectJoinRequest(request)
-                                  }}
-                                >
-                                  {t.sessions.reject}
-                                </button>
-                              </div>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </>
-                  ) : null}
-
-                  <h3>{t.sessions.discussion}</h3>
-                  {!selectedIsMember ? (
-                    <p className="subtle">{t.sessions.joinToDiscuss}</p>
-                  ) : (
-                    <>
-                      <form className="stack" onSubmit={handleSubmitComment}>
-                        <label className="field">
-                          <span>{t.sessions.yourComment}</span>
-                          <textarea
-                            value={commentDraft}
-                            onChange={(event) => setCommentDraft(event.target.value)}
-                            placeholder={t.sessions.commentPlaceholder}
-                          />
-                        </label>
-                        <button type="submit" className="primary" disabled={postingComment}>
-                          {postingComment ? t.common.posting : t.sessions.postComment}
-                        </button>
-                      </form>
-
-                      <ul className="comment-list">
-                        {sessionComments.map((comment) => {
-                          const profile = sessionProfiles[comment.user_id]
-                          const likes = commentMeta.likeCounts[comment.id] ?? 0
-                          const likedByMe = Boolean(commentMeta.likedByMe[comment.id])
-
-                          return (
-                            <li key={comment.id} className="comment-item">
-                              <div className="comment-head">
-                                <div className="identity-row">
-                                  {profile?.avatar_url ? (
-                                    <img
-                                      className="avatar avatar-sm"
-                                      src={profile.avatar_url}
-                                      alt={`${profile.display_name || comment.user_id.slice(0, 8)} avatar`}
-                                    />
-                                  ) : (
-                                    <span className="avatar avatar-sm avatar-fallback" aria-hidden="true">
-                                      {getInitials(profile?.display_name || comment.user_id.slice(0, 8))}
-                                    </span>
-                                  )}
-                                  <strong>{profile?.display_name || comment.user_id.slice(0, 8)}</strong>
-                                </div>
-                                <span className="subtle">{new Date(comment.created_at).toLocaleString()}</span>
-                              </div>
-                              <p className="comment-body">{comment.is_deleted ? t.sessions.deleted : comment.body}</p>
-                              <button
-                                type="button"
-                                className={`like-button ${likedByMe ? 'like-button-active' : ''}`}
-                                disabled={likingCommentId === comment.id}
-                                onClick={() => {
-                                  void handleToggleLike(comment.id)
-                                }}
-                              >
-                                {likingCommentId === comment.id ? t.common.updating : likedByMe ? t.sessions.liked(likes) : t.sessions.like(likes)}
-                              </button>
-                            </li>
-                          )
-                        })}
-                      </ul>
-                    </>
-                  )}
-                </section>
-              </div>
-            </>
-          )}
-        </article>
+        <SessionDetailPanel
+          t={t}
+          selectedSession={selectedSession}
+          selectedIsOwner={selectedIsOwner}
+          selectedIsMember={selectedIsMember}
+          busySessionId={busySessionId}
+          loadingSessionDetail={loadingSessionDetail}
+          sessionMembers={sessionMembers}
+          sessionProfiles={sessionProfiles}
+          memberLatestProgress={memberLatestProgress}
+          pendingRequests={pendingRequests}
+          requestBusyId={requestBusyId}
+          commentDraft={commentDraft}
+          postingComment={postingComment}
+          sessionComments={sessionComments}
+          commentMeta={commentMeta}
+          likingCommentId={likingCommentId}
+          onArchiveOrRestore={selectedSession?.status === 'active' ? handleArchiveSelected : handleRestoreSelected}
+          onApproveJoinRequest={handleApproveJoinRequest}
+          onRejectJoinRequest={handleRejectJoinRequest}
+          onSubmitComment={handleSubmitComment}
+          onCommentDraftChange={setCommentDraft}
+          onToggleLike={handleToggleLike}
+        />
       </section>
     </main>
   )
