@@ -45,9 +45,13 @@ export function filterSessions(
 }
 
 export function buildLatestChapterByUser(progressUpdates: ProgressUpdate[]): Record<string, number> {
+  const latestCreatedAtByUser: Record<string, number> = {}
   const lookup: Record<string, number> = {}
   for (const update of progressUpdates) {
-    if (!(update.user_id in lookup)) {
+    const createdAtMs = Date.parse(update.created_at)
+    const createdAt = Number.isNaN(createdAtMs) ? Number.NEGATIVE_INFINITY : createdAtMs
+    if (!(update.user_id in lookup) || createdAt >= (latestCreatedAtByUser[update.user_id] ?? Number.NEGATIVE_INFINITY)) {
+      latestCreatedAtByUser[update.user_id] = createdAt
       lookup[update.user_id] = update.chapter_number
     }
   }

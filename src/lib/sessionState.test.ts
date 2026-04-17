@@ -59,6 +59,17 @@ describe('getPreferredSelectedSessionId', () => {
     const selected = getPreferredSelectedSessionId(sessions, memberships, 'active', 'missing')
     expect(selected).toBe('s3')
   })
+
+  it('falls back to first session in current view when user is not a member of any', () => {
+    const sessions = [
+      makeSession('s1', 'archived', 'public', 'Old', 'Author A'),
+      makeSession('s2', 'active', 'public', 'Active One', 'Author B'),
+      makeSession('s3', 'active', 'public', 'Active Two', 'Author C'),
+    ]
+
+    const selected = getPreferredSelectedSessionId(sessions, {}, 'active', null)
+    expect(selected).toBe('s2')
+  })
 })
 
 describe('filterSessions', () => {
@@ -82,6 +93,16 @@ describe('filterSessions', () => {
     const result = filterSessions(sessions, 'active', 'public', '')
     expect(result.map((session) => session.id)).toEqual(['s1'])
   })
+
+  it('matches by author name in a case-insensitive way', () => {
+    const result = filterSessions(sessions, 'active', 'all', 'frank HERBERT')
+    expect(result.map((session) => session.id)).toEqual(['s2'])
+  })
+
+  it('returns empty list when no session matches search and filters', () => {
+    const result = filterSessions(sessions, 'active', 'private', 'alchemist')
+    expect(result).toEqual([])
+  })
 })
 
 describe('buildLatestChapterByUser', () => {
@@ -93,6 +114,26 @@ describe('buildLatestChapterByUser', () => {
     ]
 
     expect(buildLatestChapterByUser(updates)).toEqual({ u1: 8, u2: 4 })
+  })
+
+  it('uses created_at ordering when updates arrive out of order', () => {
+    const updates: ProgressUpdate[] = [
+      { session_id: 's1', user_id: 'u1', chapter_number: 3, created_at: '2026-01-01T00:00:00.000Z' },
+      { session_id: 's1', user_id: 'u1', chapter_number: 8, created_at: '2026-01-03T00:00:00.000Z' },
+      { session_id: 's1', user_id: 'u2', chapter_number: 1, created_at: '2026-01-01T00:00:00.000Z' },
+      { session_id: 's1', user_id: 'u2', chapter_number: 5, created_at: '2026-01-02T00:00:00.000Z' },
+    ]
+
+    expect(buildLatestChapterByUser(updates)).toEqual({ u1: 8, u2: 5 })
+  })
+
+  it('uses the later encountered update for ties on created_at', () => {
+    const updates: ProgressUpdate[] = [
+      { session_id: 's1', user_id: 'u1', chapter_number: 4, created_at: '2026-01-01T00:00:00.000Z' },
+      { session_id: 's1', user_id: 'u1', chapter_number: 6, created_at: '2026-01-01T00:00:00.000Z' },
+    ]
+
+    expect(buildLatestChapterByUser(updates)).toEqual({ u1: 6 })
   })
 
   it('returns empty lookup for empty updates', () => {
