@@ -1,0 +1,303 @@
+{
+  "project_name": "Books & Friends (repository: vibecodebook)",
+  "project_summary": {
+    "purpose": "Provide a shared reading-community platform where authenticated users create book reading sessions, join sessions, track chapter progress, discuss in a single thread, and react with likes.",
+    "target_users": "Book readers, reading clubs, and small communities coordinating progress around the same book across web and mobile clients.",
+    "core_problem_solved": "Coordinates collaborative reading progress and discussion in one place with access control, ownership flows, and real-time updates.",
+    "main_use_cases": [
+      "Sign up/sign in with email and password",
+      "Create a reading session with title, author, chapter count, description, visibility, and join policy",
+      "Discover sessions via search, visibility filter, and active/archived views",
+      "Join open sessions or request access to request-based sessions",
+      "Approve/reject join requests as session owner",
+      "Leave sessions",
+      "Submit chapter progress and view progress bars",
+      "Post comments in a single session thread",
+      "Like/unlike comments",
+      "Archive/restore sessions as owner",
+      "Update profile display name (web and mobile) and avatar (web upload)"
+    ]
+  },
+  "architecture": "Monorepo-style dual-client architecture with a React + Vite web app and a React Native + Expo mobile app sharing one Supabase backend. No custom application server layer is present; clients call Supabase Auth, Postgres tables, RPC functions, Realtime channels, and Storage directly. Domain types and feature flows are parallel across web and mobile, with client-side state orchestration in top-level App components and utility modules/hooks for derived session state.",
+  "tech_stack": {
+    "frontend": "Web: React 19 + TypeScript + Vite + CSS. Mobile: React Native 0.76 + Expo 52 + TypeScript.",
+    "backend": "Supabase managed backend (Auth, Postgres, Realtime, Storage, SQL functions/RPC, RLS policies).",
+    "database": "PostgreSQL (Supabase) with pgcrypto extension and relational schema in supabase/schema.sql.",
+    "auth": "Supabase Auth email/password sessions; mobile uses AsyncStorage-backed auth persistence.",
+    "deployment": "Web intended for static Vite deployment; mobile via Expo workflow; backend hosted on Supabase. No CI/CD pipeline configuration is present in repository."
+  },
+  "features": [
+    "Authenticated-only access model",
+    "Bilingual UI support (English and Burmese) on web and mobile",
+    "Session creation via secure RPC (create_reading_session) with validation",
+    "Session visibility modes: public/private",
+    "Join policies: open join or request-based join",
+    "Session status lifecycle: active/archived with owner restore",
+    "Session discovery: title/author search + visibility filtering + active/archived tab",
+    "Membership tracking with owner/member roles",
+    "Join-request lifecycle: pending/approved/rejected",
+    "Progress updates by chapter number and session/member progress visualization",
+    "Single-thread discussion per session",
+    "Like-only reactions per comment with toggle behavior",
+    "Realtime refresh subscriptions for comments, likes, progress updates, membership changes, and join requests",
+    "Profile display name update (web and mobile)",
+    "Avatar support: upload/preview/signed-url rendering on web; display only on mobile"
+  ],
+  "data_models": [
+    {
+      "name": "profiles",
+      "fields": [
+        "id uuid PK -> auth.users.id",
+        "display_name text nullable",
+        "avatar_url text nullable",
+        "created_at timestamptz default now()",
+        "updated_at timestamptz default now()"
+      ],
+      "relationships": [
+        "1:1 with auth.users",
+        "Referenced by reading_sessions.creator_id, session_members.user_id, progress_updates.user_id, comments.user_id, comment_likes.user_id, session_join_requests.user_id"
+      ],
+      "constraints": [
+        "Primary key id",
+        "FK cascade on delete from auth.users"
+      ]
+    },
+    {
+      "name": "reading_sessions",
+      "fields": [
+        "id uuid PK default gen_random_uuid()",
+        "creator_id uuid FK -> profiles.id default auth.uid()",
+        "book_title text not null",
+        "book_author text not null",
+        "total_chapters int not null check > 0",
+        "description text nullable",
+        "visibility text check in (public, private)",
+        "join_policy text check in (open, request)",
+        "status text check in (active, archived)",
+        "created_at timestamptz default now()",
+        "updated_at timestamptz default now()"
+      ],
+      "relationships": [
+        "1:N to session_members",
+        "1:N to progress_updates",
+        "1:N to comments",
+        "1:N to session_join_requests"
+      ],
+      "constraints": [
+        "Visibility enum-like check",
+        "Join policy enum-like check",
+        "Status enum-like check"
+      ]
+    },
+    {
+      "name": "session_members",
+      "fields": [
+        "id uuid PK default gen_random_uuid()",
+        "session_id uuid FK -> reading_sessions.id",
+        "user_id uuid FK -> profiles.id",
+        "role text check in (owner, member)",
+        "joined_at timestamptz default now()"
+      ],
+      "relationships": [
+        "Membership bridge between users and sessions"
+      ],
+      "constraints": [
+        "Unique(session_id, user_id)"
+      ]
+    },
+    {
+      "name": "progress_updates",
+      "fields": [
+        "id uuid PK default gen_random_uuid()",
+        "session_id uuid FK -> reading_sessions.id",
+        "user_id uuid FK -> profiles.id",
+        "chapter_number int check > 0",
+        "created_at timestamptz default now()"
+      ],
+      "relationships": [
+        "Belongs to one session and one user"
+      ],
+      "constraints": [
+        "Chapter number positive"
+      ]
+    },
+    {
+      "name": "comments",
+      "fields": [
+        "id uuid PK default gen_random_uuid()",
+        "session_id uuid FK -> reading_sessions.id",
+        "user_id uuid FK -> profiles.id",
+        "body text not null",
+        "is_deleted boolean default false",
+        "created_at timestamptz default now()",
+        "updated_at timestamptz default now()"
+      ],
+      "relationships": [
+        "Belongs to one session and one user",
+        "1:N to comment_likes"
+      ]
+    },
+    {
+      "name": "comment_likes",
+      "fields": [
+        "id uuid PK default gen_random_uuid()",
+        "comment_id uuid FK -> comments.id",
+        "user_id uuid FK -> profiles.id",
+        "created_at timestamptz default now()"
+      ],
+      "relationships": [
+        "Belongs to one comment and one user"
+      ],
+      "constraints": [
+        "Unique(comment_id, user_id)"
+      ]
+    },
+    {
+      "name": "session_join_requests",
+      "fields": [
+        "id uuid PK default gen_random_uuid()",
+        "session_id uuid FK -> reading_sessions.id",
+        "user_id uuid FK -> profiles.id",
+        "status text check in (pending, approved, rejected)",
+        "created_at timestamptz default now()"
+      ],
+      "relationships": [
+        "Belongs to one session and one user"
+      ],
+      "constraints": [
+        "Unique(session_id, user_id)"
+      ]
+    }
+  ],
+  "api_structure": [
+    {
+      "type": "auth",
+      "operations": [
+        "supabase.auth.getSession",
+        "supabase.auth.onAuthStateChange",
+        "supabase.auth.signInWithPassword",
+        "supabase.auth.signUp",
+        "supabase.auth.signOut"
+      ]
+    },
+    {
+      "type": "rpc_functions",
+      "operations": [
+        "public.create_reading_session(p_book_title, p_book_author, p_total_chapters, p_description, p_visibility, p_join_policy)",
+        "public.is_session_member(p_session_id, p_user_id)"
+      ]
+    },
+    {
+      "type": "table_queries",
+      "operations": [
+        "reading_sessions: select, update(status), insert via RPC result flow",
+        "session_members: select, insert(join/owner add), delete(leave)",
+        "progress_updates: select, insert",
+        "comments: select, insert",
+        "comment_likes: select, insert, delete(toggle)",
+        "session_join_requests: select, insert/upsert(request), update(approve/reject), delete(own request)",
+        "profiles: upsert(id), select, update(display_name/avatar_url)"
+      ]
+    },
+    {
+      "type": "realtime",
+      "operations": [
+        "Per-selected-session channel subscription",
+        "postgres_changes on comments (filtered by session_id)",
+        "postgres_changes on progress_updates (filtered by session_id)",
+        "postgres_changes on session_members (filtered by session_id)",
+        "postgres_changes on session_join_requests (filtered by session_id)",
+        "postgres_changes on comment_likes (global table events)"
+      ]
+    },
+    {
+      "type": "storage",
+      "operations": [
+        "avatars bucket upload",
+        "avatars bucket remove previous image",
+        "createSignedUrl for private path rendering fallback to getPublicUrl"
+      ]
+    }
+  ],
+  "state_management": "Local component state with React hooks (useState/useEffect/useMemo/useCallback) in monolithic App-level containers (web and mobile). Derived state is centralized on web via useSessionDerivedState plus pure helpers in sessionData/sessionState. No Redux/Zustand/MobX; state refresh strategy relies on Promise.all data fetches and targeted realtime-triggered reloads.",
+  "routing_structure": "No explicit route-based navigation in web or mobile. Web renders a single App shell (no react-router usage despite dependency). Mobile uses a single-screen ScrollView layout without navigation stack.",
+  "ui_components": [
+    "Web: AuthView, AuthLoadingView, DashboardHeader, SessionListPanel, SessionDetailPanel, Avatar",
+    "Web layout blocks: profile card, session creation form, sessions list, detail pane (member progress + join requests + discussion)",
+    "Mobile: single App component with reusable ActionButton and section cards for auth, profile, session creation, session list, and session detail",
+    "Shared UI patterns: segmented toggles, pills/badges, progress bars, form fields, primary/secondary/ghost actions"
+  ],
+  "design_system": {
+    "colors": [
+      "#f3f7ff (base background)",
+      "#d8e8ff/#cfe0ff radial overlays",
+      "#245cff and #1b45c6 accents",
+      "#131f38 primary text",
+      "#4f607f and #667697 muted text",
+      "#d4e2fb borders",
+      "#ffffff and rgba(255,255,255,0.95) card surfaces",
+      "#962e42/#fff0f4 error palette",
+      "Mobile palette centered on #2a5bd7 primary with neutral blue-grays"
+    ],
+    "typography": "Web uses Google Fonts Outfit (body) and Space Grotesk (headings); mobile uses React Native system fonts with weight-based hierarchy.",
+    "spacing": "Card and stack-based spacing system with compact gaps, rounded corners (10-20px), responsive breakpoints at 960px and 640px on web.",
+    "component_style": "Soft, rounded, high-contrast cards with blue gradients, pill badges, segmented controls, outlined inputs, and animated button press/hover feedback.",
+    "theme": "Light blue editorial/productivity style; no dark theme implementation."
+  },
+  "coding_patterns": [
+    "Feature orchestration in top-level App with colocated handlers",
+    "Pure transformation utilities for lookup maps and derived metadata",
+    "Defensive async error handling with early returns and per-operation busy flags",
+    "Parallel data loading with Promise.all for related datasets",
+    "Type-safe domain modeling through shared TypeScript interfaces",
+    "Status-based UI branching (auth/loading/member/owner/request states)",
+    "Data consistency via post-mutation refetches",
+    "Small presentational component decomposition for web panels"
+  ],
+  "folder_structure": "Root web app at src with components/hooks/lib/i18n/types; mobile client isolated in mobile-app with parallel i18n/lib/types and App.tsx; Supabase SQL schema in supabase/schema.sql; static assets in public; config/tooling files (Vite, TypeScript, ESLint, Vitest) at repository root.",
+  "naming_conventions": "TypeScript uses PascalCase for components/types, camelCase for variables/functions, and descriptive handler names (handleX). Database schema uses snake_case table/column names. UI state names use explicit suffixes (Loading, Busy, Draft, Error). Policy names in SQL are human-readable sentence strings.",
+  "dependencies": [
+    "Web runtime: react, react-dom, @supabase/supabase-js, react-router-dom (installed but unused)",
+    "Web tooling: vite, typescript, eslint, vitest, @vitejs/plugin-react, @vitest/coverage-v8",
+    "Mobile runtime: expo, react-native, react-native-web, @supabase/supabase-js, @react-native-async-storage/async-storage, react-native-url-polyfill, expo-status-bar",
+    "Mobile tooling: typescript, @types/react, @types/node"
+  ],
+  "security_practices": [
+    "Row Level Security enabled on all core tables",
+    "Authenticated-only read/write policy model across app data",
+    "Policy separation by ownership/member/requester capabilities",
+    "Security definer helper function is_session_member to avoid recursive policy checks",
+    "Security definer RPC create_reading_session with explicit input validation and auth.uid enforcement",
+    "Restricted function grants (execute to authenticated, revoke from public)",
+    "Profile row creation trigger on auth.users insert plus backfill migration",
+    "Avatar upload type and size validation client-side before storage upload"
+  ],
+  "performance_patterns": [
+    "Memoized derived state (filtered sessions, selected session, like metadata, pending requests)",
+    "Lookup maps for memberships, progress, join statuses, and profile resolution",
+    "Batch data retrieval with Promise.all to reduce sequential latency",
+    "Scoped realtime channels per selected session to limit event scope",
+    "Selective detail refresh after mutations rather than full app reload in some paths",
+    "Progressive conditional queries (load likes only when comments exist)"
+  ],
+  "reusable_logic": [
+    "useSessionDerivedState hook (web)",
+    "sessionData utilities: buildMembershipLookup, buildLatestProgressBySession, buildJoinRequestStatusLookup",
+    "sessionState utilities: getPreferredSelectedSessionId, filterSessions, buildLatestChapterByUser, buildCommentMeta",
+    "avatar utilities: getInitials, file type/extension handling, signed/public URL resolvers",
+    "shared translation dictionaries and language typing",
+    "shared domain interfaces in web and mobile types files",
+    "mobile ActionButton reusable interaction component"
+  ],
+  "limitations": [
+    "No OAuth providers implemented (email/password only)",
+    "No guest browsing; app requires authentication for all access",
+    "No owner moderation/delete flow for other users' comments",
+    "Mobile app does not implement avatar upload UI (display-name editing only)",
+    "No route-based navigation architecture (single-screen/stateful composition)",
+    "No dedicated backend service layer for business logic beyond Supabase SQL/RPC",
+    "No explicit CI/CD, EAS pipeline, or deployment automation in repository",
+    "No offline-first sync/conflict handling; depends on network and realtime availability",
+    "No evidence of pagination/virtualization for large session/comment datasets"
+  ]
+}

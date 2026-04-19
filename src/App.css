@@ -1,6 +1,6 @@
 .shell {
-  width: min(1100px, 100% - 2.5rem);
-  margin: 2rem auto 2.5rem;
+  width: min(1480px, 100% - 3rem);
+  margin: 2rem auto 3rem;
   display: grid;
   gap: 1.25rem;
 }
@@ -11,19 +11,23 @@
 
 .card {
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 8px;
   background: var(--card-bg);
   box-shadow: var(--shadow-soft);
   padding: 1.2rem;
 }
 
 .auth-card {
-  width: min(500px, 100%);
-  margin: 5vh auto;
-  padding: 1.4rem;
-  padding-bottom: 4rem;
+  width: min(740px, 100%);
+  margin: 4vh auto;
+  padding: 1.6rem;
+  padding-bottom: 4.2rem;
   position: relative;
-  box-shadow: 0 20px 44px rgba(28, 85, 245, 0.16);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--white), var(--white)) padding-box,
+    var(--hero-gradient) border-box;
+  box-shadow: var(--shadow-medium);
 }
 
 .header-card {
@@ -31,6 +35,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--white), var(--white)) padding-box,
+    linear-gradient(106deg, #cadfff 8%, #7ca6f0 42%, #2f4c86 74%, #0b162b 100%) border-box;
 }
 
 .header-actions {
@@ -45,14 +53,14 @@
   gap: 0.6rem;
   padding: 0.42rem 0.6rem;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #f8fbff;
+  border-radius: 50px;
+  background: var(--white);
 }
 
 .profile-card {
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fbfdff;
+  border-radius: 8px;
+  background: var(--white);
   padding: 0.85rem;
 }
 
@@ -74,10 +82,10 @@
 }
 
 .avatar {
-  border-radius: 999px;
-  border: 1px solid #c1d5fb;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
   object-fit: cover;
-  background: #fff;
+  background: var(--white);
   flex-shrink: 0;
 }
 
@@ -100,14 +108,14 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  color: #2148a8;
-  background: linear-gradient(140deg, #d8e7ff, #edf4ff);
+  font-weight: 540;
+  color: var(--black);
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1.25fr;
+  grid-template-columns: 1fr 2.5fr;
   gap: 1rem;
 }
 
@@ -127,40 +135,59 @@
 
 .eyebrow {
   margin: 0;
-  letter-spacing: 0.08em;
+  font-family: var(--font-mono);
+  letter-spacing: 0.54px;
   text-transform: uppercase;
-  font-size: 0.78rem;
-  color: var(--accent-strong);
-  font-weight: 700;
+  font-size: 1rem;
+  color: var(--black);
+  font-weight: 400;
 }
 
 h1 {
   margin: 0.35rem 0;
-  font-size: clamp(1.7rem, 3vw, 2.35rem);
+  font-size: clamp(2rem, 4vw, 3.8rem);
   font-family: var(--font-heading);
-  line-height: 1.1;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+}
+
+.auth-card h1 {
+  font-size: clamp(2.6rem, 8vw, 5.38rem);
+  line-height: 1;
+  letter-spacing: -0.065em;
 }
 
 h2 {
   margin: 0;
   font-family: var(--font-heading);
-  font-size: 1.25rem;
+  font-size: clamp(1.45rem, 2vw, 1.95rem);
+  font-weight: 540;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
 }
 
 h3 {
   margin: 0;
   font-family: var(--font-heading);
-  font-size: 1.1rem;
+  font-size: 1.4rem;
+  font-weight: 480;
+  line-height: 1.3;
+  letter-spacing: -0.02em;
 }
 
 .subtle {
   margin: 0;
   color: var(--text-soft);
+  font-weight: 330;
+  letter-spacing: -0.02em;
 }
 
 .muted {
   margin: 0;
   color: var(--text-muted);
+  font-weight: 320;
+  letter-spacing: -0.02em;
 }
 
 .field {
@@ -169,8 +196,11 @@ h3 {
 }
 
 .field > span {
-  font-weight: 600;
-  font-size: 0.92rem;
+  font-family: var(--font-mono);
+  font-weight: 400;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
 }
 
 input,
@@ -184,10 +214,11 @@ input,
 textarea,
 select {
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
+  border-radius: 8px;
+  background: var(--white);
   padding: 0.7rem 0.85rem;
   color: var(--text-strong);
+  font-weight: 330;
 }
 
 textarea {
@@ -199,16 +230,17 @@ input:focus,
 textarea:focus,
 select:focus,
 button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px dashed var(--black);
   outline-offset: 1px;
 }
 
 button {
   border: 1px solid transparent;
-  border-radius: 14px;
-  padding: 0.66rem 0.92rem;
+  border-radius: 50px;
+  padding: 0.5rem 1rem 0.62rem;
   cursor: pointer;
-  font-weight: 600;
+  font-weight: 480;
+  letter-spacing: -0.01em;
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
@@ -223,34 +255,39 @@ button:disabled {
 }
 
 .primary {
-  background: linear-gradient(135deg, #2148c0, #1a2e63);
-  color: #fff;
-  box-shadow: 0 9px 22px rgba(28, 67, 175, 0.36);
+  background: var(--black);
+  color: var(--white);
+  border-color: var(--black);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
 }
 
 .secondary {
-  background: #f4f8ff;
-  color: var(--text-strong);
-  border-color: #d3e2fd;
+  background: var(--white);
+  color: var(--black);
+  border-color: var(--black);
 }
 
 .tertiary {
-  background: #eef4ff;
-  color: var(--text-strong);
-  border-color: #c9dbff;
+  background: var(--glass-dark);
+  color: var(--black);
+  border-color: transparent;
 }
 
 .ghost {
   background: transparent;
-  color: var(--text-soft);
-  border-color: var(--line);
+  color: var(--black);
+  border-color: var(--line-strong);
 }
 
 .link {
   background: transparent;
-  color: var(--accent-strong);
+  color: var(--black);
   text-align: left;
   padding-inline: 0;
+  border-radius: 0;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }
 
 .split {
@@ -264,17 +301,17 @@ button:disabled {
   grid-template-columns: 1fr 1fr;
   gap: 0.25rem;
   padding: 0.2rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: #eef3ff;
+  border-radius: 50px;
+  border: 1px solid var(--line-strong);
+  background: var(--white);
 }
 
 .auth-switch-option {
   border: none;
-  border-radius: 999px;
+  border-radius: 50px;
   background: transparent;
-  color: #425372;
-  font-weight: 700;
+  color: var(--black);
+  font-weight: 340;
   padding-block: 0.56rem;
 }
 
@@ -283,9 +320,9 @@ button:disabled {
 }
 
 .auth-switch-option-active {
-  background: #fff;
-  color: #1a2e63;
-  box-shadow: 0 4px 10px rgba(42, 86, 209, 0.2);
+  background: var(--black);
+  color: var(--white);
+  box-shadow: none;
 }
 
 .auth-switch-corner {
@@ -320,14 +357,14 @@ button:disabled {
 
 .session-item {
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fff;
+  border-radius: 8px;
+  background: var(--white);
   padding: 0.8rem;
 }
 
 .session-item-selected {
-  border-color: #9dc1ff;
-  box-shadow: 0 8px 18px rgba(37, 95, 245, 0.2);
+  border-color: var(--black);
+  box-shadow: inset 0 0 0 1px var(--black);
 }
 
 .session-heading {
@@ -338,13 +375,15 @@ button:disabled {
 }
 
 .pill {
-  border: 1px solid #b9d0ff;
-  background: #edf4ff;
-  color: #2348ad;
-  border-radius: 999px;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.78rem;
-  text-transform: capitalize;
+  border: 1px solid var(--line-strong);
+  background: var(--white);
+  color: var(--black);
+  border-radius: 50px;
+  padding: 0.25rem 0.62rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
 }
 
 .progress-row {
@@ -354,8 +393,8 @@ button:disabled {
 
 .progress-track {
   height: 0.62rem;
-  border-radius: 999px;
-  background: #dbe7ff;
+  border-radius: 50px;
+  background: rgba(0, 0, 0, 0.14);
   overflow: hidden;
 }
 
@@ -363,20 +402,21 @@ button:disabled {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #3474ff, #1538a7);
+  background: var(--black);
 }
 
 .progress-label {
   font-size: 0.86rem;
   color: var(--text-soft);
+  letter-spacing: -0.02em;
 }
 
 .error {
   margin: 0;
-  color: #962e42;
-  background: #fff0f4;
-  border: 1px solid #f3ccd7;
-  border-radius: 10px;
+  color: var(--black);
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
   padding: 0.5rem 0.6rem;
 }
 
@@ -399,8 +439,8 @@ button:disabled {
 
 .detail-pane {
   border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fbfdff;
+  border-radius: 8px;
+  background: var(--white);
   padding: 0.8rem;
 }
 
@@ -416,9 +456,9 @@ button:disabled {
 .member-item,
 .comment-item {
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 0.62rem;
-  background: #ffffff;
+  background: var(--white);
 }
 
 .member-head,
@@ -432,20 +472,21 @@ button:disabled {
 .comment-body {
   margin: 0.4rem 0;
   white-space: pre-wrap;
+  letter-spacing: -0.02em;
 }
 
 .like-button {
-  background: #edf3ff;
-  color: #214bb8;
-  border-color: #c7dafd;
+  background: var(--glass-dark);
+  color: var(--black);
+  border-color: transparent;
   font-size: 0.88rem;
-  padding: 0.44rem 0.62rem;
+  padding: 0.44rem 0.78rem;
 }
 
 .like-button-active {
-  background: #cdddff;
-  color: #102d85;
-  border-color: #a8c3ff;
+  background: var(--black);
+  color: var(--white);
+  border-color: var(--black);
 }
 
 @media (max-width: 960px) {
@@ -470,13 +511,17 @@ button:disabled {
 
 @media (max-width: 640px) {
   .shell {
-    width: min(1100px, 100% - 1.2rem);
+    width: min(1480px, 100% - 1.2rem);
     margin-block: 1rem;
   }
 
   .card,
   .session-item {
-    border-radius: 14px;
+    border-radius: 8px;
+  }
+
+  .auth-card {
+    padding-inline: 1rem;
   }
 
   .split {
@@ -494,6 +539,6 @@ button:disabled {
   }
 
   .header-identity {
-    border-radius: 14px;
+    border-radius: 8px;
   }
 }
