@@ -1,27 +1,36 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
-
 :root {
-  --font-base: 'Outfit', 'Segoe UI', sans-serif;
-  --font-heading: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-base: 'figmaSans', 'Figma Sans', 'Avenir Next', 'SF Pro Display', 'Segoe UI', sans-serif;
+  --font-heading: 'figmaSans', 'Figma Sans', 'Avenir Next', 'SF Pro Display', 'Segoe UI', sans-serif;
+  --font-mono: 'figmaMono', 'Figma Mono', 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
 
-  --bg-base: #f3f7ff;
-  --bg-overlay: radial-gradient(circle at 12% 0%, #d8e8ff 0%, transparent 44%),
-    radial-gradient(circle at 88% 4%, #cfe0ff 0%, transparent 38%);
+  --black: #000000;
+  --white: #ffffff;
+  --glass-dark: rgba(0, 0, 0, 0.08);
+  --glass-light: rgba(255, 255, 255, 0.16);
 
-  --text-strong: #131f38;
-  --text-soft: #4f607f;
-  --text-muted: #667697;
-  --line: #d4e2fb;
-  --card-bg: rgba(255, 255, 255, 0.95);
+  --bg-base: var(--white);
+  --text-strong: var(--black);
+  --text-soft: rgba(0, 0, 0, 0.75);
+  --text-muted: rgba(0, 0, 0, 0.62);
+  --line: rgba(0, 0, 0, 0.16);
+  --line-strong: rgba(0, 0, 0, 0.42);
+  --card-bg: var(--white);
 
-  --accent: #245cff;
-  --accent-strong: #1b45c6;
-  --shadow-soft: 0 12px 34px rgba(36, 92, 255, 0.12);
+  --hero-gradient: linear-gradient(126deg, #bfd4ff 0%, #4b79d6 42%, #0b1528 72%, #000000 100%);
+  --bg-overlay:
+    radial-gradient(circle at 10% 6%, rgba(177, 207, 255, 0.42) 0%, rgba(177, 207, 255, 0.12) 24%, transparent 54%),
+    radial-gradient(circle at 86% 16%, rgba(88, 132, 221, 0.55) 0%, rgba(88, 132, 221, 0.16) 30%, transparent 58%),
+    linear-gradient(145deg, #d2e3ff 0%, #88aef8 24%, #476eb8 46%, #1f345c 64%, #0a1324 82%, #000000 100%);
+
+  --shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.08);
+  --shadow-medium: 0 22px 52px rgba(0, 0, 0, 0.14);
 
   font-family: var(--font-base);
   line-height: 1.45;
-  font-weight: 500;
+  font-weight: 330;
   font-synthesis: none;
+  font-feature-settings: 'kern' 1;
+  letter-spacing: -0.012em;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -29,6 +38,11 @@
 
 * {
   box-sizing: border-box;
+}
+
+*::selection {
+  color: var(--white);
+  background: var(--black);
 }
 
 html,
@@ -40,5 +54,6 @@ body,
 body {
   margin: 0;
   color: var(--text-strong);
-  background: var(--bg-overlay), var(--bg-base);
+  background: var(--bg-overlay);
+  background-attachment: fixed;
 }
