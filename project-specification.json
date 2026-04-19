@@ -1,5 +1,5 @@
 {
-  "project_name": "Books & Friends (repository: vibecodebook)",
+  "project_name": "BookCom (repository: bookcom)",
   "project_summary": {
     "purpose": "Provide a shared reading-community platform where authenticated users create book reading sessions, join sessions, track chapter progress, discuss in a single thread, and react with likes.",
     "target_users": "Book readers, reading clubs, and small communities coordinating progress around the same book across web and mobile clients.",

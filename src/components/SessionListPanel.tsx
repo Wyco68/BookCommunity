@@ -5,9 +5,8 @@ import type { ReadingSession, SessionJoinRequest, SessionMembership } from '../t
 
 type Copy = (typeof translations)[Language]
 
-interface SessionListPanelProps {
+export interface SessionListPanelProps {
   t: Copy
-  sessionView: 'active' | 'archived'
   sessionSearch: string
   visibilityFilter: 'all' | 'public' | 'private'
   screenError: string | null
@@ -20,7 +19,6 @@ interface SessionListPanelProps {
   progressDrafts: Record<string, number>
   busySessionId: string | null
   totalSessionCount: number
-  onSessionViewChange: (view: 'active' | 'archived') => void
   onSessionSearchChange: (value: string) => void
   onVisibilityFilterChange: (value: 'all' | 'public' | 'private') => void
   onSelectSession: (sessionId: string) => void
@@ -28,11 +26,11 @@ interface SessionListPanelProps {
   onUpdateProgress: (session: ReadingSession) => Promise<void>
   onLeaveSession: (sessionId: string) => Promise<void>
   onJoinSession: (sessionId: string) => Promise<void>
+  showControls?: boolean
 }
 
 export function SessionListPanel({
   t,
-  sessionView,
   sessionSearch,
   visibilityFilter,
   screenError,
@@ -45,7 +43,6 @@ export function SessionListPanel({
   progressDrafts,
   busySessionId,
   totalSessionCount,
-  onSessionViewChange,
   onSessionSearchChange,
   onVisibilityFilterChange,
   onSelectSession,
@@ -53,54 +50,40 @@ export function SessionListPanel({
   onUpdateProgress,
   onLeaveSession,
   onJoinSession,
+  showControls = true,
 }: SessionListPanelProps) {
   return (
     <article className="card stack">
       <div>
-        <h2>{sessionView === 'active' ? t.sessions.findSessions : t.sessions.archivedSessions}</h2>
-        <p className="subtle">{sessionView === 'active' ? t.sessions.activeSummary : t.sessions.archivedSummary}</p>
+        <h2>{t.sessions.findSessions}</h2>
+        <p className="subtle">{t.sessions.activeSummary}</p>
       </div>
 
-      <div className="stack gap-sm">
-        <div className="auth-switch" role="tablist" aria-label={t.sessions.viewAriaLabel}>
-          <button
-            type="button"
-            className={`auth-switch-option ${sessionView === 'active' ? 'auth-switch-option-active' : ''}`}
-            onClick={() => onSessionViewChange('active')}
-          >
-            {t.sessions.active}
-          </button>
-          <button
-            type="button"
-            className={`auth-switch-option ${sessionView === 'archived' ? 'auth-switch-option-active' : ''}`}
-            onClick={() => onSessionViewChange('archived')}
-          >
-            {t.sessions.archived}
-          </button>
+      {showControls ? (
+        <div className="stack gap-sm">
+          <label className="field">
+            <span>{t.sessions.searchLabel}</span>
+            <input
+              type="text"
+              value={sessionSearch}
+              onChange={(event) => onSessionSearchChange(event.target.value)}
+              placeholder={t.sessions.searchPlaceholder}
+            />
+          </label>
+
+          <label className="field">
+            <span>{t.sessions.visibility}</span>
+            <select
+              value={visibilityFilter}
+              onChange={(event) => onVisibilityFilterChange(event.target.value as 'all' | 'public' | 'private')}
+            >
+              <option value="all">{t.sessions.all}</option>
+              <option value="public">{t.enums.visibility.public}</option>
+              <option value="private">{t.enums.visibility.private}</option>
+            </select>
+          </label>
         </div>
-
-        <label className="field">
-          <span>{t.sessions.searchLabel}</span>
-          <input
-            type="text"
-            value={sessionSearch}
-            onChange={(event) => onSessionSearchChange(event.target.value)}
-            placeholder={t.sessions.searchPlaceholder}
-          />
-        </label>
-
-        <label className="field">
-          <span>{t.sessions.visibility}</span>
-          <select
-            value={visibilityFilter}
-            onChange={(event) => onVisibilityFilterChange(event.target.value as 'all' | 'public' | 'private')}
-          >
-            <option value="all">{t.sessions.all}</option>
-            <option value="public">{t.enums.visibility.public}</option>
-            <option value="private">{t.enums.visibility.private}</option>
-          </select>
-        </label>
-      </div>
+      ) : null}
 
       {screenError ? <p className="error">{screenError}</p> : null}
       {loadingSessions ? <p className="subtle">{t.sessions.loading}</p> : null}
@@ -181,7 +164,7 @@ export function SessionListPanel({
                   <button
                     type="button"
                     className="secondary"
-                    disabled={busySessionId === session.id || session.status === 'archived' || requestStatus === 'pending'}
+                    disabled={busySessionId === session.id || requestStatus === 'pending'}
                     onClick={() => {
                       void onJoinSession(session.id)
                     }}

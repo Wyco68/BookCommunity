@@ -1,10 +1,12 @@
+import { NavLink } from 'react-router-dom'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import { Avatar } from './Avatar'
+import { APP_PATHS } from '../router/paths'
 
 type Copy = (typeof translations)[Language]
 
-interface DashboardHeaderProps {
+export interface DashboardHeaderProps {
   t: Copy
   language: Language
   joinedSessionCount: number
@@ -25,15 +27,27 @@ export function DashboardHeader({
   onLanguageChange,
   onSignOut,
 }: DashboardHeaderProps) {
+  const getNavClass = ({ isActive }: { isActive: boolean }) =>
+    `nav-link ${isActive ? 'nav-link-active' : ''}`
+
   return (
     <header className="card header-card">
-      <div>
+      <div className="header-brand">
         <p className="eyebrow">{t.auth.welcomeBack}</p>
-        <h1>Books and Friends</h1>
+        <h1>BookCom</h1>
         <p className="subtle">{t.auth.joinedSessionsSummary(joinedSessionCount)}</p>
       </div>
 
       <div className="header-actions">
+        <nav className="navbar-links" aria-label="Primary">
+          <NavLink className={getNavClass} to={APP_PATHS.search}>
+            Search
+          </NavLink>
+          <NavLink className={getNavClass} to={APP_PATHS.sections}>
+            Sections
+          </NavLink>
+        </nav>
+
         <div className="auth-switch" role="tablist" aria-label={t.language.switchLabel}>
           <button
             type="button"
@@ -51,13 +65,15 @@ export function DashboardHeader({
           </button>
         </div>
 
-        <div className="header-identity">
-          <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="md" />
-          <div>
-            <p className="subtle">{t.auth.signedInAs}</p>
-            <strong>{myDisplayName}</strong>
+        <NavLink className="header-identity-link" to={APP_PATHS.profileEdit}>
+          <div className="header-identity">
+            <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="md" />
+            <div>
+              <p className="subtle">{t.auth.signedInAs}</p>
+              <strong>{myDisplayName}</strong>
+            </div>
           </div>
-        </div>
+        </NavLink>
 
         <button type="button" className="secondary" onClick={onSignOut}>
           {t.auth.signOut}

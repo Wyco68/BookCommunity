@@ -12,12 +12,11 @@ import { Avatar } from './Avatar'
 
 type Copy = (typeof translations)[Language]
 
-interface SessionDetailPanelProps {
+export interface SessionDetailPanelProps {
   t: Copy
   selectedSession: ReadingSession | null
   selectedIsOwner: boolean
   selectedIsMember: boolean
-  busySessionId: string | null
   loadingSessionDetail: boolean
   sessionMembers: SessionMembership[]
   sessionProfiles: Record<string, Profile>
@@ -32,12 +31,12 @@ interface SessionDetailPanelProps {
     likedByMe: Record<string, boolean>
   }
   likingCommentId: string | null
-  onArchiveOrRestore: () => Promise<void>
   onApproveJoinRequest: (request: SessionJoinRequest) => Promise<void>
   onRejectJoinRequest: (request: SessionJoinRequest) => Promise<void>
   onSubmitComment: (event: FormEvent<HTMLFormElement>) => Promise<void>
   onCommentDraftChange: (value: string) => void
   onToggleLike: (commentId: string) => Promise<void>
+  fullWidth?: boolean
 }
 
 export function SessionDetailPanel({
@@ -45,7 +44,6 @@ export function SessionDetailPanel({
   selectedSession,
   selectedIsOwner,
   selectedIsMember,
-  busySessionId,
   loadingSessionDetail,
   sessionMembers,
   sessionProfiles,
@@ -57,15 +55,15 @@ export function SessionDetailPanel({
   sessionComments,
   commentMeta,
   likingCommentId,
-  onArchiveOrRestore,
   onApproveJoinRequest,
   onRejectJoinRequest,
   onSubmitComment,
   onCommentDraftChange,
   onToggleLike,
+  fullWidth = true,
 }: SessionDetailPanelProps) {
   return (
-    <article className="card stack span-full">
+    <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
       {!selectedSession ? (
         <p className="subtle">{t.sessions.selectSessionPrompt}</p>
       ) : (
@@ -75,24 +73,6 @@ export function SessionDetailPanel({
               <h2>{selectedSession.book_title}</h2>
               <p className="subtle">{t.sessions.singleThread}</p>
             </div>
-            {selectedIsOwner ? (
-              <button
-                type="button"
-                className="ghost"
-                disabled={busySessionId === selectedSession.id}
-                onClick={() => {
-                  void onArchiveOrRestore()
-                }}
-              >
-                {busySessionId === selectedSession.id
-                  ? selectedSession.status === 'active'
-                    ? t.sessions.archiving
-                    : t.sessions.restoring
-                  : selectedSession.status === 'active'
-                    ? t.sessions.archiveSession
-                    : t.sessions.restoreSession}
-              </button>
-            ) : null}
           </div>
 
           <div className="detail-grid">

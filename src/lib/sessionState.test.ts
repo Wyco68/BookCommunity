@@ -36,17 +36,17 @@ describe('getPreferredSelectedSessionId', () => {
     ]
 
     const memberships: Record<string, SessionMembership> = {}
-    const selected = getPreferredSelectedSessionId(sessions, memberships, 'active', 's2')
+    const selected = getPreferredSelectedSessionId(sessions, memberships, 's2')
 
     expect(selected).toBe('s2')
   })
 
   it('returns null for empty session list', () => {
-    const selected = getPreferredSelectedSessionId([], {}, 'active', null)
+    const selected = getPreferredSelectedSessionId([], {}, null)
     expect(selected).toBeNull()
   })
 
-  it('prefers joined session in the current view when selection is missing', () => {
+  it('prefers joined active session when selection is missing', () => {
     const sessions = [
       makeSession('s1', 'archived', 'public', 'Old', 'Author A'),
       makeSession('s2', 'active', 'public', 'Active One', 'Author B'),
@@ -56,18 +56,18 @@ describe('getPreferredSelectedSessionId', () => {
       s3: { session_id: 's3', user_id: 'u1', role: 'member' },
     }
 
-    const selected = getPreferredSelectedSessionId(sessions, memberships, 'active', 'missing')
+    const selected = getPreferredSelectedSessionId(sessions, memberships, 'missing')
     expect(selected).toBe('s3')
   })
 
-  it('falls back to first session in current view when user is not a member of any', () => {
+  it('falls back to first active session when user is not a member of any', () => {
     const sessions = [
       makeSession('s1', 'archived', 'public', 'Old', 'Author A'),
       makeSession('s2', 'active', 'public', 'Active One', 'Author B'),
       makeSession('s3', 'active', 'public', 'Active Two', 'Author C'),
     ]
 
-    const selected = getPreferredSelectedSessionId(sessions, {}, 'active', null)
+    const selected = getPreferredSelectedSessionId(sessions, {}, null)
     expect(selected).toBe('s2')
   })
 })
@@ -80,27 +80,27 @@ describe('filterSessions', () => {
   ]
 
   it('returns happy path match by title', () => {
-    const result = filterSessions(sessions, 'active', 'all', 'dune')
+    const result = filterSessions(sessions, 'all', 'dune')
     expect(result.map((session) => session.id)).toEqual(['s2'])
   })
 
   it('handles leading and trailing whitespace in search query', () => {
-    const result = filterSessions(sessions, 'active', 'all', '  alchemist  ')
+    const result = filterSessions(sessions, 'all', '  alchemist  ')
     expect(result.map((session) => session.id)).toEqual(['s1'])
   })
 
   it('applies visibility and status filters together', () => {
-    const result = filterSessions(sessions, 'active', 'public', '')
+    const result = filterSessions(sessions, 'public', '')
     expect(result.map((session) => session.id)).toEqual(['s1'])
   })
 
   it('matches by author name in a case-insensitive way', () => {
-    const result = filterSessions(sessions, 'active', 'all', 'frank HERBERT')
+    const result = filterSessions(sessions, 'all', 'frank HERBERT')
     expect(result.map((session) => session.id)).toEqual(['s2'])
   })
 
   it('returns empty list when no session matches search and filters', () => {
-    const result = filterSessions(sessions, 'active', 'private', 'alchemist')
+    const result = filterSessions(sessions, 'private', 'alchemist')
     expect(result).toEqual([])
   })
 })

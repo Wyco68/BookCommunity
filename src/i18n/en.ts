@@ -1,5 +1,5 @@
 export const en = {
-  appName: 'Books and Friends',
+  appName: 'BookCom',
   language: {
     switchLabel: 'Language',
     english: 'English',
@@ -17,7 +17,7 @@ export const en = {
   },
   auth: {
     checkingSession: 'Checking your session...',
-    welcome: 'Welcome to Books & Friends',
+    welcome: 'Welcome to BookCom',
     subtitle: 'Log in to join sessions or create your own.',
     modeAriaLabel: 'Authentication mode',
     signIn: 'Sign in',

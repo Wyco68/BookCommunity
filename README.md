@@ -1,6 +1,6 @@
-# Books & Friends
+# BookCom
 
-Books & Friends is a dual-client reading community app built on Supabase.
+BookCom is a dual-client reading community app built on Supabase.
 
 - Web client: React + Vite + TypeScript
 - Mobile client: React Native + Expo + TypeScript
@@ -10,7 +10,7 @@ The app is authenticated-only: users sign in, join reading sessions, post chapte
 
 ## Product summary
 
-Books & Friends supports shared reading sessions where members track chapter progress together.
+BookCom supports shared reading sessions where members track chapter progress together.
 
 ### Core MVP behavior
 

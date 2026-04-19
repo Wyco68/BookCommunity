@@ -22,23 +22,20 @@ import {
   resolveAvatarUrl,
   resolveAvatarUrlMap,
 } from './lib/avatar'
-import { Avatar } from './components/Avatar'
 import { AuthLoadingView, AuthView } from './components/AuthView'
-import { DashboardHeader } from './components/DashboardHeader'
-import { SessionDetailPanel } from './components/SessionDetailPanel'
-import { SessionListPanel } from './components/SessionListPanel'
 import { useSessionDerivedState } from './hooks/useSessionDerivedState'
 import {
   buildJoinRequestStatusLookup,
   buildLatestProgressBySession,
   buildMembershipLookup,
 } from './lib/sessionData'
-import { getPreferredSelectedSessionId } from './lib/sessionState'
+import { filterSessions, getPreferredSelectedSessionId } from './lib/sessionState'
+import { AppRouter } from './router/AppRouter'
 import './App.css'
 
 type AuthMode = 'sign-in' | 'sign-up'
 
-interface SessionFormState {
+export interface SessionFormState {
   bookTitle: string
   bookAuthor: string
   totalChapters: number
@@ -56,7 +53,7 @@ const defaultSessionForm: SessionFormState = {
   joinPolicy: 'open',
 }
 
-const LANGUAGE_STORAGE_KEY = 'books-friends-language'
+const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
 function App() {
   const [user, setUser] = useState<User | null>(null)
@@ -95,7 +92,6 @@ function App() {
   const [sessionJoinRequests, setSessionJoinRequests] = useState<SessionJoinRequest[]>([])
   const [requestBusyId, setRequestBusyId] = useState<string | null>(null)
 
-  const [sessionView, setSessionView] = useState<'active' | 'archived'>('active')
   const [sessionSearch, setSessionSearch] = useState('')
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all')
   const [myJoinRequestStatus, setMyJoinRequestStatus] = useState<Record<string, SessionJoinRequest['status']>>({})
@@ -119,7 +115,7 @@ function App() {
     setScreenError(null)
 
     const [sessionsResult, membershipsResult, progressResult, requestsResult] = await Promise.all([
-      supabase.from('reading_sessions').select('*').in('status', ['active', 'archived']).order('created_at', { ascending: false }),
+      supabase.from('reading_sessions').select('*').eq('status', 'active').order('created_at', { ascending: false }),
       supabase.from('session_members').select('session_id,user_id,role').eq('user_id', activeUser.id),
       supabase
         .from('progress_updates')
@@ -355,11 +351,11 @@ function App() {
   }, [avatarPreviewUrl, loadAppData, loadMyProfile])
 
   useEffect(() => {
-    const nextSelectedSessionId = getPreferredSelectedSessionId(sessions, memberships, sessionView, selectedSessionId)
+    const nextSelectedSessionId = getPreferredSelectedSessionId(sessions, memberships, selectedSessionId)
     if (nextSelectedSessionId !== selectedSessionId) {
       setSelectedSessionId(nextSelectedSessionId)
     }
-  }, [memberships, selectedSessionId, sessionView, sessions])
+  }, [memberships, selectedSessionId, sessions])
 
   useEffect(() => {
     if (!selectedSessionId) {
@@ -589,55 +585,6 @@ function App() {
     if (selectedSessionId === sessionId) {
       setSelectedSessionId(null)
     }
-    setBusySessionId(null)
-  }
-
-  async function handleArchiveSelected() {
-    if (!user || !selectedSessionId) {
-      return
-    }
-
-    setBusySessionId(selectedSessionId)
-    const { error } = await supabase
-      .from('reading_sessions')
-      .update({ status: 'archived' })
-      .eq('id', selectedSessionId)
-      .eq('creator_id', user.id)
-
-    if (error) {
-      setScreenError(error.message)
-      setBusySessionId(null)
-      return
-    }
-
-    await loadAppData(user)
-    if (selectedSession) {
-      setSessionView('archived')
-      setSelectedSessionId(selectedSession.id)
-    }
-    setBusySessionId(null)
-  }
-
-  async function handleRestoreSelected() {
-    if (!user || !selectedSessionId) {
-      return
-    }
-
-    setBusySessionId(selectedSessionId)
-    const { error } = await supabase
-      .from('reading_sessions')
-      .update({ status: 'active' })
-      .eq('id', selectedSessionId)
-      .eq('creator_id', user.id)
-
-    if (error) {
-      setScreenError(error.message)
-      setBusySessionId(null)
-      return
-    }
-
-    await loadAppData(user)
-    setSessionView('active')
     setBusySessionId(null)
   }
 
@@ -903,10 +850,18 @@ function App() {
     sessionProgress,
     sessionLikes,
     sessionJoinRequests,
-    sessionView,
     visibilityFilter,
     sessionSearch,
   })
+
+  const searchFilteredSessions = filterSessions(sessions, visibilityFilter, sessionSearch).filter(
+    (session) => !memberships[session.id],
+  )
+  const joinedSearchSessions = filterSessions(sessions, visibilityFilter, sessionSearch).filter(
+    (session) => Boolean(memberships[session.id]),
+  )
+  const combinedSearchSessions = [...searchFilteredSessions, ...joinedSearchSessions]
+  const joinedFilteredSessions = filteredSessions.filter((session) => Boolean(memberships[session.id]))
 
   async function handleUpdateProgress(session: ReadingSession) {
     if (!user) {
@@ -964,214 +919,106 @@ function App() {
     )
   }
 
+  const listPanelProps = {
+    t,
+    sessionSearch,
+    visibilityFilter,
+    screenError,
+    loadingSessions,
+    filteredSessions,
+    memberships,
+    latestProgress,
+    selectedSessionId,
+    myJoinRequestStatus,
+    progressDrafts,
+    busySessionId,
+    totalSessionCount: sessions.length,
+    onSessionSearchChange: setSessionSearch,
+    onVisibilityFilterChange: setVisibilityFilter,
+    onSelectSession: setSelectedSessionId,
+    onProgressDraftsChange: setProgressDrafts,
+    onUpdateProgress: handleUpdateProgress,
+    onLeaveSession: handleLeaveSession,
+    onJoinSession: handleJoinSession,
+  }
+
+  const searchListProps = {
+    ...listPanelProps,
+    filteredSessions: combinedSearchSessions,
+  }
+
+  const sectionsListProps = {
+    ...listPanelProps,
+    filteredSessions: joinedFilteredSessions,
+    sessionSearch: '',
+    onSessionSearchChange: () => {},
+    onVisibilityFilterChange: () => {},
+  }
+
+  const detailPanelProps = {
+    t,
+    selectedSession,
+    selectedIsOwner,
+    selectedIsMember,
+    loadingSessionDetail,
+    sessionMembers,
+    sessionProfiles,
+    memberLatestProgress,
+    pendingRequests,
+    requestBusyId,
+    commentDraft,
+    postingComment,
+    sessionComments,
+    commentMeta,
+    likingCommentId,
+    onApproveJoinRequest: handleApproveJoinRequest,
+    onRejectJoinRequest: handleRejectJoinRequest,
+    onSubmitComment: handleSubmitComment,
+    onCommentDraftChange: setCommentDraft,
+    onToggleLike: handleToggleLike,
+  }
+
   return (
-    <main className="shell dashboard-shell">
-      <DashboardHeader
-        t={t}
-        language={language}
-        joinedSessionCount={joinedSessionCount}
-        myAvatarImage={myAvatarImage}
-        myAvatarLabel={myAvatarLabel}
-        myDisplayName={myDisplayName}
-        onLanguageChange={setLanguage}
-        onSignOut={handleSignOut}
-      />
-
-      <section className="grid">
-        <article className="card stack">
-          <div>
-            <h2>{t.profile.title}</h2>
-            <p className="subtle">{t.profile.subtitle}</p>
-          </div>
-
-          <div className="profile-card stack">
-            <div className="profile-row">
-              <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="lg" />
-              <div className="stack gap-sm profile-upload-stack">
-                <label className="field">
-                  <span>{t.profile.avatarImage}</span>
-                  <input
-                    key={avatarInputKey}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={handleAvatarFileChange}
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={!avatarFile || avatarUploadBusy}
-                  onClick={() => {
-                    void handleUploadAvatar()
-                  }}
-                >
-                  {avatarUploadBusy ? t.common.uploading : t.profile.uploadAvatar}
-                </button>
-                <p className="muted">{t.profile.avatarHelp}</p>
-              </div>
-            </div>
-
-            <form className="stack" onSubmit={handleSaveProfile}>
-              <label className="field">
-                <span>{t.profile.displayName}</span>
-                <input
-                  type="text"
-                  value={profileNameDraft}
-                  onChange={(event) => setProfileNameDraft(event.target.value)}
-                  placeholder={t.profile.displayNamePlaceholder}
-                  maxLength={80}
-                />
-              </label>
-              <button type="submit" className="primary" disabled={profileSaving}>
-                {profileSaving ? t.common.saving : t.profile.saveProfile}
-              </button>
-            </form>
-
-            {profileNotice ? <p className="subtle">{profileNotice}</p> : null}
-          </div>
-
-          <div>
-            <h2>{t.sessionForm.title}</h2>
-            <p className="subtle">{t.sessionForm.subtitle}</p>
-          </div>
-
-          <form className="stack" onSubmit={handleCreateSession}>
-            <label className="field">
-              <span>{t.sessionForm.bookTitle}</span>
-              <input
-                type="text"
-                value={sessionForm.bookTitle}
-                onChange={(event) => setSessionForm((current) => ({ ...current, bookTitle: event.target.value }))}
-                placeholder={t.sessionForm.bookTitlePlaceholder}
-              />
-            </label>
-
-            <label className="field">
-              <span>{t.sessionForm.author}</span>
-              <input
-                type="text"
-                value={sessionForm.bookAuthor}
-                onChange={(event) => setSessionForm((current) => ({ ...current, bookAuthor: event.target.value }))}
-                placeholder={t.sessionForm.authorPlaceholder}
-              />
-            </label>
-
-            <label className="field">
-              <span>{t.sessionForm.totalChapters}</span>
-              <input
-                type="number"
-                min={1}
-                max={999}
-                value={sessionForm.totalChapters}
-                onChange={(event) =>
-                  setSessionForm((current) => ({
-                    ...current,
-                    totalChapters: Number.isNaN(Number(event.target.value)) ? 1 : Number(event.target.value),
-                  }))
-                }
-              />
-            </label>
-
-            <label className="field">
-              <span>{t.sessionForm.description}</span>
-              <textarea
-                value={sessionForm.description}
-                onChange={(event) => setSessionForm((current) => ({ ...current, description: event.target.value }))}
-                placeholder={t.sessionForm.descriptionPlaceholder}
-              />
-            </label>
-
-            <div className="split">
-              <label className="field">
-                <span>{t.sessionForm.visibility}</span>
-                <select
-                  value={sessionForm.visibility}
-                  onChange={(event) =>
-                    setSessionForm((current) => ({
-                      ...current,
-                      visibility: event.target.value as 'public' | 'private',
-                    }))
-                  }
-                >
-                  <option value="public">{t.sessionForm.public}</option>
-                  <option value="private">{t.sessionForm.private}</option>
-                </select>
-              </label>
-
-              <label className="field">
-                <span>{t.sessionForm.joinPolicy}</span>
-                <select
-                  value={sessionForm.joinPolicy}
-                  onChange={(event) =>
-                    setSessionForm((current) => ({
-                      ...current,
-                      joinPolicy: event.target.value as 'open' | 'request',
-                    }))
-                  }
-                >
-                  <option value="open">{t.sessionForm.openJoin}</option>
-                  <option value="request">{t.sessionForm.requestRequired}</option>
-                </select>
-              </label>
-            </div>
-
-            <button type="submit" className="primary" disabled={creatingSession}>
-              {creatingSession ? t.sessionForm.creating : t.sessionForm.createSession}
-            </button>
-          </form>
-        </article>
-
-        <SessionListPanel
-          t={t}
-          sessionView={sessionView}
-          sessionSearch={sessionSearch}
-          visibilityFilter={visibilityFilter}
-          screenError={screenError}
-          loadingSessions={loadingSessions}
-          filteredSessions={filteredSessions}
-          memberships={memberships}
-          latestProgress={latestProgress}
-          selectedSessionId={selectedSessionId}
-          myJoinRequestStatus={myJoinRequestStatus}
-          progressDrafts={progressDrafts}
-          busySessionId={busySessionId}
-          totalSessionCount={sessions.length}
-          onSessionViewChange={setSessionView}
-          onSessionSearchChange={setSessionSearch}
-          onVisibilityFilterChange={setVisibilityFilter}
-          onSelectSession={setSelectedSessionId}
-          onProgressDraftsChange={setProgressDrafts}
-          onUpdateProgress={handleUpdateProgress}
-          onLeaveSession={handleLeaveSession}
-          onJoinSession={handleJoinSession}
-        />
-
-        <SessionDetailPanel
-          t={t}
-          selectedSession={selectedSession}
-          selectedIsOwner={selectedIsOwner}
-          selectedIsMember={selectedIsMember}
-          busySessionId={busySessionId}
-          loadingSessionDetail={loadingSessionDetail}
-          sessionMembers={sessionMembers}
-          sessionProfiles={sessionProfiles}
-          memberLatestProgress={memberLatestProgress}
-          pendingRequests={pendingRequests}
-          requestBusyId={requestBusyId}
-          commentDraft={commentDraft}
-          postingComment={postingComment}
-          sessionComments={sessionComments}
-          commentMeta={commentMeta}
-          likingCommentId={likingCommentId}
-          onArchiveOrRestore={selectedSession?.status === 'active' ? handleArchiveSelected : handleRestoreSelected}
-          onApproveJoinRequest={handleApproveJoinRequest}
-          onRejectJoinRequest={handleRejectJoinRequest}
-          onSubmitComment={handleSubmitComment}
-          onCommentDraftChange={setCommentDraft}
-          onToggleLike={handleToggleLike}
-        />
-      </section>
-    </main>
+    <AppRouter
+      headerProps={{
+        t,
+        language,
+        joinedSessionCount,
+        myAvatarImage,
+        myAvatarLabel,
+        myDisplayName,
+        onLanguageChange: setLanguage,
+        onSignOut: handleSignOut,
+      }}
+      profileEditProps={{
+        t,
+        myAvatarImage,
+        myAvatarLabel,
+        avatarInputKey,
+        avatarFile,
+        avatarUploadBusy,
+        profileNameDraft,
+        profileSaving,
+        profileNotice,
+        onAvatarFileChange: handleAvatarFileChange,
+        onUploadAvatar: handleUploadAvatar,
+        onProfileNameDraftChange: setProfileNameDraft,
+        onSaveProfile: handleSaveProfile,
+      }}
+      searchSectionProps={{
+        t,
+        listProps: searchListProps,
+        sessionForm,
+        creatingSession,
+        onSessionFormChange: setSessionForm,
+        onCreateSession: handleCreateSession,
+      }}
+      sectionsAndDetailsProps={{
+        t,
+        listProps: sectionsListProps,
+        detailProps: detailPanelProps,
+      }}
+    />
   )
 }
 

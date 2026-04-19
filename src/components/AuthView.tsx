@@ -39,7 +39,7 @@ export function AuthView({
     <main className="shell">
       <section className="card auth-card">
         <div>
-          <p className="eyebrow">Books and Friends</p>
+          <p className="eyebrow">BookCom</p>
           <h1>{t.auth.welcome}</h1>
           <p className="subtle">{t.auth.subtitle}</p>
         </div>
@@ -120,7 +120,7 @@ export function AuthLoadingView({ message }: AuthLoadingViewProps) {
   return (
     <main className="shell">
       <section className="card centered">
-        <h1>Books and Friends</h1>
+        <h1>BookCom</h1>
         <p>{message}</p>
       </section>
     </main>

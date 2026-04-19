@@ -25,7 +25,7 @@ export const en = {
     loading: 'Loading...',
   },
   header: {
-    title: 'Books and Friends',
+    title: 'BookCom',
     activeJoinedSessions: (count: number) => `${count} active joined sessions`,
     signedInAs: (name: string) => `Signed in as ${name}`,
     signOut: 'Sign out',

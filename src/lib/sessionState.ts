@@ -3,7 +3,6 @@ import type { CommentLike, ProgressUpdate, ReadingSession, SessionMembership } f
 export function getPreferredSelectedSessionId(
   sessions: ReadingSession[],
   memberships: Record<string, SessionMembership>,
-  sessionView: 'active' | 'archived',
   selectedSessionId: string | null,
 ): string | null {
   if (sessions.length === 0) {
@@ -14,21 +13,20 @@ export function getPreferredSelectedSessionId(
     return selectedSessionId
   }
 
-  const joinedSession = sessions.find((session) => memberships[session.id] && session.status === sessionView)
-  const firstInView = sessions.find((session) => session.status === sessionView)
+  const joinedSession = sessions.find((session) => memberships[session.id] && session.status === 'active')
+  const firstInView = sessions.find((session) => session.status === 'active')
   return joinedSession?.id ?? firstInView?.id ?? sessions[0]?.id ?? null
 }
 
 export function filterSessions(
   sessions: ReadingSession[],
-  sessionView: 'active' | 'archived',
   visibilityFilter: 'all' | 'public' | 'private',
   sessionSearch: string,
 ): ReadingSession[] {
   const query = sessionSearch.trim().toLowerCase()
 
   return sessions.filter((session) => {
-    if (session.status !== sessionView) {
+    if (session.status !== 'active') {
       return false
     }
 

@@ -16,7 +16,6 @@ interface UseSessionDerivedStateInput {
   sessionProgress: ProgressUpdate[]
   sessionLikes: CommentLike[]
   sessionJoinRequests: SessionJoinRequest[]
-  sessionView: 'active' | 'archived'
   visibilityFilter: 'all' | 'public' | 'private'
   sessionSearch: string
 }
@@ -29,7 +28,6 @@ export function useSessionDerivedState({
   sessionProgress,
   sessionLikes,
   sessionJoinRequests,
-  sessionView,
   visibilityFilter,
   sessionSearch,
 }: UseSessionDerivedStateInput) {
@@ -44,8 +42,8 @@ export function useSessionDerivedState({
   )
 
   const filteredSessions = useMemo(
-    () => filterSessions(sessions, sessionView, visibilityFilter, sessionSearch),
-    [sessions, sessionView, visibilityFilter, sessionSearch],
+    () => filterSessions(sessions, visibilityFilter, sessionSearch),
+    [sessions, visibilityFilter, sessionSearch],
   )
 
   const selectedMembership = selectedSessionId ? memberships[selectedSessionId] : undefined
