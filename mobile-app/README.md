@@ -1,6 +1,6 @@
-# Books and Friends (Mobile)
+# BookCom (Mobile)
 
-React Native + Expo mobile client for Books and Friends, using the same Supabase backend as the web app.
+React Native + Expo mobile client for BookCom, using the same Supabase backend as the web app.
 
 ## Features implemented
 

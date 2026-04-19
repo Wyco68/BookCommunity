@@ -25,4 +25,7 @@ dist-ssr
 *.sw?
 
 
-/supabase/schema.sql    
+/supabase/schema.sql   
+
+DESIGN.md 
+/mobile-app

@@ -1,36 +1,42 @@
-:root {
-  --font-base: 'figmaSans', 'Figma Sans', 'Avenir Next', 'SF Pro Display', 'Segoe UI', sans-serif;
-  --font-heading: 'figmaSans', 'Figma Sans', 'Avenir Next', 'SF Pro Display', 'Segoe UI', sans-serif;
-  --font-mono: 'figmaMono', 'Figma Mono', 'IBM Plex Mono', 'SF Mono', Consolas, monospace;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist+Mono:wght@500;600&display=swap');
 
-  --black: #000000;
+:root {
+  --font-base: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback', ui-monospace, 'SFMono-Regular', monospace;
+
+  --color-brand: #3b82f6;
+  --color-brand-soft: #dbeafe;
+  --color-brand-deep: #1d4ed8;
+
+  --black: #0d0d0d;
   --white: #ffffff;
-  --glass-dark: rgba(0, 0, 0, 0.08);
-  --glass-light: rgba(255, 255, 255, 0.16);
+  --glass-dark: rgba(0, 0, 0, 0.04);
+  --glass-light: rgba(255, 255, 255, 0.4);
 
   --bg-base: var(--white);
-  --text-strong: var(--black);
-  --text-soft: rgba(0, 0, 0, 0.75);
-  --text-muted: rgba(0, 0, 0, 0.62);
-  --line: rgba(0, 0, 0, 0.16);
-  --line-strong: rgba(0, 0, 0, 0.42);
-  --card-bg: var(--white);
+  --text-strong: #0d0d0d;
+  --text-soft: #333333;
+  --text-muted: #666666;
+  --line: rgba(0, 0, 0, 0.05);
+  --line-strong: rgba(0, 0, 0, 0.08);
+  --card-bg: #ffffff;
 
-  --hero-gradient: linear-gradient(126deg, #bfd4ff 0%, #4b79d6 42%, #0b1528 72%, #000000 100%);
+  --hero-gradient: radial-gradient(circle at 10% 12%, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0.1) 34%, transparent 70%);
   --bg-overlay:
-    radial-gradient(circle at 10% 6%, rgba(177, 207, 255, 0.42) 0%, rgba(177, 207, 255, 0.12) 24%, transparent 54%),
-    radial-gradient(circle at 86% 16%, rgba(88, 132, 221, 0.55) 0%, rgba(88, 132, 221, 0.16) 30%, transparent 58%),
-    linear-gradient(145deg, #d2e3ff 0%, #88aef8 24%, #476eb8 46%, #1f345c 64%, #0a1324 82%, #000000 100%);
+    radial-gradient(circle at 12% 0%, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 28%, transparent 58%),
+    radial-gradient(circle at 88% 8%, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.04) 24%, transparent 56%),
+    linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
 
-  --shadow-soft: 0 14px 34px rgba(0, 0, 0, 0.08);
-  --shadow-medium: 0 22px 52px rgba(0, 0, 0, 0.14);
+  --shadow-soft: 0 2px 4px rgba(0, 0, 0, 0.03);
+  --shadow-medium: 0 8px 18px rgba(0, 0, 0, 0.04);
 
   font-family: var(--font-base);
-  line-height: 1.45;
-  font-weight: 330;
+  line-height: 1.5;
+  font-weight: 400;
   font-synthesis: none;
   font-feature-settings: 'kern' 1;
-  letter-spacing: -0.012em;
+  letter-spacing: normal;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -42,7 +48,7 @@
 
 *::selection {
   color: var(--white);
-  background: var(--black);
+  background: var(--color-brand-deep);
 }
 
 html,
@@ -54,6 +60,7 @@ body,
 body {
   margin: 0;
   color: var(--text-strong);
-  background: var(--bg-overlay);
+  background: var(--bg-base);
+  background-image: var(--bg-overlay);
   background-attachment: fixed;
 }

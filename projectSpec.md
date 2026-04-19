@@ -1,8 +1,8 @@
-# Books & Friends - Project Spec (Working Document)
+# BookCom - Project Spec (Working Document)
 
 ## 1) Product Overview
 
-- Name: Books & Friends
+- Name: BookCom
 - Description: Anyone can register. A member can create a reading session for a book by submitting title, author, and chapters. Other members can join and submit chapter progress. Members discuss in a single thread per session and react to comments.
 - Services: Supabase Backend
 - Products: Web App, Mobile App

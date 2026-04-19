@@ -45,7 +45,7 @@ const defaultSessionForm: SessionFormState = {
   joinPolicy: 'open',
 }
 
-const LANGUAGE_STORAGE_KEY = 'books-friends-mobile-language'
+const LANGUAGE_STORAGE_KEY = 'bookcom-mobile-language'
 
 function labelForProfile(userId: string, profiles: Record<string, Profile>): string {
   return profiles[userId]?.display_name?.trim() || userId.slice(0, 8)

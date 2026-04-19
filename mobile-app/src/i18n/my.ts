@@ -25,7 +25,7 @@ export const my = {
     loading: 'ဖတ်နေသည်...',
   },
   header: {
-    title: 'Books and Friends',
+    title: 'BookCom',
     activeJoinedSessions: (count: number) => `သင် join ထားသော active session ${count} ခု`,
     signedInAs: (name: string) => `${name} အနေဖြင့် ဝင်ရောက်ထားသည်`,
     signOut: 'ထွက်မည်',
