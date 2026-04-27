@@ -74,9 +74,9 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
 
       if (!profilesResult.error) {
         const profiles = (profilesResult.data ?? []) as Profile[]
-        const avatarPaths = profiles
+        const avatarPaths: string[] = profiles
           .map((p) => p.avatar_url)
-          .filter((url): url is string => Boolean(url) && !isRemoteUrl(url))
+          .filter((url): url is string => typeof url === 'string' && url.length > 0 && !isRemoteUrl(url))
         const resolvedAvatars = await resolveAvatarUrlMap(avatarPaths)
 
         const lookup: Record<string, Profile> = {}

@@ -72,5 +72,11 @@ export async function resolveAvatarUrlMap(paths: string[]): Promise<Record<strin
     }),
   )
 
-  return Object.fromEntries(signedResults.filter(([, url]) => url !== null))
+  const result: Record<string, string> = {}
+  for (const [path, url] of signedResults) {
+    if (url !== null) {
+      result[path] = url
+    }
+  }
+  return result
 }
