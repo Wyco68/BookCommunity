@@ -1,9 +1,9 @@
+import { memo } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import { translations } from '../i18n'
-import type { Language } from '../i18n'
 import type { ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
 
-type Copy = (typeof translations)[Language]
+type Copy = typeof translations.en
 
 export interface SessionListPanelProps {
   t: Copy
@@ -29,7 +29,7 @@ export interface SessionListPanelProps {
   showControls?: boolean
 }
 
-export function SessionListPanel({
+export const SessionListPanel = memo(function SessionListPanel({
   t,
   sessionSearch,
   visibilityFilter,
@@ -185,4 +185,4 @@ export function SessionListPanel({
       </ul>
     </article>
   )
-}
+})

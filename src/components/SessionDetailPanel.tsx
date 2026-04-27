@@ -1,6 +1,6 @@
+import { memo } from 'react'
 import type { FormEvent } from 'react'
 import { translations } from '../i18n'
-import type { Language } from '../i18n'
 import type {
   Comment,
   MediaType,
@@ -13,7 +13,7 @@ import type {
 import { Avatar } from './Avatar'
 import { MediaUpload, MediaGallery } from './Media/MediaComponents'
 
-type Copy = (typeof translations)[Language]
+type Copy = typeof translations.en
 
 export interface SessionDetailPanelProps {
   t: Copy
@@ -55,7 +55,7 @@ export interface SessionDetailPanelProps {
   mediaLimit?: number
 }
 
-export function SessionDetailPanel({
+export const SessionDetailPanel = memo(function SessionDetailPanel({
   t,
   selectedSession,
   selectedIsOwner,
@@ -274,4 +274,4 @@ export function SessionDetailPanel({
       )}
     </article>
   )
-}
+})

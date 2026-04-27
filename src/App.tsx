@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import type { FormEvent, ChangeEvent } from 'react'
 import { supabase } from './lib/supabase'
 import { translations } from './i18n'
@@ -11,6 +11,7 @@ import { useSessionDetail } from './hooks/useSessionDetail'
 import { useProfile } from './hooks/useProfile'
 import { AppRouter } from './router/AppRouter'
 import { AuthLoadingView, AuthView } from './components/AuthView'
+import type { ReadingSession, SessionJoinRequest } from './types'
 import './App.css'
 
 export type { SessionFormState } from './hooks/useSessions'
@@ -56,14 +57,29 @@ function App() {
     sessionSearch,
   })
 
-  const searchFilteredSessions = filterSessions(sessions.sessions, visibilityFilter, sessionSearch).filter(
-    (session) => !sessions.memberships[session.id],
+  const searchFilteredSessions = useMemo(
+    () => filterSessions(sessions.sessions, visibilityFilter, sessionSearch).filter(
+      (session) => !sessions.memberships[session.id],
+    ),
+    [sessions.sessions, sessions.memberships, visibilityFilter, sessionSearch],
   )
-  const joinedSearchSessions = filterSessions(sessions.sessions, visibilityFilter, sessionSearch).filter(
-    (session) => Boolean(sessions.memberships[session.id]),
+
+  const joinedSearchSessions = useMemo(
+    () => filterSessions(sessions.sessions, visibilityFilter, sessionSearch).filter(
+      (session) => Boolean(sessions.memberships[session.id]),
+    ),
+    [sessions.sessions, sessions.memberships, visibilityFilter, sessionSearch],
   )
-  const combinedSearchSessions = [...searchFilteredSessions, ...joinedSearchSessions]
-  const joinedFilteredSessions = filteredSessions.filter((session) => Boolean(sessions.memberships[session.id]))
+
+  const combinedSearchSessions = useMemo(
+    () => [...searchFilteredSessions, ...joinedSearchSessions],
+    [searchFilteredSessions, joinedSearchSessions],
+  )
+
+  const joinedFilteredSessions = useMemo(
+    () => filteredSessions.filter((session) => Boolean(sessions.memberships[session.id])),
+    [filteredSessions, sessions.memberships],
+  )
 
   useEffect(() => {
     let alive = true
@@ -196,16 +212,16 @@ function App() {
     }
   }, [auth.user, selectedSessionId])
 
-  function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
+  const handleAuthSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (auth.mode === 'sign-in') {
       void auth.signIn()
     } else {
       void auth.signUp()
     }
-  }
+  }, [auth.mode])
 
-  function handleCreateSession(event: FormEvent<HTMLFormElement>) {
+  const handleCreateSession = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!auth.user) {
       return Promise.resolve()
@@ -213,16 +229,16 @@ function App() {
     return sessions.createSession(auth.user, sessionForm).then(() => {
       setSessionForm(defaultSessionForm)
     })
-  }
+  }, [auth.user, sessionForm])
 
-  async function handleJoinSession(sessionId: string) {
+  const handleJoinSession = useCallback(async (sessionId: string) => {
     if (!auth.user) {
       return
     }
     await sessions.joinSession(sessionId, auth.user)
-  }
+  }, [auth.user, sessions])
 
-  async function handleLeaveSession(sessionId: string) {
+  const handleLeaveSession = useCallback(async (sessionId: string) => {
     if (!auth.user) {
       return
     }
@@ -230,17 +246,17 @@ function App() {
     if (selectedSessionId === sessionId) {
       setSelectedSessionId(null)
     }
-  }
+  }, [auth.user, sessions, selectedSessionId])
 
-  async function handleUpdateProgress(session: import('./types').ReadingSession) {
+  const handleUpdateProgress = useCallback(async (session: ReadingSession) => {
     if (!auth.user) {
       return
     }
     const chapter = sessions.progressDrafts[session.id]
     await sessions.updateProgress(session, chapter, auth.user)
-  }
+  }, [auth.user, sessions])
 
-  async function handleSubmitComment(event: FormEvent<HTMLFormElement>) {
+  const handleSubmitComment = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!auth.user || !selectedSessionId) {
       return
@@ -250,28 +266,28 @@ function App() {
     }
     await detail.submitComment(selectedSessionId, auth.user.id, commentDraft)
     setCommentDraft('')
-  }
+  }, [auth.user, selectedSessionId, commentDraft, detail])
 
-  async function handleToggleLike(commentId: string) {
+  const handleToggleLike = useCallback(async (commentId: string) => {
     if (!auth.user || !selectedSessionId) {
       return
     }
     await detail.toggleLike(selectedSessionId, auth.user.id, commentId)
-  }
+  }, [auth.user, selectedSessionId, detail])
 
-  async function handleApproveJoinRequest(request: import('./types').SessionJoinRequest) {
+  const handleApproveJoinRequest = useCallback(async (request: SessionJoinRequest) => {
     if (!selectedSessionId || !auth.user) {
       return
     }
     await detail.approveRequest(selectedSessionId, request)
-  }
+  }, [selectedSessionId, auth.user, detail])
 
-  async function handleRejectJoinRequest(request: import('./types').SessionJoinRequest) {
+  const handleRejectJoinRequest = useCallback(async (request: SessionJoinRequest) => {
     if (!selectedSessionId || !auth.user) {
       return
     }
     await detail.rejectRequest(selectedSessionId, request)
-  }
+  }, [selectedSessionId, auth.user, detail])
 
   if (auth.loading) {
     return <AuthLoadingView message={t.auth.checkingSession} />
@@ -369,61 +385,69 @@ function App() {
     currentUserId: activeUserId,
   }
 
+  const headerProps = {
+    t,
+    language: auth.language,
+    joinedSessionCount,
+    myAvatarImage: profile.avatarPreviewUrl,
+    myAvatarLabel: profile.profile?.display_name || auth.user?.email || t.auth.signedInAs,
+    myDisplayName: profile.profile?.display_name?.trim() || auth.user?.email || activeUserId.slice(0, 8),
+    onLanguageChange: auth.setLanguage,
+    onSignOut: auth.signOut,
+  }
+
+  const profileEditProps = {
+    t,
+    myAvatarImage: profile.avatarPreviewUrl,
+    myAvatarLabel: profile.profile?.display_name || auth.user?.email || t.auth.signedInAs,
+    avatarInputKey: profile.avatarInputKey,
+    avatarFile: null,
+    avatarUploadBusy: profile.uploading,
+    profileNameDraft: profile.nameDraft,
+    profileSaving: profile.saving,
+    profileNotice: profile.notice,
+    onAvatarFileChange: (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0]
+      if (file) {
+        profile.handleAvatarFile(file)
+      }
+    },
+    onUploadAvatar: () => {
+      if (auth.user) {
+        profile.uploadAvatar(auth.user.id)
+      }
+      return Promise.resolve()
+    },
+    onProfileNameDraftChange: profile.setNameDraft,
+    onSaveProfile: () => {
+      if (auth.user) {
+        profile.saveProfile(auth.user.id)
+      }
+      return Promise.resolve()
+    },
+  }
+
+  const searchSectionProps = {
+    t,
+    listProps: searchListProps as never,
+    sessionForm,
+    creatingSession: sessions.creating,
+    onSessionFormChange: setSessionForm,
+    onCreateSession: handleCreateSession,
+  }
+
+  const sectionsAndDetailsProps = {
+    t,
+    listProps: sectionsListProps as never,
+    detailProps: detailPanelProps as never,
+  }
+
   return (
     <AppRouter
-      headerProps={{
-        t,
-        language: auth.language,
-        joinedSessionCount,
-        myAvatarImage: profile.avatarPreviewUrl,
-        myAvatarLabel: profile.profile?.display_name || auth.user?.email || t.auth.signedInAs,
-        myDisplayName: profile.profile?.display_name?.trim() || auth.user?.email || activeUserId.slice(0, 8),
-        onLanguageChange: auth.setLanguage,
-        onSignOut: auth.signOut,
-      }}
-      profileEditProps={{
-        t,
-        myAvatarImage: profile.avatarPreviewUrl,
-        myAvatarLabel: profile.profile?.display_name || auth.user?.email || t.auth.signedInAs,
-        avatarInputKey: profile.avatarInputKey,
-        avatarFile: null,
-        avatarUploadBusy: profile.uploading,
-        profileNameDraft: profile.nameDraft,
-        profileSaving: profile.saving,
-        profileNotice: profile.notice,
-        onAvatarFileChange: (event: ChangeEvent<HTMLInputElement>) => {
-          const file = event.target.files?.[0]
-          if (file) {
-            profile.handleAvatarFile(file)
-          }
-        },
-        onUploadAvatar: () => {
-          if (auth.user) {
-            profile.uploadAvatar(auth.user.id)
-          }
-          return Promise.resolve()
-        },
-        onProfileNameDraftChange: profile.setNameDraft,
-        onSaveProfile: () => {
-          if (auth.user) {
-            profile.saveProfile(auth.user.id)
-          }
-          return Promise.resolve()
-        },
-      }}
-      searchSectionProps={{
-        t,
-        listProps: searchListProps,
-        sessionForm,
-        creatingSession: sessions.creating,
-        onSessionFormChange: setSessionForm,
-        onCreateSession: handleCreateSession,
-      }}
-      sectionsAndDetailsProps={{
-        t,
-        listProps: sectionsListProps,
-        detailProps: detailPanelProps,
-      }}
+      headerProps={headerProps}
+      profileEditProps={profileEditProps}
+      searchSectionProps={searchSectionProps}
+      sectionsAndDetailsProps={sectionsAndDetailsProps}
       userId={activeUserId}
     />
   )
