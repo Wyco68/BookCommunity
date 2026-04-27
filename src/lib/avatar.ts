@@ -51,8 +51,7 @@ export async function resolveAvatarUrl(pathOrUrl: string | null): Promise<string
     return signedResult.data.signedUrl
   }
 
-  const publicResult = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(pathOrUrl)
-  return publicResult.data.publicUrl
+  return null
 }
 
 export async function resolveAvatarUrlMap(paths: string[]): Promise<Record<string, string>> {
@@ -69,10 +68,9 @@ export async function resolveAvatarUrlMap(paths: string[]): Promise<Record<strin
         return [path, signedResult.data.signedUrl] as const
       }
 
-      const publicResult = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
-      return [path, publicResult.data.publicUrl] as const
+      return [path, null] as const
     }),
   )
 
-  return Object.fromEntries(signedResults)
+  return Object.fromEntries(signedResults.filter(([, url]) => url !== null))
 }

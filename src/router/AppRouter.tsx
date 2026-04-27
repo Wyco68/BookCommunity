@@ -7,6 +7,7 @@ import type { SectionsLayoutProps } from '../components/Sections/SectionsLayout'
 import { ProfileEditPage } from '../pages/ProfileEditPage'
 import { SearchSectionPage } from '../pages/SearchSectionPage'
 import { SectionsAndDetailsPage } from '../pages/SectionsAndDetailsPage'
+import { CategoriesRoutePage } from '../pages/CategoriesRoutePage'
 import { APP_PATHS } from './paths'
 
 interface AppRouterProps {
@@ -14,6 +15,7 @@ interface AppRouterProps {
   profileEditProps: ProfileEditProps
   searchSectionProps: SearchSectionProps
   sectionsAndDetailsProps: SectionsLayoutProps
+  userId: string
 }
 
 export function AppRouter({
@@ -21,6 +23,7 @@ export function AppRouter({
   profileEditProps,
   searchSectionProps,
   sectionsAndDetailsProps,
+  userId,
 }: AppRouterProps) {
   return (
     <Routes>
@@ -29,6 +32,7 @@ export function AppRouter({
         <Route path={APP_PATHS.profileEdit} element={<ProfileEditPage {...profileEditProps} />} />
         <Route path={APP_PATHS.search} element={<SearchSectionPage {...searchSectionProps} />} />
         <Route path={APP_PATHS.sections} element={<SectionsAndDetailsPage {...sectionsAndDetailsProps} />} />
+        <Route path={APP_PATHS.categories} element={<CategoriesRoutePage userId={userId} />} />
       </Route>
       <Route path="*" element={<Navigate to={APP_PATHS.search} replace />} />
     </Routes>

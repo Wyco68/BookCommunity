@@ -56,3 +56,58 @@ export interface SessionJoinRequest {
   status: 'pending' | 'approved' | 'rejected'
   created_at: string
 }
+
+
+export type CategoryVisibility = 'public' | 'private'
+export type CategoryMemberRole = 'owner' | 'moderator' | 'member'
+export type MediaType = 'image' | 'book_file'
+
+export interface Category {
+  id: string
+  name: string
+  description: string | null
+  visibility: CategoryVisibility
+  creator_id: string
+  cover_image_path: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CategoryMember {
+  id: string
+  category_id: string
+  user_id: string
+  role: CategoryMemberRole
+  joined_at: string
+}
+
+export interface SessionCategory {
+  id: string
+  session_id: string
+  category_id: string
+  created_at: string
+}
+
+export interface SessionMedia {
+  id: string
+  session_id: string
+  uploader_id: string
+  media_type: MediaType
+  file_path: string
+  file_name: string
+  file_size_bytes: number
+  mime_type: string
+  description: string | null
+  created_at: string
+}
+
+export interface PaginationCursor {
+  created_at: string
+  id: string
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  nextCursor: PaginationCursor | null
+  hasMore: boolean
+}

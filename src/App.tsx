@@ -30,6 +30,7 @@ import {
   buildMembershipLookup,
 } from './lib/sessionData'
 import { filterSessions, getPreferredSelectedSessionId } from './lib/sessionState'
+import { useMediaUpload } from './hooks/useMediaUpload'
 import { AppRouter } from './router/AppRouter'
 import './App.css'
 
@@ -105,6 +106,11 @@ function App() {
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
   const [myAvatarRenderUrl, setMyAvatarRenderUrl] = useState<string | null>(null)
   const [avatarInputKey, setAvatarInputKey] = useState(0)
+
+  const sessionMedia = useMediaUpload({
+    sessionId: selectedSessionId,
+    userId: user?.id ?? null,
+  })
 
   useEffect(() => {
     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
@@ -366,7 +372,9 @@ function App() {
       setScreenError(error instanceof Error ? error.message : 'Failed to load session detail')
       setLoadingSessionDetail(false)
     })
-  }, [loadSessionDetail, selectedSessionId])
+
+    void sessionMedia.loadMedia()
+  }, [loadSessionDetail, selectedSessionId, sessionMedia.loadMedia])
 
   useEffect(() => {
     if (!user || !selectedSessionId) {
@@ -976,6 +984,16 @@ function App() {
     onSubmitComment: handleSubmitComment,
     onCommentDraftChange: setCommentDraft,
     onToggleLike: handleToggleLike,
+    media: sessionMedia.media,
+    mediaUrls: sessionMedia.mediaUrls,
+    mediaLoading: sessionMedia.loading,
+    mediaUploading: sessionMedia.uploading,
+    mediaError: sessionMedia.error,
+    mediaHasMore: sessionMedia.hasMore,
+    onUploadMedia: sessionMedia.uploadMedia,
+    onRemoveMedia: sessionMedia.removeMedia,
+    onLoadMoreMedia: sessionMedia.loadMore,
+    currentUserId: activeUserId,
   }
 
   return (
@@ -1018,6 +1036,7 @@ function App() {
         listProps: sectionsListProps,
         detailProps: detailPanelProps,
       }}
+      userId={activeUserId}
     />
   )
 }

@@ -3,12 +3,15 @@ import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import type {
   Comment,
+  MediaType,
   Profile,
   ReadingSession,
   SessionJoinRequest,
+  SessionMedia,
   SessionMembership,
 } from '../types'
 import { Avatar } from './Avatar'
+import { MediaUpload, MediaGallery } from './Media/MediaComponents'
 
 type Copy = (typeof translations)[Language]
 
@@ -37,6 +40,19 @@ export interface SessionDetailPanelProps {
   onCommentDraftChange: (value: string) => void
   onToggleLike: (commentId: string) => Promise<void>
   fullWidth?: boolean
+  media?: SessionMedia[]
+  mediaUrls?: Record<string, string>
+  mediaLoading?: boolean
+  mediaUploading?: boolean
+  mediaError?: string | null
+  mediaHasMore?: boolean
+  onUploadMedia?: (file: File, mediaType: MediaType, description?: string) => Promise<boolean>
+  onRemoveMedia?: (item: SessionMedia) => Promise<boolean>
+  onLoadMoreMedia?: () => Promise<void>
+  currentUserId?: string
+  canUploadMedia?: boolean
+  mediaCount?: number
+  mediaLimit?: number
 }
 
 export function SessionDetailPanel({
@@ -61,6 +77,19 @@ export function SessionDetailPanel({
   onCommentDraftChange,
   onToggleLike,
   fullWidth = true,
+  media,
+  mediaUrls,
+  mediaLoading,
+  mediaUploading,
+  mediaError,
+  mediaHasMore,
+  onUploadMedia,
+  onRemoveMedia,
+  onLoadMoreMedia,
+  currentUserId,
+  canUploadMedia,
+  mediaCount,
+  mediaLimit,
 }: SessionDetailPanelProps) {
   return (
     <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
@@ -207,6 +236,40 @@ export function SessionDetailPanel({
               )}
             </section>
           </div>
+
+          {selectedIsMember && media && onRemoveMedia && onLoadMoreMedia && currentUserId ? (
+            <section className="detail-pane stack">
+              <div className="detail-header">
+                <h3>Media</h3>
+                {mediaLimit != null && mediaCount != null ? (
+                  <span className="pill">{mediaCount} / {mediaLimit}</span>
+                ) : null}
+              </div>
+
+              {canUploadMedia && onUploadMedia ? (
+                <MediaUpload
+                  onUpload={onUploadMedia}
+                  uploading={mediaUploading ?? false}
+                  error={mediaError ?? null}
+                />
+              ) : null}
+
+              {!canUploadMedia && selectedIsOwner && mediaCount != null && mediaLimit != null && mediaCount >= mediaLimit ? (
+                <p className="subtle">Media limit reached ({mediaLimit} files, one per chapter).</p>
+              ) : null}
+
+              <MediaGallery
+                media={media}
+                mediaUrls={mediaUrls ?? {}}
+                loading={mediaLoading ?? false}
+                hasMore={mediaHasMore ?? false}
+                onLoadMore={onLoadMoreMedia}
+                onRemove={onRemoveMedia}
+                currentUserId={currentUserId}
+                sessionOwnerId={selectedSession.creator_id}
+              />
+            </section>
+          ) : null}
         </>
       )}
     </article>
