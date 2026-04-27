@@ -3,7 +3,7 @@
 ## 1) Product Overview
 
 - Name: BookCom
-- Description: Anyone can register. A member can create a reading session for a book by submitting title, author, and chapters. Other members can join and submit chapter progress. Members discuss in a single thread per session and react to comments.
+- Description: Anyone can register. A member can create a reading session for a book by submitting title, author, and chapters. Other members can join and submit chapter progress. Members discuss in a single thread per session and react to comments. The platform is evolving into a category-driven social application where users can create/join categories to group sessions, and session owners can upload restricted media (images/PDF/EPUB) representing chapters.
 - Services: Supabase Backend
 - Products: Web App, Mobile App
 
@@ -34,12 +34,9 @@
 - Authentication: Sign up/sign in/sign out with email/password.
 - Sessions:
 	- Create session with title, author, total chapters, description, visibility, join policy.
-	- Active and archived session states.
-	- Owner can archive and restore own sessions.
 - Session discovery:
 	- Search by title/author.
 	- Filter by visibility.
-	- Active/archived tab views.
 - Membership:
 	- Open join sessions can be joined directly.
 	- Request-to-join sessions use approval flow.
@@ -51,8 +48,16 @@
 	- Single thread per session.
 	- Members post comments.
 	- Like-only reactions.
+- Categories:
+	- Browse, create, join, and leave categories.
+	- Categories can be public or private.
+	- Sessions can be grouped under categories.
+- Media Sharing:
+	- Session owners can upload media (images, PDFs, EPUBs) to a secure private bucket.
+	- Media upload is rate-limited and capped by the total chapters in a session.
+	- Media is accessed securely via temporary signed URLs.
 - Realtime:
-	- Live updates for comments, likes, progress, memberships, and join requests.
+	- Live updates for comments, likes, progress, memberships, join requests, and categories.
 
 ## 5) Current Supabase Setup (for Future Context)
 
@@ -79,6 +84,10 @@
 - comments
 - comment_likes
 - session_join_requests
+- categories
+- category_members
+- session_categories
+- session_media
 
 ### 5.4 Functions and Triggers in Use
 
@@ -86,8 +95,16 @@
 - Trigger on auth.users to run handle_new_user.
 - public.create_reading_session(...) RPC to safely create sessions.
 - public.is_session_member(...) helper to avoid RLS recursion in reading_sessions select policy.
+- public.can_access_session(...) helper for secure media RLS policies.
+- public.is_category_owner(...) and public.is_category_member(...) helpers for category RLS policies.
 
-### 5.5 Security Model Notes
+### 5.5 Storage Model
+
+- Avatars and Media rely entirely on secure, private buckets.
+- Strict 15-minute signed URLs are utilized for viewing any uploaded asset (public URLs are blocked for security).
+- Client-side rate limiting and media dimension compression are enforced before upload.
+
+### 5.6 Security Model Notes
 
 - RLS enabled on all core app tables.
 - Reading sessions read policy allows:
@@ -117,9 +134,9 @@
 
 ## 7) Current Status Summary
 
-- Web app: MVP-level core features implemented.
-- Supabase: schema and RLS strategy updated to support search/filter, archive/restore, and request approvals.
-- Mobile app: Expo + React Native client implemented with MVP parity for auth, sessions, membership, progress, discussion, likes, archive/restore, and join request approval flow.
+- Web app: MVP-level core features implemented, along with social expansion (Categories and secure Media galleries). Global React states are being refactored into dedicated custom hooks for better maintainability.
+- Supabase: schema and RLS strategy updated to support categories, secure private media storage, search/filter, and request approvals.
+- Mobile app: Expo + React Native client implemented with MVP parity for auth, sessions, membership, progress, discussion, likes, and join request approval flow. Needs updates to match the new web social features (Categories & Media).
 
 ## 8) Next Steps
 
