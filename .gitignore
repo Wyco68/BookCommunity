@@ -27,6 +27,7 @@ dist-ssr
 
 /supabase/schema.sql   
 
+AGENTS.md
 DESIGN.md 
 /mobile-app
 project-analysis.json

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import type { SessionFormState } from '../../App'
 import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import { SessionListPanel } from '../SessionListPanel'
@@ -8,6 +7,7 @@ import type { SessionListPanelProps } from '../SessionListPanel'
 import { SearchInput } from './SearchInput'
 import { CreateSectionButton } from './CreateSectionButton'
 import { SearchButton } from './SearchButton'
+import type { SessionFormState } from '../../hooks/useSessions'
 
 type Copy = (typeof translations)[Language]
 
