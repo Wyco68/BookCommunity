@@ -46,6 +46,9 @@ export function DashboardHeader({
           <NavLink className={getNavClass} to={APP_PATHS.sections}>
             Sections
           </NavLink>
+          <NavLink className={getNavClass} to={APP_PATHS.categories}>
+            Categories
+          </NavLink>
         </nav>
 
         <div className="auth-switch" role="tablist" aria-label={t.language.switchLabel}>
