@@ -37,7 +37,6 @@ function App() {
 
   const activeUserId = auth.user?.id ?? ''
   const {
-    joinedSessionCount,
     selectedSession,
     filteredSessions,
     selectedIsMember,
@@ -388,7 +387,6 @@ function App() {
   const headerProps = {
     t,
     language: auth.language,
-    joinedSessionCount,
     myAvatarImage: profile.avatarPreviewUrl,
     myAvatarLabel: profile.profile?.display_name || auth.user?.email || t.auth.signedInAs,
     myDisplayName: profile.profile?.display_name?.trim() || auth.user?.email || activeUserId.slice(0, 8),

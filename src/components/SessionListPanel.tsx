@@ -116,7 +116,7 @@ export const SessionListPanel = memo(function SessionListPanel({
                   <span className="progress-label">{t.sessions.chapterProgress(chapter || '-', session.total_chapters)}</span>
                 </div>
 
-                <button type="button" className="tertiary" onClick={() => onSelectSession(session.id)}>
+                <button type="button" className="secondary" onClick={() => onSelectSession(session.id)}>
                   {isSelected ? t.sessions.viewingDetails : t.sessions.openDetails}
                 </button>
 
@@ -151,7 +151,7 @@ export const SessionListPanel = memo(function SessionListPanel({
 
                     <button
                       type="button"
-                      className="ghost"
+                      className="btn-danger"
                       disabled={busySessionId === session.id || (membership.role === 'owner' && totalSessionCount === 1)}
                       onClick={() => {
                         void onLeaveSession(session.id)

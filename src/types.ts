@@ -31,6 +31,28 @@ export interface Profile {
   id: string
   display_name: string | null
   avatar_url: string | null
+  bio: string | null
+  cover_url: string | null
+  location: string | null
+  website: string | null
+  is_private: boolean
+  created_at: string
+}
+
+export interface Post {
+  id: string
+  user_id: string
+  body: string
+  reply_to_id: string | null
+  is_deleted: boolean
+  created_at: string
+}
+
+export interface PostLike {
+  id: string
+  post_id: string
+  user_id: string
+  created_at: string
 }
 
 export interface Comment {
