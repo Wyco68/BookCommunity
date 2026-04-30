@@ -57,7 +57,7 @@ export function CategoryList({
                   {membership.role !== 'owner' ? (
                     <button
                       type="button"
-                      className="ghost"
+                      className="btn-danger"
                       disabled={busyCategoryId === category.id}
                       onClick={() => { void onLeaveCategory(category.id) }}
                     >

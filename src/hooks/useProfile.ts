@@ -55,7 +55,7 @@ export function useProfile(): UseProfileReturn {
 
     const profileResult = await supabase
       .from('profiles')
-      .select('id,display_name,avatar_url')
+      .select('*')
       .eq('id', userId)
       .maybeSingle()
 
@@ -65,7 +65,17 @@ export function useProfile(): UseProfileReturn {
       return
     }
 
-    const loadedProfile = (profileResult.data ?? { id: userId, display_name: null, avatar_url: null }) as Profile
+    const loadedProfile = (profileResult.data ?? {
+      id: userId,
+      display_name: null,
+      avatar_url: null,
+      bio: null,
+      cover_url: null,
+      location: null,
+      website: null,
+      is_private: false,
+      created_at: '',
+    }) as Profile
     const avatarUrl = await resolveAvatarUrl(loadedProfile.avatar_url)
 
     setProfile(loadedProfile)
@@ -81,6 +91,7 @@ export function useProfile(): UseProfileReturn {
     setNotice(null)
 
     const trimmedName = nameDraft.trim()
+
     const { error } = await supabase
       .from('profiles')
       .update({ display_name: trimmedName.length > 0 ? trimmedName : null })
@@ -96,6 +107,12 @@ export function useProfile(): UseProfileReturn {
       id: userId,
       display_name: trimmedName.length > 0 ? trimmedName : null,
       avatar_url: profile?.avatar_url ?? null,
+      bio: profile?.bio ?? null,
+      cover_url: profile?.cover_url ?? null,
+      location: profile?.location ?? null,
+      website: profile?.website ?? null,
+      is_private: profile?.is_private ?? false,
+      created_at: profile?.created_at ?? '',
     }
 
     setProfile(nextProfile)
@@ -163,6 +180,12 @@ export function useProfile(): UseProfileReturn {
       id: userId,
       display_name: profile?.display_name ?? null,
       avatar_url: nextPath,
+      bio: profile?.bio ?? null,
+      cover_url: profile?.cover_url ?? null,
+      location: profile?.location ?? null,
+      website: profile?.website ?? null,
+      is_private: profile?.is_private ?? false,
+      created_at: profile?.created_at ?? '',
     }
 
     setProfile(updatedProfile)

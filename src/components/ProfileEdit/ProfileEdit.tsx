@@ -1,17 +1,28 @@
-import type { ChangeEvent, FormEvent } from 'react'
+import type { ChangeEvent } from 'react'
 import { Avatar } from '../Avatar'
-import { translations } from '../../i18n'
-import type { Language } from '../../i18n'
-import styles from './ProfileEdit.module.css'
 
-type Copy = (typeof translations)[Language]
+interface ProfileField {
+  title: string
+  subtitle: string
+  avatarImage: string
+  uploadAvatar: string
+  avatarHelp: string
+  displayName: string
+  displayNamePlaceholder: string
+  saveProfile: string
+}
+
+interface CommonField {
+  saving: string
+  uploading: string
+}
 
 interface ProfileEditProps {
-  t: Copy
+  t: { profile: ProfileField; common: CommonField }
   myAvatarImage: string | null
   myAvatarLabel: string
   avatarInputKey: number
-  avatarFile: File | null
+  avatarFile?: File | null
   avatarUploadBusy: boolean
   profileNameDraft: string
   profileSaving: boolean
@@ -19,7 +30,7 @@ interface ProfileEditProps {
   onAvatarFileChange: (event: ChangeEvent<HTMLInputElement>) => void
   onUploadAvatar: () => Promise<void>
   onProfileNameDraftChange: (value: string) => void
-  onSaveProfile: (event: FormEvent<HTMLFormElement>) => Promise<void>
+  onSaveProfile: () => Promise<void>
 }
 
 export function ProfileEdit({
@@ -38,64 +49,67 @@ export function ProfileEdit({
   onSaveProfile,
 }: ProfileEditProps) {
   return (
-    <section className={styles.profileEditGrid}>
-      <article className="card stack">
-        <div>
-          <h2>{t.profile.title}</h2>
-          <p className="subtle">{t.profile.subtitle}</p>
-        </div>
+    <section className="feed">
+      <div className="feed-header">
+        <h1 className="feed-title">{t.profile.title}</h1>
+      </div>
+      <div className="feed-content">
+        <article className="card" style={{ maxWidth: '100%', width: '100%' }}>
+          <p className="subtle" style={{ marginBottom: '1.5rem' }}>{t.profile.subtitle}</p>
 
-        <div className="profile-card stack">
-          <div className="profile-row">
-            <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="lg" />
-            <div className="stack gap-sm profile-upload-stack">
+          <div className="profile-card stack" style={{ border: 'none', padding: 0, background: 'transparent' }}>
+            <div className="profile-row">
+              <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="lg" />
+              <div className="stack gap-sm profile-upload-stack">
+                <label className="field">
+                  <span className="field-label">{t.profile.avatarImage}</span>
+                  <input
+                    key={avatarInputKey}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={onAvatarFileChange}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={!avatarFile || avatarUploadBusy}
+                  onClick={() => {
+                    void onUploadAvatar()
+                  }}
+                >
+                  {avatarUploadBusy ? t.common.uploading : t.profile.uploadAvatar}
+                </button>
+                <p className="muted">{t.profile.avatarHelp}</p>
+              </div>
+            </div>
+
+            <form
+              className="stack"
+              onSubmit={(event) => {
+                event.preventDefault()
+                void onSaveProfile()
+              }}
+            >
               <label className="field">
-                <span>{t.profile.avatarImage}</span>
+                <span className="field-label">{t.profile.displayName}</span>
                 <input
-                  key={avatarInputKey}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={onAvatarFileChange}
+                  type="text"
+                  value={profileNameDraft}
+                  onChange={(event) => onProfileNameDraftChange(event.target.value)}
+                  placeholder={t.profile.displayNamePlaceholder}
+                  maxLength={80}
                 />
               </label>
-              <button
-                type="button"
-                className="secondary"
-                disabled={!avatarFile || avatarUploadBusy}
-                onClick={() => {
-                  void onUploadAvatar()
-                }}
-              >
-                {avatarUploadBusy ? t.common.uploading : t.profile.uploadAvatar}
+              <button type="submit" className="btn-primary" disabled={profileSaving}>
+                {profileSaving ? t.common.saving : t.profile.saveProfile}
               </button>
-              <p className="muted">{t.profile.avatarHelp}</p>
-            </div>
+            </form>
+
+            {profileNotice ? <p className="subtle">{profileNotice}</p> : null}
           </div>
-
-          <form
-            className="stack"
-            onSubmit={(event) => {
-              void onSaveProfile(event)
-            }}
-          >
-            <label className="field">
-              <span>{t.profile.displayName}</span>
-              <input
-                type="text"
-                value={profileNameDraft}
-                onChange={(event) => onProfileNameDraftChange(event.target.value)}
-                placeholder={t.profile.displayNamePlaceholder}
-                maxLength={80}
-              />
-            </label>
-            <button type="submit" className="primary" disabled={profileSaving}>
-              {profileSaving ? t.common.saving : t.profile.saveProfile}
-            </button>
-          </form>
-
-          {profileNotice ? <p className="subtle">{profileNotice}</p> : null}
-        </div>
-      </article>
+        </article>
+      </div>
     </section>
   )
 }
