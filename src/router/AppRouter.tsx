@@ -28,13 +28,13 @@ export function AppRouter({
   return (
     <Routes>
       <Route element={<AppLayout headerProps={headerProps} />}>
-        <Route index element={<Navigate to={APP_PATHS.search} replace />} />
+        <Route index element={<Navigate to={APP_PATHS.home} replace />} />
+        <Route path={APP_PATHS.home} element={<SectionsAndDetailsPage {...sectionsAndDetailsProps} />} />
         <Route path={APP_PATHS.profileEdit} element={<ProfileEditPage {...profileEditProps} />} />
         <Route path={APP_PATHS.search} element={<SearchSectionPage {...searchSectionProps} />} />
-        <Route path={APP_PATHS.sections} element={<SectionsAndDetailsPage {...sectionsAndDetailsProps} />} />
         <Route path={APP_PATHS.categories} element={<CategoriesRoutePage userId={userId} />} />
       </Route>
-      <Route path="*" element={<Navigate to={APP_PATHS.search} replace />} />
+      <Route path="*" element={<Navigate to={APP_PATHS.home} replace />} />
     </Routes>
   )
 }

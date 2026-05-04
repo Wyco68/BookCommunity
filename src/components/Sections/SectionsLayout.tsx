@@ -14,21 +14,33 @@ interface SectionsLayoutProps {
 }
 
 export function SectionsLayout({
-  t,
   listProps,
   detailProps,
 }: SectionsLayoutProps) {
+  const hasJoinedSessions = listProps.filteredSessions.length > 0 || listProps.loadingSessions
+
   return (
     <section className="stack">
       <article className="card stack">
-        <h2>Sections</h2>
-        <p className="subtle">Select a joined section to review {t.sessions.memberProgress.toLowerCase()} and discussion.</p>
+        <h2>Home</h2>
+        <p className="subtle">Your joined reading sessions.</p>
       </article>
 
-      <section className="sections-grid">
-        <JoinedSectionsList listProps={listProps} />
-        <SectionDetails detailProps={detailProps} />
-      </section>
+      {hasJoinedSessions ? (
+        <section className="sections-grid">
+          <JoinedSectionsList listProps={listProps} />
+          <SectionDetails detailProps={detailProps} />
+        </section>
+      ) : (
+        <article className="card">
+          <div className="empty">
+            <p className="subtle" style={{ margin: 0 }}>You haven't joined any sessions yet.</p>
+            <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.875rem' }}>
+              Use the <strong>Search</strong> tab to discover and join reading sessions.
+            </p>
+          </div>
+        </article>
+      )}
     </section>
   )
 }

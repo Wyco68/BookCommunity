@@ -423,6 +423,7 @@ function App() {
       }
       return Promise.resolve()
     },
+    onSignOut: auth.signOut,
   }
 
   const searchSectionProps = {

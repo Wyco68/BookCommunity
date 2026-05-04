@@ -24,7 +24,6 @@ export function DashboardHeader({
   myAvatarLabel,
   myDisplayName,
   onLanguageChange,
-  onSignOut,
 }: DashboardHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -56,11 +55,11 @@ export function DashboardHeader({
           </button>
         </div>
         <div className="sidebar-nav">
-          <Link to={APP_PATHS.search} className="sidebar-link" onClick={() => setMobileMenuOpen(false)}>
+          <Link to={APP_PATHS.home} className="sidebar-link" onClick={() => setMobileMenuOpen(false)}>
             Home
           </Link>
-          <Link to={APP_PATHS.sections} className="sidebar-link" onClick={() => setMobileMenuOpen(false)}>
-            Sessions
+          <Link to={APP_PATHS.search} className="sidebar-link" onClick={() => setMobileMenuOpen(false)}>
+            Search
           </Link>
           <Link to={APP_PATHS.categories} className="sidebar-link" onClick={() => setMobileMenuOpen(false)}>
             Categories
@@ -74,9 +73,6 @@ export function DashboardHeader({
             <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="sm" />
             <span style={{ fontWeight: 460 }}>{myDisplayName}</span>
           </div>
-          <button className="btn-danger" onClick={() => { setMobileMenuOpen(false); onSignOut() }} style={{ width: '100%' }}>
-            {t.auth.signOut}
-          </button>
         </div>
       </nav>
 
@@ -85,16 +81,16 @@ export function DashboardHeader({
 
       {/* Desktop sidebar */}
       <nav className="sidebar">
-        <Link to={APP_PATHS.search} className="sidebar-brand">
+        <Link to={APP_PATHS.home} className="sidebar-brand">
           BookCom
         </Link>
 
         <div className="sidebar-nav">
-          <NavLink to={APP_PATHS.search} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+          <NavLink to={APP_PATHS.home} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
             Home
           </NavLink>
-          <NavLink to={APP_PATHS.sections} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-            Sessions
+          <NavLink to={APP_PATHS.search} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
+            Search
           </NavLink>
           <NavLink to={APP_PATHS.categories} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
             Categories
@@ -129,9 +125,6 @@ export function DashboardHeader({
               MY
             </button>
           </div>
-          <button className="btn-danger" onClick={onSignOut} style={{ width: '100%' }}>
-            {t.auth.signOut}
-          </button>
         </div>
       </nav>
     </>
