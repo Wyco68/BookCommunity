@@ -3,7 +3,6 @@ import { supabase } from '../../lib/supabase'
 import { useCategories } from '../../hooks/useCategories'
 import {
   CategoryList,
-  CreateCategoryForm,
   CategoryDetail,
 } from './CategoryComponents'
 import type { CategoryMember, Profile } from '../../types'
@@ -19,15 +18,12 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
     categoryMembers,
     loading,
     error,
-    createCategory,
     joinCategory,
     leaveCategory,
   } = useCategories({ userId })
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
-  const [panelMode, setPanelMode] = useState<'browse' | 'create'>('browse')
   const [busyCategoryId, setBusyCategoryId] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
 
   const [detailMembers, setDetailMembers] = useState<CategoryMember[]>([])
   const [detailProfiles, setDetailProfiles] = useState<Record<string, Profile>>({})
@@ -123,58 +119,24 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
       <article className="card stack">
         <div>
           <h2>Categories</h2>
-          <p className="subtle">Browse, join, or create reading categories.</p>
-        </div>
-
-        <div className="auth-switch" role="tablist" aria-label="Category views">
-          <button
-            type="button"
-            className={`auth-switch-option ${panelMode === 'browse' ? 'auth-switch-option-active' : ''}`}
-            onClick={() => setPanelMode('browse')}
-          >
-            Browse
-          </button>
-          <button
-            type="button"
-            className={`auth-switch-option ${panelMode === 'create' ? 'auth-switch-option-active' : ''}`}
-            onClick={() => setPanelMode('create')}
-          >
-            Create
-          </button>
+          <p className="subtle">Browse and join reading categories.</p>
         </div>
 
         {error ? <p className="error">{error}</p> : null}
 
-        {panelMode === 'browse' ? (
-          <>
-            {loading ? <p className="subtle">Loading categories…</p> : null}
-            {!loading && categories.length === 0 ? (
-              <p className="subtle">No categories yet. Create one to get started!</p>
-            ) : null}
-            <CategoryList
-              categories={categories}
-              categoryMembers={categoryMembers}
-              selectedCategoryId={selectedCategoryId}
-              onSelectCategory={setSelectedCategoryId}
-              onJoinCategory={handleJoin}
-              onLeaveCategory={handleLeave}
-              busyCategoryId={busyCategoryId}
-            />
-          </>
-        ) : (
-          <CreateCategoryForm
-            onCreateCategory={async (name, desc, vis) => {
-              setCreating(true)
-              const result = await createCategory(name, desc, vis)
-              setCreating(false)
-              if (result) {
-                setPanelMode('browse')
-              }
-              return result
-            }}
-            creating={creating}
-          />
-        )}
+        {loading ? <p className="subtle">Loading categories…</p> : null}
+        {!loading && categories.length === 0 ? (
+          <p className="subtle">No categories available yet.</p>
+        ) : null}
+        <CategoryList
+          categories={categories}
+          categoryMembers={categoryMembers}
+          selectedCategoryId={selectedCategoryId}
+          onSelectCategory={setSelectedCategoryId}
+          onJoinCategory={handleJoin}
+          onLeaveCategory={handleLeave}
+          busyCategoryId={busyCategoryId}
+        />
       </article>
 
       {selectedCategoryId ? (

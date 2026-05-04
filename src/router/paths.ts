@@ -1,6 +1,6 @@
 export const APP_PATHS = {
+  home: '/home',
   profileEdit: '/profile/edit',
   search: '/search',
-  sections: '/sections',
   categories: '/categories',
 } as const
