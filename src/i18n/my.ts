@@ -115,6 +115,12 @@ export const my = {
     deleted: '[ဖျက်ထားသည်]',
     liked: (count: number) => `နှစ်သက်ပြီး (${count})`,
     like: (count: number) => `နှစ်သက် (${count})`,
+    cardColUsername: 'အသုံးပြုသူအမည်',
+    cardColRole: 'အခန်းကဏ္ဍ',
+    cardColChapters: 'အခန်းများ',
+    yourReading: 'သင်၏ဖတ်ရှုမှု',
+    cannotLeaveOwnerSole: 'ပိုင်ရှင်အနေနဲ့ သင်၏တစ်ခုတည်းသော session ဖြစ့်နေရသောကြောင့် မထွက်နိုင်ပါ။',
+    readChaptersByUsersMetric: 'အသုံးပြုသူဖတ်ခဲ့သော အခန်းများ',
   },
   enums: {
     visibility: {

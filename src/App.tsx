@@ -3,15 +3,12 @@ import type { FormEvent, ChangeEvent } from 'react'
 import { supabase } from './lib/supabase'
 import { translations } from './i18n'
 import { useSessionDerivedState } from './hooks/useSessionDerivedState'
-import { filterSessions, getPreferredSelectedSessionId } from './lib/sessionState'
-import { useMediaUpload } from './hooks/useMediaUpload'
+import { filterSessions } from './lib/sessionState'
 import { useAuth } from './hooks/useAuth'
 import { useSessions, defaultSessionForm } from './hooks/useSessions'
-import { useSessionDetail } from './hooks/useSessionDetail'
 import { useProfile } from './hooks/useProfile'
 import { AppRouter } from './router/AppRouter'
 import { AuthLoadingView, AuthView } from './components/AuthView'
-import type { ReadingSession, SessionJoinRequest } from './types'
 import './App.css'
 
 export type { SessionFormState } from './hooks/useSessions'
@@ -20,38 +17,24 @@ export { defaultSessionForm } from './hooks/useSessions'
 function App() {
   const auth = useAuth()
   const sessions = useSessions()
-  const detail = useSessionDetail()
   const profile = useProfile()
   const t = translations[auth.language]
 
   const [sessionSearch, setSessionSearch] = useState('')
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all')
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
-  const [commentDraft, setCommentDraft] = useState('')
   const [sessionForm, setSessionForm] = useState(defaultSessionForm)
-
-  const sessionMedia = useMediaUpload({
-    sessionId: selectedSessionId,
-    userId: auth.user?.id ?? null,
-  })
 
   const activeUserId = auth.user?.id ?? ''
   const {
-    selectedSession,
     filteredSessions,
-    selectedIsMember,
-    selectedIsOwner,
-    memberLatestProgress,
-    commentMeta,
-    pendingRequests,
   } = useSessionDerivedState({
     activeUserId,
     sessions: sessions.sessions,
     memberships: sessions.memberships,
-    selectedSessionId,
-    sessionProgress: detail.progress,
-    sessionLikes: detail.likes,
-    sessionJoinRequests: detail.joinRequests,
+    selectedSessionId: null,
+    sessionProgress: [],
+    sessionLikes: [],
+    sessionJoinRequests: [],
     visibilityFilter,
     sessionSearch,
   })
@@ -123,9 +106,9 @@ function App() {
         sessions.setMemberships({})
         sessions.setLatestProgress({})
         sessions.setProgressDrafts({})
-        setSelectedSessionId(null)
-        detail.clearDetail()
         sessions.setMyJoinRequestStatus({})
+        sessions.setSessionCategoryNames({})
+        sessions.setSessionReadChaptersByUsers({})
         profile.setProfile(null)
         profile.setNameDraft('')
         profile.setNotice(null)
@@ -138,78 +121,6 @@ function App() {
       authListener.subscription.unsubscribe()
     }
   }, [])
-
-  useEffect(() => {
-    const nextSelectedSessionId = getPreferredSelectedSessionId(sessions.sessions, sessions.memberships, selectedSessionId)
-    if (nextSelectedSessionId !== selectedSessionId) {
-      setSelectedSessionId(nextSelectedSessionId)
-    }
-  }, [sessions.memberships, selectedSessionId, sessions.sessions])
-
-  useEffect(() => {
-    if (!selectedSessionId) {
-      return
-    }
-
-    detail.loadDetail(selectedSessionId).catch((error: unknown) => {
-      auth.setError(error instanceof Error ? error.message : 'Failed to load session detail')
-    })
-
-    void sessionMedia.loadMedia()
-  }, [selectedSessionId])
-
-  useEffect(() => {
-    if (!auth.user || !selectedSessionId) {
-      return
-    }
-
-    const channel = supabase
-      .channel(`session-live-${selectedSessionId}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'comments', filter: `session_id=eq.${selectedSessionId}` },
-        () => {
-          void detail.loadDetail(selectedSessionId)
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'progress_updates', filter: `session_id=eq.${selectedSessionId}` },
-        () => {
-          void detail.loadDetail(selectedSessionId)
-          void sessions.loadSessions(auth.user!)
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'session_members', filter: `session_id=eq.${selectedSessionId}` },
-        () => {
-          void detail.loadDetail(selectedSessionId)
-          void sessions.loadSessions(auth.user!)
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'comment_likes' },
-        () => {
-          void detail.loadDetail(selectedSessionId)
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'session_join_requests', filter: `session_id=eq.${selectedSessionId}` },
-        () => {
-          void detail.loadDetail(selectedSessionId)
-          void sessions.loadSessions(auth.user!)
-        },
-      )
-
-    channel.subscribe()
-
-    return () => {
-      void supabase.removeChannel(channel)
-    }
-  }, [auth.user, selectedSessionId])
 
   const handleAuthSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -236,57 +147,6 @@ function App() {
     }
     await sessions.joinSession(sessionId, auth.user)
   }, [auth.user, sessions])
-
-  const handleLeaveSession = useCallback(async (sessionId: string) => {
-    if (!auth.user) {
-      return
-    }
-    await sessions.leaveSession(sessionId, auth.user)
-    if (selectedSessionId === sessionId) {
-      setSelectedSessionId(null)
-    }
-  }, [auth.user, sessions, selectedSessionId])
-
-  const handleUpdateProgress = useCallback(async (session: ReadingSession) => {
-    if (!auth.user) {
-      return
-    }
-    const chapter = sessions.progressDrafts[session.id]
-    await sessions.updateProgress(session, chapter, auth.user)
-  }, [auth.user, sessions])
-
-  const handleSubmitComment = useCallback(async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!auth.user || !selectedSessionId) {
-      return
-    }
-    if (!commentDraft.trim()) {
-      return
-    }
-    await detail.submitComment(selectedSessionId, auth.user.id, commentDraft)
-    setCommentDraft('')
-  }, [auth.user, selectedSessionId, commentDraft, detail])
-
-  const handleToggleLike = useCallback(async (commentId: string) => {
-    if (!auth.user || !selectedSessionId) {
-      return
-    }
-    await detail.toggleLike(selectedSessionId, auth.user.id, commentId)
-  }, [auth.user, selectedSessionId, detail])
-
-  const handleApproveJoinRequest = useCallback(async (request: SessionJoinRequest) => {
-    if (!selectedSessionId || !auth.user) {
-      return
-    }
-    await detail.approveRequest(selectedSessionId, request)
-  }, [selectedSessionId, auth.user, detail])
-
-  const handleRejectJoinRequest = useCallback(async (request: SessionJoinRequest) => {
-    if (!selectedSessionId || !auth.user) {
-      return
-    }
-    await detail.rejectRequest(selectedSessionId, request)
-  }, [selectedSessionId, auth.user, detail])
 
   if (auth.loading) {
     return <AuthLoadingView message={t.auth.checkingSession} />
@@ -323,18 +183,15 @@ function App() {
     loadingSessions: sessions.loading,
     filteredSessions,
     memberships: sessions.memberships,
-    latestProgress: sessions.latestProgress,
-    selectedSessionId,
+    selectedSessionId: null as string | null,
     myJoinRequestStatus: sessions.myJoinRequestStatus,
     progressDrafts: sessions.progressDrafts,
     busySessionId: sessions.busySessionId,
-    totalSessionCount: sessions.sessions.length,
+    sessionCategoryNames: sessions.sessionCategoryNames,
+    sessionReadChaptersByUsers: sessions.sessionReadChaptersByUsers,
     onSessionSearchChange: setSessionSearch,
     onVisibilityFilterChange: setVisibilityFilter,
-    onSelectSession: setSelectedSessionId,
-    onProgressDraftsChange: sessions.setProgressDrafts,
-    onUpdateProgress: handleUpdateProgress,
-    onLeaveSession: handleLeaveSession,
+    onSelectSession: () => {},
     onJoinSession: handleJoinSession,
   }
 
@@ -349,39 +206,6 @@ function App() {
     sessionSearch: '',
     onSessionSearchChange: () => {},
     onVisibilityFilterChange: () => {},
-  }
-
-  const detailPanelProps = {
-    t,
-    selectedSession,
-    selectedIsOwner,
-    selectedIsMember,
-    loadingSessionDetail: detail.loading,
-    sessionMembers: detail.members,
-    sessionProfiles: detail.profiles,
-    memberLatestProgress,
-    pendingRequests,
-    requestBusyId: null,
-    commentDraft,
-    postingComment: false,
-    sessionComments: detail.comments,
-    commentMeta,
-    likingCommentId: null,
-    onApproveJoinRequest: handleApproveJoinRequest,
-    onRejectJoinRequest: handleRejectJoinRequest,
-    onSubmitComment: handleSubmitComment,
-    onCommentDraftChange: setCommentDraft,
-    onToggleLike: handleToggleLike,
-    media: sessionMedia.media,
-    mediaUrls: sessionMedia.mediaUrls,
-    mediaLoading: sessionMedia.loading,
-    mediaUploading: sessionMedia.uploading,
-    mediaError: sessionMedia.error,
-    mediaHasMore: sessionMedia.hasMore,
-    onUploadMedia: sessionMedia.uploadMedia,
-    onRemoveMedia: sessionMedia.removeMedia,
-    onLoadMoreMedia: sessionMedia.loadMore,
-    currentUserId: activeUserId,
   }
 
   const headerProps = {
@@ -438,7 +262,6 @@ function App() {
   const sectionsAndDetailsProps = {
     t,
     listProps: sectionsListProps as never,
-    detailProps: detailPanelProps as never,
   }
 
   return (

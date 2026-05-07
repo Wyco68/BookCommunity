@@ -3,4 +3,5 @@ export const APP_PATHS = {
   profileEdit: '/profile/edit',
   search: '/search',
   categories: '/categories',
+  sessionDetail: '/session/:id',
 } as const

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Comment, CommentLike, Profile, ProgressUpdate, SessionJoinRequest, SessionMembership } from '../types'
 import { resolveAvatarUrlMap, isRemoteUrl } from '../lib/avatar'
@@ -29,8 +29,13 @@ export function useSessionDetail(): UseSessionDetailReturn {
   const [joinRequests, setJoinRequests] = useState<SessionJoinRequest[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const lastLoadRef = useRef<{ sessionId: string; time: number }>({ sessionId: '', time: 0 })
 
   const loadDetail = useCallback(async (sessionId: string) => {
+    const now = Date.now()
+    if (lastLoadRef.current.sessionId === sessionId && now - lastLoadRef.current.time < 1000) return
+    lastLoadRef.current = { sessionId, time: now }
+
     setLoading(true)
 
     const [commentsResult, membersResult, progressResult, requestsResult] = await Promise.all([
@@ -90,7 +95,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
       ]),
     )
 
-    let profileLookup: Record<string, Profile> = {}
+    const profileLookup: Record<string, Profile> = {}
     if (profileUserIds.length > 0) {
       const profilesResult = await supabase
         .from('profiles')

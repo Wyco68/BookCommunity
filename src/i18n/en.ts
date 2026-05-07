@@ -115,6 +115,12 @@ export const en = {
     deleted: '[deleted]',
     liked: (count: number) => `Liked (${count})`,
     like: (count: number) => `Like (${count})`,
+    cardColUsername: 'Username',
+    cardColRole: 'Role',
+    cardColChapters: 'Chapters',
+    yourReading: 'Your reading',
+    cannotLeaveOwnerSole: 'You cannot leave while this is your only session as owner.',
+    readChaptersByUsersMetric: 'Read chapters by users',
   },
   enums: {
     visibility: {
