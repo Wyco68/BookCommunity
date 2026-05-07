@@ -8,6 +8,7 @@ import { ProfileEditPage } from '../pages/ProfileEditPage'
 import { SearchSectionPage } from '../pages/SearchSectionPage'
 import { SectionsAndDetailsPage } from '../pages/SectionsAndDetailsPage'
 import { CategoriesRoutePage } from '../pages/CategoriesRoutePage'
+import { SessionDetailPage } from '../pages/SessionDetailPage'
 import { APP_PATHS } from './paths'
 
 interface AppRouterProps {
@@ -33,6 +34,7 @@ export function AppRouter({
         <Route path={APP_PATHS.profileEdit} element={<ProfileEditPage {...profileEditProps} />} />
         <Route path={APP_PATHS.search} element={<SearchSectionPage {...searchSectionProps} />} />
         <Route path={APP_PATHS.categories} element={<CategoriesRoutePage userId={userId} />} />
+        <Route path={APP_PATHS.sessionDetail} element={<SessionDetailPage userId={userId} />} />
       </Route>
       <Route path="*" element={<Navigate to={APP_PATHS.home} replace />} />
     </Routes>

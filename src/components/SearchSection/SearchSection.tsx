@@ -31,15 +31,12 @@ export function SearchSection({
   }, [listProps.sessionSearch])
 
   return (
-    <section className="stack">
-      <article className="card stack">
-        <div>
-          <h2>Search</h2>
-          <p className="subtle">Find reading sessions by title or author.</p>
-        </div>
-
+    <section className="page-tight">
+      <article className="card page-tight-card">
+        <h2>Search</h2>
+        <p className="subtle">Find reading sessions by title or author.</p>
         <form
-          className="search-toolbar"
+          className="search-toolbar page-tight-toolbar"
           onSubmit={(event) => {
             event.preventDefault()
             listProps.onSessionSearchChange(draftSearch)
@@ -54,14 +51,14 @@ export function SearchSection({
           />
           <SearchButton label={t.sessions.findSessions} />
         </form>
+        {hasSearched ? (
+          <>
+            <hr className="page-tight-rule" />
+            <h3>Search Results</h3>
+            <SessionListPanel {...listProps} showControls={false} embedded />
+          </>
+        ) : null}
       </article>
-
-      {hasSearched ? (
-        <article className="card stack">
-          <h3>Search Results</h3>
-          <SessionListPanel {...listProps} showControls={false} />
-        </article>
-      ) : null}
     </section>
   )
 }

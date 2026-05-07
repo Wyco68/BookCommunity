@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { ReadingSession, SessionMembership, SessionJoinRequest, ProgressUpdate } from '../types'
+import type { Category, ReadingSession, SessionMembership, SessionJoinRequest, ProgressUpdate } from '../types'
 import {
   buildJoinRequestStatusLookup,
   buildLatestProgressBySession,
@@ -32,6 +32,8 @@ export interface UseSessionsReturn {
   latestProgress: Record<string, number>
   progressDrafts: Record<string, number>
   myJoinRequestStatus: Record<string, SessionJoinRequest['status']>
+  sessionCategoryNames: Record<string, string[]>
+  sessionReadChaptersByUsers: Record<string, number>
   loading: boolean
   error: string | null
   creating: boolean
@@ -46,6 +48,8 @@ export interface UseSessionsReturn {
   setLatestProgress: React.Dispatch<React.SetStateAction<Record<string, number>>>
   setProgressDrafts: React.Dispatch<React.SetStateAction<Record<string, number>>>
   setMyJoinRequestStatus: React.Dispatch<React.SetStateAction<Record<string, SessionJoinRequest['status']>>>
+  setSessionCategoryNames: React.Dispatch<React.SetStateAction<Record<string, string[]>>>
+  setSessionReadChaptersByUsers: React.Dispatch<React.SetStateAction<Record<string, number>>>
   setError: (error: string | null) => void
 }
 
@@ -55,12 +59,19 @@ export function useSessions(): UseSessionsReturn {
   const [latestProgress, setLatestProgress] = useState<Record<string, number>>({})
   const [progressDrafts, setProgressDrafts] = useState<Record<string, number>>({})
   const [myJoinRequestStatus, setMyJoinRequestStatus] = useState<Record<string, SessionJoinRequest['status']>>({})
+  const [sessionCategoryNames, setSessionCategoryNames] = useState<Record<string, string[]>>({})
+  const [sessionReadChaptersByUsers, setSessionReadChaptersByUsers] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [busySessionId, setBusySessionId] = useState<string | null>(null)
+  const lastLoadedRef = useRef(0)
 
   const loadSessions = useCallback(async (user: User) => {
+    const now = Date.now()
+    if (now - lastLoadedRef.current < 2000) return
+    lastLoadedRef.current = now
+
     setLoading(true)
     setError(null)
 
@@ -93,15 +104,66 @@ export function useSessions(): UseSessionsReturn {
       return
     }
 
+    const sessionsData = (sessionsResult.data ?? []) as ReadingSession[]
     const membershipLookup = buildMembershipLookup((membershipsResult.data ?? []) as SessionMembership[])
     const progressLookup = buildLatestProgressBySession((progressResult.data ?? []) as ProgressUpdate[])
     const requestLookup = buildJoinRequestStatusLookup((requestsResult.data ?? []) as SessionJoinRequest[])
 
-    setSessions((sessionsResult.data ?? []) as ReadingSession[])
+    // Fetch category names per session
+    const sessionIds = sessionsData.map((s) => s.id)
+    const catLookup: Record<string, string[]> = {}
+    const readByUsersLookup: Record<string, number> = {}
+    if (sessionIds.length > 0) {
+      const { data: scData } = await supabase
+        .from('session_categories')
+        .select('session_id, category_id')
+        .in('session_id', sessionIds)
+      if (scData && scData.length > 0) {
+        const catIds = [...new Set(scData.map((sc: { category_id: string }) => sc.category_id))]
+        const { data: catData } = await supabase
+          .from('categories')
+          .select('id, name')
+          .in('id', catIds)
+        const catNameMap: Record<string, string> = {}
+        for (const c of (catData ?? []) as Category[]) {
+          catNameMap[c.id] = c.name
+        }
+        for (const sc of scData as { session_id: string; category_id: string }[]) {
+          if (!catLookup[sc.session_id]) catLookup[sc.session_id] = []
+          const name = catNameMap[sc.category_id]
+          if (name) catLookup[sc.session_id].push(name)
+        }
+      }
+
+      const { data: progressByUsers } = await supabase
+        .from('progress_updates')
+        .select('session_id,user_id,chapter_number,created_at')
+        .in('session_id', sessionIds)
+        .order('created_at', { ascending: false })
+
+      if (progressByUsers && progressByUsers.length > 0) {
+        const latestBySessionAndUser = new Map<string, number>()
+        for (const item of progressByUsers as ProgressUpdate[]) {
+          const key = `${item.session_id}:${item.user_id}`
+          if (!latestBySessionAndUser.has(key)) {
+            latestBySessionAndUser.set(key, item.chapter_number)
+          }
+        }
+
+        for (const [key, chapter] of latestBySessionAndUser.entries()) {
+          const sessionId = key.split(':')[0]
+          readByUsersLookup[sessionId] = (readByUsersLookup[sessionId] ?? 0) + chapter
+        }
+      }
+    }
+
+    setSessions(sessionsData)
     setMemberships(membershipLookup)
     setLatestProgress(progressLookup)
     setProgressDrafts(progressLookup)
     setMyJoinRequestStatus(requestLookup)
+    setSessionCategoryNames(catLookup)
+    setSessionReadChaptersByUsers(readByUsersLookup)
     setLoading(false)
   }, [])
 
@@ -244,6 +306,8 @@ export function useSessions(): UseSessionsReturn {
     latestProgress,
     progressDrafts,
     myJoinRequestStatus,
+    sessionCategoryNames,
+    sessionReadChaptersByUsers,
     loading,
     error,
     creating,
@@ -258,6 +322,8 @@ export function useSessions(): UseSessionsReturn {
     setLatestProgress,
     setProgressDrafts,
     setMyJoinRequestStatus,
+    setSessionCategoryNames,
+    setSessionReadChaptersByUsers,
     setError: setError,
   }
 }

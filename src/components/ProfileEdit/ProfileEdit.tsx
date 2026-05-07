@@ -56,6 +56,7 @@ export function ProfileEdit({
   onSaveProfile,
   onSignOut,
 }: ProfileEditProps) {
+  const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordBusy, setPasswordBusy] = useState(false)
   const [passwordNotice, setPasswordNotice] = useState<string | null>(null)
@@ -64,18 +65,48 @@ export function ProfileEdit({
   const [deleteBusy, setDeleteBusy] = useState(false)
 
   async function handleChangePassword() {
+    if (!oldPassword.trim()) {
+      setPasswordNotice('Old password is required.')
+      return
+    }
+
     if (!newPassword.trim() || newPassword.length < 6) {
       setPasswordNotice('Password must be at least 6 characters.')
       return
     }
+
+    if (oldPassword === newPassword) {
+      setPasswordNotice('New password must be different from old password.')
+      return
+    }
+
     setPasswordBusy(true)
     setPasswordNotice(null)
+
+    const { data: userResult, error: userError } = await supabase.auth.getUser()
+    const email = userResult.user?.email
+    if (userError || !email) {
+      setPasswordNotice(userError?.message || 'Unable to verify current user.')
+      setPasswordBusy(false)
+      return
+    }
+
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+      email,
+      password: oldPassword,
+    })
+    if (reauthError) {
+      setPasswordNotice('Old password is incorrect.')
+      setPasswordBusy(false)
+      return
+    }
 
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) {
       setPasswordNotice(error.message)
     } else {
       setPasswordNotice('Password updated successfully.')
+      setOldPassword('')
       setNewPassword('')
     }
     setPasswordBusy(false)
@@ -156,6 +187,16 @@ export function ProfileEdit({
         <article className="card stack" style={{ maxWidth: '100%', width: '100%', marginTop: '1rem' }}>
           <h3>Change Password</h3>
           <label className="field">
+            <span className="field-label">Old password</span>
+            <input
+              type="password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              placeholder="Current password"
+              autoComplete="current-password"
+            />
+          </label>
+          <label className="field">
             <span className="field-label">New password</span>
             <input
               type="password"
@@ -163,12 +204,13 @@ export function ProfileEdit({
               onChange={(e) => setNewPassword(e.target.value)}
               placeholder="At least 6 characters"
               minLength={6}
+              autoComplete="new-password"
             />
           </label>
           <button
             type="button"
             className="btn-primary"
-            disabled={passwordBusy || !newPassword.trim()}
+            disabled={passwordBusy || !oldPassword.trim() || !newPassword.trim()}
             onClick={() => { void handleChangePassword() }}
           >
             {passwordBusy ? t.common.saving : 'Update Password'}

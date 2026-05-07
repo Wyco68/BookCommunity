@@ -1,12 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useCategories } from '../../hooks/useCategories'
-import {
-  CategoryList,
-  CategoryDetail,
-} from './CategoryComponents'
-import type { CategoryMember, Profile } from '../../types'
-import { resolveAvatarUrlMap, isRemoteUrl } from '../../lib/avatar'
+import type { ReadingSession } from '../../types'
 
 interface CategoriesPageProps {
   userId: string
@@ -22,139 +18,159 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
     leaveCategory,
   } = useCategories({ userId })
 
+  const navigate = useNavigate()
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [categorySessions, setCategorySessions] = useState<ReadingSession[]>([])
+  const [loadingSessions, setLoadingSessions] = useState(false)
   const [busyCategoryId, setBusyCategoryId] = useState<string | null>(null)
 
-  const [detailMembers, setDetailMembers] = useState<CategoryMember[]>([])
-  const [detailProfiles, setDetailProfiles] = useState<Record<string, Profile>>({})
-  const [detailSessionCount, setDetailSessionCount] = useState(0)
-  const [loadingDetail, setLoadingDetail] = useState(false)
-
-  const selectedCategory = useMemo(
-    () => categories.find((c) => c.id === selectedCategoryId) ?? null,
-    [categories, selectedCategoryId],
-  )
-
+  const selectedCategory = categories.find((c) => c.id === selectedCategoryId) ?? null
   const selectedIsMember = selectedCategoryId ? Boolean(categoryMembers[selectedCategoryId]) : false
-  const selectedIsOwner = selectedCategory ? selectedCategory.creator_id === userId : false
 
-  const loadCategoryDetail = useCallback(async (categoryId: string) => {
-    setLoadingDetail(true)
+  const loadCategorySessions = useCallback(async (categoryId: string) => {
+    setLoadingSessions(true)
+    const { data: scData } = await supabase
+      .from('session_categories')
+      .select('session_id')
+      .eq('category_id', categoryId)
 
-    const [membersResult, sessionCatResult] = await Promise.all([
-      supabase
-        .from('category_members')
-        .select('*')
-        .eq('category_id', categoryId),
-      supabase
-        .from('session_categories')
-        .select('id')
-        .eq('category_id', categoryId),
-    ])
-
-    if (membersResult.error || sessionCatResult.error) {
-      setLoadingDetail(false)
+    if (!scData || scData.length === 0) {
+      setCategorySessions([])
+      setLoadingSessions(false)
       return
     }
 
-    const members = (membersResult.data ?? []) as CategoryMember[]
-    setDetailMembers(members)
-    setDetailSessionCount((sessionCatResult.data ?? []).length)
+    const sessionIds = scData.map((sc: { session_id: string }) => sc.session_id)
+    const { data: sessionsData } = await supabase
+      .from('reading_sessions')
+      .select('*')
+      .in('id', sessionIds)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
 
-    const memberUserIds = members.map((m) => m.user_id)
-    if (memberUserIds.length > 0) {
-      const profilesResult = await supabase
-        .from('profiles')
-        .select('id,display_name,avatar_url')
-        .in('id', memberUserIds)
-
-      if (!profilesResult.error) {
-        const profiles = (profilesResult.data ?? []) as Profile[]
-        const avatarPaths: string[] = profiles
-          .map((p) => p.avatar_url)
-          .filter((url): url is string => typeof url === 'string' && url.length > 0 && !isRemoteUrl(url))
-        const resolvedAvatars = await resolveAvatarUrlMap(avatarPaths)
-
-        const lookup: Record<string, Profile> = {}
-        for (const profile of profiles) {
-          if (profile.avatar_url && !isRemoteUrl(profile.avatar_url) && resolvedAvatars[profile.avatar_url]) {
-            lookup[profile.id] = { ...profile, avatar_url: resolvedAvatars[profile.avatar_url] }
-          } else {
-            lookup[profile.id] = profile
-          }
-        }
-        setDetailProfiles(lookup)
-      }
-    }
-
-    setLoadingDetail(false)
+    setCategorySessions((sessionsData ?? []) as ReadingSession[])
+    setLoadingSessions(false)
   }, [])
 
   useEffect(() => {
     if (selectedCategoryId) {
-      void loadCategoryDetail(selectedCategoryId)
+      void loadCategorySessions(selectedCategoryId)
+    } else {
+      setCategorySessions([])
     }
-  }, [selectedCategoryId, loadCategoryDetail])
+  }, [selectedCategoryId, loadCategorySessions])
 
   async function handleJoin(categoryId: string) {
     setBusyCategoryId(categoryId)
     await joinCategory(categoryId)
-    if (selectedCategoryId === categoryId) {
-      await loadCategoryDetail(categoryId)
-    }
     setBusyCategoryId(null)
   }
 
   async function handleLeave(categoryId: string) {
     setBusyCategoryId(categoryId)
     await leaveCategory(categoryId)
-    if (selectedCategoryId === categoryId) {
-      await loadCategoryDetail(categoryId)
-    }
     setBusyCategoryId(null)
   }
 
   return (
-    <section className="stack">
-      <article className="card stack">
-        <div>
-          <h2>Categories</h2>
-          <p className="subtle">Browse and join reading categories.</p>
-        </div>
+    <section className="page-tight">
+      <article className="card page-tight-card">
+        <h2>Categories</h2>
+        <p className="subtle">Browse reading sessions by category.</p>
 
         {error ? <p className="error">{error}</p> : null}
-
         {loading ? <p className="subtle">Loading categories…</p> : null}
+
         {!loading && categories.length === 0 ? (
           <p className="subtle">No categories available yet.</p>
         ) : null}
-        <CategoryList
-          categories={categories}
-          categoryMembers={categoryMembers}
-          selectedCategoryId={selectedCategoryId}
-          onSelectCategory={setSelectedCategoryId}
-          onJoinCategory={handleJoin}
-          onLeaveCategory={handleLeave}
-          busyCategoryId={busyCategoryId}
-        />
-      </article>
 
-      {selectedCategoryId ? (
-        loadingDetail ? (
-          <article className="card stack">
-            <p className="subtle">Loading category details…</p>
-          </article>
-        ) : (
-          <CategoryDetail
-            category={selectedCategory}
-            members={detailMembers}
-            profiles={detailProfiles}
-            isMember={selectedIsMember}
-            isOwner={selectedIsOwner}
-            sessionCount={detailSessionCount}
-          />
-        )
-      ) : null}
+        {categories.length > 0 ? (
+          <div className="category-tab-bar page-tight-tabs" role="tablist" aria-label="Category filter">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                role="tab"
+                aria-selected={selectedCategoryId === cat.id}
+                className={`category-tab ${selectedCategoryId === cat.id ? 'category-tab-active' : ''}`}
+                onClick={() => setSelectedCategoryId(selectedCategoryId === cat.id ? null : cat.id)}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {selectedCategory ? (
+          <>
+            <hr className="page-tight-rule" />
+            <div className="detail-header">
+              <div>
+                <h3>{selectedCategory.name}</h3>
+                {selectedCategory.description ? (
+                  <p className="subtle">{selectedCategory.description}</p>
+                ) : null}
+              </div>
+              <div className="page-tight-actions">
+                <span className="pill">{selectedCategory.visibility}</span>
+                {selectedIsMember ? (
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    disabled={busyCategoryId === selectedCategory.id}
+                    onClick={() => { void handleLeave(selectedCategory.id) }}
+                  >
+                    {busyCategoryId === selectedCategory.id ? 'Leaving…' : 'Leave'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={busyCategoryId === selectedCategory.id}
+                    onClick={() => { void handleJoin(selectedCategory.id) }}
+                  >
+                    {busyCategoryId === selectedCategory.id ? 'Joining…' : 'Join'}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <h3>Sessions</h3>
+            {loadingSessions ? <p className="subtle">Loading sessions…</p> : null}
+            {!loadingSessions && categorySessions.length === 0 ? (
+              <p className="subtle">No sessions in this category yet.</p>
+            ) : null}
+
+            {!loadingSessions && categorySessions.length > 0 ? (
+              <ul className="session-list page-tight-session-list">
+                {categorySessions.map((session) => (
+                  <li
+                    key={session.id}
+                    className="session-item session-card-clickable"
+                    onClick={() => navigate(`/session/${session.id}`)}
+                  >
+                    <div className="page-tight-session-inner">
+                      <div className="session-heading">
+                        <h3>{session.book_title}</h3>
+                        <span className="pill">{session.visibility}</span>
+                      </div>
+                      <p className="subtle">by {session.book_author}</p>
+                      <div className="session-meta-grid">
+                        <div className="session-meta-item">
+                          <span className="session-meta-label">Chapters</span>
+                          <span className="session-meta-value">{session.total_chapters}</span>
+                        </div>
+                      </div>
+                      {session.description ? <p className="muted">{session.description}</p> : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </>
+        ) : null}
+      </article>
     </section>
   )
 }

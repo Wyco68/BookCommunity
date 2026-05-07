@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import type { FormEvent } from 'react'
 import { translations } from '../i18n'
+import type { Language } from '../i18n'
 import type {
   Comment,
   MediaType,
@@ -13,7 +14,9 @@ import type {
 import { Avatar } from './Avatar'
 import { MediaUpload, MediaGallery } from './Media/MediaComponents'
 
-type Copy = typeof translations.en
+type Copy = (typeof translations)[Language]
+
+export type SessionDetailPanelTranslations = Copy
 
 export interface SessionDetailPanelProps {
   t: Copy
@@ -53,6 +56,14 @@ export interface SessionDetailPanelProps {
   canUploadMedia?: boolean
   mediaCount?: number
   mediaLimit?: number
+  readChaptersByUsers?: number
+  onLeaveSession?: () => Promise<void>
+  leavingSession?: boolean
+  myProgressChapterDraft?: number
+  onMyProgressChapterDraftChange?: (chapter: number) => void
+  onSaveMyProgress?: () => Promise<void>
+  savingMyProgress?: boolean
+  leaveSessionDisabled?: boolean
 }
 
 export const SessionDetailPanel = memo(function SessionDetailPanel({
@@ -90,6 +101,14 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
   canUploadMedia,
   mediaCount,
   mediaLimit,
+  readChaptersByUsers = 0,
+  onLeaveSession,
+  leavingSession = false,
+  myProgressChapterDraft = 1,
+  onMyProgressChapterDraftChange,
+  onSaveMyProgress,
+  savingMyProgress = false,
+  leaveSessionDisabled = false,
 }: SessionDetailPanelProps) {
   return (
     <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
@@ -102,9 +121,56 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
               <h2>{selectedSession.book_title}</h2>
               <p className="subtle">{t.sessions.singleThread}</p>
             </div>
+            <span className="detail-stat-pill">Read chapters by users: {readChaptersByUsers}</span>
           </div>
 
-          <div className="detail-grid">
+          {selectedIsMember && selectedSession && onSaveMyProgress && onMyProgressChapterDraftChange ? (
+            <section className="detail-pane stack detail-my-reading">
+              <h3>{t.sessions.yourReading}</h3>
+              <div className="detail-my-reading-row">
+                <label className="field">
+                  <span>{t.sessions.updateChapter}</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={selectedSession.total_chapters}
+                    value={myProgressChapterDraft}
+                    onChange={(event) => {
+                      const n = Number(event.target.value)
+                      onMyProgressChapterDraftChange(Number.isNaN(n) ? 1 : n)
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="secondary detail-save-progress-btn"
+                  disabled={savingMyProgress}
+                  onClick={() => {
+                    void onSaveMyProgress()
+                  }}
+                >
+                  {savingMyProgress ? t.common.saving : t.sessions.saveProgress}
+                </button>
+              </div>
+              {onLeaveSession ? (
+                <div className="detail-leave-row">
+                  <button
+                    type="button"
+                    className="btn-danger"
+                    disabled={leavingSession || leaveSessionDisabled}
+                    title={leaveSessionDisabled ? t.sessions.cannotLeaveOwnerSole : undefined}
+                    onClick={() => {
+                      void onLeaveSession()
+                    }}
+                  >
+                    {leavingSession ? t.common.working : t.sessions.leave}
+                  </button>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+
+          <div className="detail-grid detail-two-col">
             <section className="detail-pane stack">
               <h3>{t.sessions.memberProgress}</h3>
               {loadingSessionDetail ? <p className="subtle">{t.sessions.loadingDetail}</p> : null}
@@ -112,73 +178,79 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                 {sessionMembers.map((member) => {
                   const profile = sessionProfiles[member.user_id]
                   const chapter = memberLatestProgress[member.user_id] ?? 0
-                  const ratio = Math.min(100, Math.round((chapter / Math.max(1, selectedSession.total_chapters)) * 100))
 
                   return (
-                    <li key={member.user_id} className="member-item">
-                      <div className="member-head">
-                        <div className="identity-row">
-                          <Avatar imageUrl={profile?.avatar_url ?? null} label={profile?.display_name || member.user_id.slice(0, 8)} size="sm" />
-                          <strong>{profile?.display_name || member.user_id.slice(0, 8)}</strong>
+                    <li key={member.user_id} className="member-item member-progress-row">
+                      <div className="session-user-cols member-progress-cols" aria-label={t.sessions.memberProgress}>
+                        <div className="session-user-col">
+                          <span className="session-col-label">{t.sessions.cardColUsername}</span>
+                          <span className="session-col-value session-col-truncate">
+                            {profile?.display_name || member.user_id.slice(0, 8)}
+                          </span>
                         </div>
-                        <span className="pill">{t.enums.role[member.role]}</span>
+                        <div className="session-user-col">
+                          <span className="session-col-label">{t.sessions.cardColRole}</span>
+                          <span className="session-col-value">{t.enums.role[member.role]}</span>
+                        </div>
+                        <div className="session-user-col">
+                          <span className="session-col-label">{t.sessions.cardColChapters}</span>
+                          <span className="session-col-value">
+                            {t.sessions.chapterProgress(chapter, selectedSession.total_chapters)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="progress-track">
-                        <span className="progress-fill" style={{ width: `${ratio}%` }} />
-                      </div>
-                      <span className="progress-label">{t.sessions.chapterProgress(chapter, selectedSession.total_chapters)}</span>
                     </li>
                   )
                 })}
               </ul>
             </section>
 
-            <section className="detail-pane stack">
-              {selectedIsOwner ? (
-                <>
-                  <h3>{t.sessions.joinRequests}</h3>
-                  {pendingRequests.length === 0 ? <p className="subtle">{t.sessions.noPendingRequests}</p> : null}
-                  <ul className="member-list">
-                    {pendingRequests.map((request) => {
-                      const profile = sessionProfiles[request.user_id]
-                      return (
-                        <li key={request.id} className="member-item stack gap-sm">
-                          <div className="member-head">
-                            <div className="identity-row">
-                              <Avatar imageUrl={profile?.avatar_url ?? null} label={profile?.display_name || request.user_id.slice(0, 8)} size="sm" />
-                              <strong>{profile?.display_name || request.user_id.slice(0, 8)}</strong>
-                            </div>
-                            <span className="subtle">{new Date(request.created_at).toLocaleString()}</span>
+            {selectedIsOwner ? (
+              <section className="detail-pane stack">
+                <h3>{t.sessions.joinRequests}</h3>
+                {pendingRequests.length === 0 ? <p className="subtle">{t.sessions.noPendingRequests}</p> : null}
+                <ul className="member-list">
+                  {pendingRequests.map((request) => {
+                    const profile = sessionProfiles[request.user_id]
+                    return (
+                      <li key={request.id} className="member-item stack gap-sm">
+                        <div className="member-head">
+                          <div className="identity-row">
+                            <Avatar imageUrl={profile?.avatar_url ?? null} label={profile?.display_name || request.user_id.slice(0, 8)} size="sm" />
+                            <strong>{profile?.display_name || request.user_id.slice(0, 8)}</strong>
                           </div>
-                          <div className="split compact">
-                            <button
-                              type="button"
-                              className="secondary"
-                              disabled={requestBusyId === request.id}
-                              onClick={() => {
-                                void onApproveJoinRequest(request)
-                              }}
-                            >
-                              {requestBusyId === request.id ? t.common.processing : t.sessions.approve}
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost"
-                              disabled={requestBusyId === request.id}
-                              onClick={() => {
-                                void onRejectJoinRequest(request)
-                              }}
-                            >
-                              {t.sessions.reject}
-                            </button>
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </>
-              ) : null}
+                          <span className="subtle">{new Date(request.created_at).toLocaleString()}</span>
+                        </div>
+                        <div className="split compact">
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={requestBusyId === request.id}
+                            onClick={() => {
+                              void onApproveJoinRequest(request)
+                            }}
+                          >
+                            {requestBusyId === request.id ? t.common.processing : t.sessions.approve}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            disabled={requestBusyId === request.id}
+                            onClick={() => {
+                              void onRejectJoinRequest(request)
+                            }}
+                          >
+                            {t.sessions.reject}
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </section>
+            ) : null}
 
+            <section className="detail-pane stack span-full">
               <h3>{t.sessions.discussion}</h3>
               {!selectedIsMember ? (
                 <p className="subtle">{t.sessions.joinToDiscuss}</p>

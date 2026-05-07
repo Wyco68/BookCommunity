@@ -1,21 +1,17 @@
 import { JoinedSectionsList } from './JoinedSectionsList'
-import { SectionDetails } from './SectionDetails'
 import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import type { SessionListPanelProps } from '../SessionListPanel'
-import type { SessionDetailPanelProps } from '../SessionDetailPanel'
 
 type Copy = (typeof translations)[Language]
 
 interface SectionsLayoutProps {
   t: Copy
   listProps: SessionListPanelProps
-  detailProps: SessionDetailPanelProps
 }
 
 export function SectionsLayout({
   listProps,
-  detailProps,
 }: SectionsLayoutProps) {
   const hasJoinedSessions = listProps.filteredSessions.length > 0 || listProps.loadingSessions
 
@@ -27,10 +23,7 @@ export function SectionsLayout({
       </article>
 
       {hasJoinedSessions ? (
-        <section className="sections-grid">
-          <JoinedSectionsList listProps={listProps} />
-          <SectionDetails detailProps={detailProps} />
-        </section>
+        <JoinedSectionsList listProps={listProps} />
       ) : (
         <article className="card">
           <div className="empty">

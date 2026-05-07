@@ -1,9 +1,10 @@
 import { memo } from 'react'
-import type { Dispatch, SetStateAction } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { translations } from '../i18n'
+import type { Language } from '../i18n'
 import type { ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
 
-type Copy = typeof translations.en
+type Copy = (typeof translations)[Language]
 
 export interface SessionListPanelProps {
   t: Copy
@@ -13,20 +14,18 @@ export interface SessionListPanelProps {
   loadingSessions: boolean
   filteredSessions: ReadingSession[]
   memberships: Record<string, SessionMembership>
-  latestProgress: Record<string, number>
   selectedSessionId: string | null
   myJoinRequestStatus: Record<string, SessionJoinRequest['status']>
-  progressDrafts: Record<string, number>
   busySessionId: string | null
-  totalSessionCount: number
+  sessionCategoryNames: Record<string, string[]>
+  sessionReadChaptersByUsers?: Record<string, number>
   onSessionSearchChange: (value: string) => void
   onVisibilityFilterChange: (value: 'all' | 'public' | 'private') => void
   onSelectSession: (sessionId: string) => void
-  onProgressDraftsChange: Dispatch<SetStateAction<Record<string, number>>>
-  onUpdateProgress: (session: ReadingSession) => Promise<void>
-  onLeaveSession: (sessionId: string) => Promise<void>
   onJoinSession: (sessionId: string) => Promise<void>
   showControls?: boolean
+  /** Flat panel inside a parent card (e.g. Search results); no outer card or duplicate title */
+  embedded?: boolean
 }
 
 export const SessionListPanel = memo(function SessionListPanel({
@@ -37,27 +36,29 @@ export const SessionListPanel = memo(function SessionListPanel({
   loadingSessions,
   filteredSessions,
   memberships,
-  latestProgress,
-  selectedSessionId,
   myJoinRequestStatus,
-  progressDrafts,
   busySessionId,
-  totalSessionCount,
+  sessionCategoryNames,
+  sessionReadChaptersByUsers = {},
   onSessionSearchChange,
   onVisibilityFilterChange,
-  onSelectSession,
-  onProgressDraftsChange,
-  onUpdateProgress,
-  onLeaveSession,
   onJoinSession,
   showControls = true,
+  embedded = false,
 }: SessionListPanelProps) {
+  const navigate = useNavigate()
+
+  const rootClassName = embedded ? 'stack session-panel-embedded' : 'card stack'
+  const RootTag = embedded ? 'div' : 'article'
+
   return (
-    <article className="card stack">
-      <div>
-        <h2>{t.sessions.findSessions}</h2>
-        <p className="subtle">{t.sessions.activeSummary}</p>
-      </div>
+    <RootTag className={rootClassName}>
+      {embedded && !showControls ? null : (
+        <div>
+          <h2>{t.sessions.findSessions}</h2>
+          <p className="subtle">{t.sessions.activeSummary}</p>
+        </div>
+      )}
 
       {showControls ? (
         <div className="stack gap-sm">
@@ -93,77 +94,46 @@ export const SessionListPanel = memo(function SessionListPanel({
       <ul className="session-list">
         {filteredSessions.map((session) => {
           const membership = memberships[session.id]
-          const chapter = latestProgress[session.id] ?? 0
-          const ratio = Math.min(100, Math.round((chapter / session.total_chapters) * 100))
-          const isSelected = selectedSessionId === session.id
           const requestStatus = myJoinRequestStatus[session.id]
+          const categories = sessionCategoryNames[session.id] ?? []
+          const readByUsers = sessionReadChaptersByUsers[session.id] ?? 0
 
           return (
-            <li key={session.id} className={`session-item ${isSelected ? 'session-item-selected' : ''}`}>
-              <div className="stack gap-sm">
+            <li
+              key={session.id}
+              className="session-item session-card session-card-clickable"
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest('button, input, select, textarea')) return
+                navigate(`/session/${session.id}`)
+              }}
+            >
+              <div className="session-card-inner">
                 <div className="session-heading">
                   <h3>{session.book_title}</h3>
                   <span className="pill">{t.enums.visibility[session.visibility]}</span>
                 </div>
 
-                <p className="subtle">{t.sessions.byAuthor(session.book_author)}</p>
-                <p className="muted">{session.description || t.sessions.noDescription}</p>
+                <p className="subtle session-card-author">{t.sessions.byAuthor(session.book_author)}</p>
 
-                <div className="progress-row" aria-label={t.sessions.progressAria(session.book_title)}>
-                  <div className="progress-track">
-                    <span className="progress-fill" style={{ width: `${ratio}%` }} />
-                  </div>
-                  <span className="progress-label">{t.sessions.chapterProgress(chapter || '-', session.total_chapters)}</span>
+                <div className="session-readby-strip" aria-label={t.sessions.readChaptersByUsersMetric}>
+                  <span className="session-readby-label">{t.sessions.readChaptersByUsersMetric}</span>
+                  <span className="session-readby-value">{readByUsers}</span>
                 </div>
 
-                <button type="button" className="secondary" onClick={() => onSelectSession(session.id)}>
-                  {isSelected ? t.sessions.viewingDetails : t.sessions.openDetails}
-                </button>
-
-                {membership ? (
-                  <div className="split compact">
-                    <label className="field">
-                      <span>{t.sessions.updateChapter}</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={session.total_chapters}
-                        value={progressDrafts[session.id] ?? 1}
-                        onChange={(event) =>
-                          onProgressDraftsChange((current) => ({
-                            ...current,
-                            [session.id]: Number.isNaN(Number(event.target.value)) ? 1 : Number(event.target.value),
-                          }))
-                        }
-                      />
-                    </label>
-
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busySessionId === session.id}
-                      onClick={() => {
-                        void onUpdateProgress(session)
-                      }}
-                    >
-                      {busySessionId === session.id ? t.common.saving : t.sessions.saveProgress}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      disabled={busySessionId === session.id || (membership.role === 'owner' && totalSessionCount === 1)}
-                      onClick={() => {
-                        void onLeaveSession(session.id)
-                      }}
-                    >
-                      {busySessionId === session.id ? t.common.working : t.sessions.leave}
-                    </button>
+                {categories.length > 0 ? (
+                  <div className="session-categories">
+                    {categories.map((cat) => (
+                      <span key={cat} className="category-pill">{cat}</span>
+                    ))}
                   </div>
-                ) : (
+                ) : null}
+
+                {session.description ? <p className="muted session-card-desc">{session.description}</p> : null}
+
+                {!membership ? (
                   <button
                     type="button"
-                    className="secondary"
+                    className="secondary session-card-cta"
                     disabled={busySessionId === session.id || requestStatus === 'pending'}
                     onClick={() => {
                       void onJoinSession(session.id)
@@ -177,12 +147,14 @@ export const SessionListPanel = memo(function SessionListPanel({
                         ? t.sessions.joining
                         : t.sessions.joinSession}
                   </button>
+                ) : (
+                  <p className="muted session-card-hint">{t.sessions.openDetails}</p>
                 )}
               </div>
             </li>
           )
         })}
       </ul>
-    </article>
+    </RootTag>
   )
 })
