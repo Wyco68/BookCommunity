@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { getSignedMediaUrl } from '../lib/storage'
 import { useSessionDetail } from '../hooks/useSessionDetail'
 import { useMediaUpload } from '../hooks/useMediaUpload'
 import { buildLatestChapterByUser, buildCommentMeta } from '../lib/sessionState'
@@ -34,11 +35,17 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
   const [myChapterDraft, setMyChapterDraft] = useState(1)
   const [savingProgress, setSavingProgress] = useState(false)
   const [myMembershipCount, setMyMembershipCount] = useState(0)
+  const [activeChapter, setActiveChapter] = useState(1)
+  const [activeChapterMedia, setActiveChapterMedia] = useState<{ file_name: string; mime_type: string; media_type: 'image' | 'book_file' } | null>(null)
+  const [activeChapterUrl, setActiveChapterUrl] = useState<string | null>(null)
+  const [loadingChapter, setLoadingChapter] = useState(false)
 
   const detail = useSessionDetail()
   const sessionMedia = useMediaUpload({
     sessionId: sessionId ?? null,
     userId: userId || null,
+    sessionOwnerId: session?.creator_id ?? null,
+    totalChapters: session?.total_chapters ?? 0,
   })
 
   const isMember = Boolean(membership)
@@ -134,12 +141,51 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
   )
 
   const myLatestChapter = userId ? (memberLatestProgress[userId] ?? 0) : 0
+  const maxProgressChapter = Math.min(
+    session?.total_chapters ?? 0,
+    sessionMedia.maxUploadedChapter,
+  )
   const leaveSessionDisabled = Boolean(membership?.role === 'owner' && myMembershipCount === 1)
+
+  const loadChapterMedia = useCallback(async (chapterNumber: number) => {
+    if (!sessionId) return
+    setLoadingChapter(true)
+    const { data } = await supabase
+      .from('session_media')
+      .select('file_name,mime_type,media_type,file_path')
+      .eq('session_id', sessionId)
+      .eq('chapter_number', chapterNumber)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (!data) {
+      setActiveChapterMedia(null)
+      setActiveChapterUrl(null)
+      setLoadingChapter(false)
+      return
+    }
+
+    const signed = await getSignedMediaUrl(data.file_path)
+    setActiveChapterMedia({
+      file_name: data.file_name,
+      mime_type: data.mime_type,
+      media_type: data.media_type,
+    })
+    setActiveChapterUrl(signed)
+    setLoadingChapter(false)
+  }, [sessionId])
 
   useEffect(() => {
     if (!session || !membership || !userId) return
     setMyChapterDraft(myLatestChapter > 0 ? myLatestChapter : 1)
   }, [session?.id, membership, userId, myLatestChapter])
+
+  useEffect(() => {
+    if (!sessionId || maxProgressChapter < 1) return
+    setActiveChapter(1)
+    void loadChapterMedia(1)
+  }, [sessionId, maxProgressChapter, loadChapterMedia])
 
   const handleSubmitComment = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -179,7 +225,7 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
 
   const handleSaveMyProgress = useCallback(async () => {
     if (!session || !userId || !membership || !sessionId) return
-    if (myChapterDraft < 1 || myChapterDraft > session.total_chapters) return
+    if (myChapterDraft < 1 || myChapterDraft > maxProgressChapter) return
     setSavingProgress(true)
     const { error } = await supabase.from('progress_updates').insert({
       session_id: session.id,
@@ -190,7 +236,7 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
     if (!error) {
       void detail.loadDetail(sessionId)
     }
-  }, [session, userId, membership, sessionId, myChapterDraft, detail])
+  }, [session, userId, membership, sessionId, myChapterDraft, maxProgressChapter, detail])
 
   if (loadingSession) {
     return (
@@ -249,15 +295,36 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
         onUploadMedia={sessionMedia.uploadMedia}
         onRemoveMedia={sessionMedia.removeMedia}
         onLoadMoreMedia={sessionMedia.loadMore}
+        canUploadMedia={sessionMedia.canUpload}
+        mediaCount={sessionMedia.mediaCount}
+        mediaLimit={sessionMedia.mediaLimit}
         currentUserId={userId}
         readChaptersByUsers={readChaptersByUsers}
         onLeaveSession={handleLeaveSession}
         leavingSession={leaving}
         myProgressChapterDraft={myChapterDraft}
-        onMyProgressChapterDraftChange={setMyChapterDraft}
+        onMyProgressChapterDraftChange={(chapter) => setMyChapterDraft(chapter)}
         onSaveMyProgress={handleSaveMyProgress}
         savingMyProgress={savingProgress}
         leaveSessionDisabled={leaveSessionDisabled}
+        maxProgressChapter={maxProgressChapter}
+        activeChapter={activeChapter}
+        maxChapter={sessionMedia.maxUploadedChapter}
+        activeChapterMedia={activeChapterMedia}
+        activeChapterUrl={activeChapterUrl}
+        loadingChapter={loadingChapter}
+        onPrevChapter={async () => {
+          if (activeChapter <= 1) return
+          const next = activeChapter - 1
+          setActiveChapter(next)
+          await loadChapterMedia(next)
+        }}
+        onNextChapter={async () => {
+          if (activeChapter >= sessionMedia.maxUploadedChapter) return
+          const next = activeChapter + 1
+          setActiveChapter(next)
+          await loadChapterMedia(next)
+        }}
       />
     </section>
   )

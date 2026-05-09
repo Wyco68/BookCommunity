@@ -64,6 +64,14 @@ export interface SessionDetailPanelProps {
   onSaveMyProgress?: () => Promise<void>
   savingMyProgress?: boolean
   leaveSessionDisabled?: boolean
+  maxProgressChapter?: number
+  activeChapter?: number
+  maxChapter?: number
+  activeChapterMedia?: { file_name: string; mime_type: string; media_type: 'image' | 'book_file' } | null
+  activeChapterUrl?: string | null
+  loadingChapter?: boolean
+  onPrevChapter?: () => Promise<void>
+  onNextChapter?: () => Promise<void>
 }
 
 export const SessionDetailPanel = memo(function SessionDetailPanel({
@@ -109,6 +117,14 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
   onSaveMyProgress,
   savingMyProgress = false,
   leaveSessionDisabled = false,
+  maxProgressChapter,
+  activeChapter = 1,
+  maxChapter = 0,
+  activeChapterMedia = null,
+  activeChapterUrl = null,
+  loadingChapter = false,
+  onPrevChapter,
+  onNextChapter,
 }: SessionDetailPanelProps) {
   return (
     <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
@@ -124,7 +140,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
             <span className="detail-stat-pill">Read chapters by users: {readChaptersByUsers}</span>
           </div>
 
-          {selectedIsMember && selectedSession && onSaveMyProgress && onMyProgressChapterDraftChange ? (
+          {selectedIsMember && !selectedIsOwner && selectedSession && onSaveMyProgress && onMyProgressChapterDraftChange ? (
             <section className="detail-pane stack detail-my-reading">
               <h3>{t.sessions.yourReading}</h3>
               <div className="detail-my-reading-row">
@@ -133,8 +149,9 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                   <input
                     type="number"
                     min={1}
-                    max={selectedSession.total_chapters}
+                    max={maxProgressChapter ?? selectedSession.total_chapters}
                     value={myProgressChapterDraft}
+                    disabled={selectedIsOwner}
                     onChange={(event) => {
                       const n = Number(event.target.value)
                       onMyProgressChapterDraftChange(Number.isNaN(n) ? 1 : n)
@@ -144,7 +161,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                 <button
                   type="button"
                   className="secondary detail-save-progress-btn"
-                  disabled={savingMyProgress}
+                  disabled={selectedIsOwner || savingMyProgress || (maxProgressChapter ?? selectedSession.total_chapters) < 1}
                   onClick={() => {
                     void onSaveMyProgress()
                   }}
@@ -152,6 +169,9 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                   {savingMyProgress ? t.common.saving : t.sessions.saveProgress}
                 </button>
               </div>
+              {selectedIsOwner ? (
+                <p className="subtle">Session owners cannot submit progress; upload chapters via media library.</p>
+              ) : null}
               {onLeaveSession ? (
                 <div className="detail-leave-row">
                   <button
@@ -167,6 +187,13 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                   </button>
                 </div>
               ) : null}
+            </section>
+          ) : null}
+
+          {selectedIsOwner ? (
+            <section className="detail-pane stack detail-my-reading">
+              <h3>{t.sessions.yourReading}</h3>
+              <p className="subtle">Owners cannot submit progress. Upload chapters to manage session content.</p>
             </section>
           ) : null}
 
@@ -312,9 +339,45 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
           {selectedIsMember && media && onRemoveMedia && onLoadMoreMedia && currentUserId ? (
             <section className="detail-pane stack">
               <div className="detail-header">
-                <h3>Media</h3>
+                <h3>Chapters / Media Library</h3>
                 {mediaLimit != null && mediaCount != null ? (
                   <span className="pill">{mediaCount} / {mediaLimit}</span>
+                ) : null}
+              </div>
+
+              <div className="detail-pane stack">
+                <div className="split compact">
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={!onPrevChapter || activeChapter <= 1 || loadingChapter}
+                    onClick={() => { void onPrevChapter?.() }}
+                  >
+                    Prev
+                  </button>
+                  <span className="pill">Chapter {activeChapter} / {maxChapter}</span>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={!onNextChapter || activeChapter >= maxChapter || loadingChapter}
+                    onClick={() => { void onNextChapter?.() }}
+                  >
+                    Next
+                  </button>
+                </div>
+
+                {loadingChapter ? <p className="subtle">Loading chapter…</p> : null}
+                {!loadingChapter && activeChapterMedia && activeChapterUrl ? (
+                  activeChapterMedia.media_type === 'image' ? (
+                    <img className="media-thumbnail" src={activeChapterUrl} alt={activeChapterMedia.file_name} loading="lazy" />
+                  ) : activeChapterMedia.mime_type === 'application/pdf' ? (
+                    <iframe className="media-pdf-frame" src={activeChapterUrl} title={activeChapterMedia.file_name} />
+                  ) : (
+                    <div className="media-file-icon">
+                      <p className="muted media-filename">{activeChapterMedia.file_name}</p>
+                      <a href={activeChapterUrl} target="_blank" rel="noopener noreferrer" className="secondary media-download-link">Open / Download</a>
+                    </div>
+                  )
                 ) : null}
               </div>
 

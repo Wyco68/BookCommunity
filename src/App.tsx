@@ -108,6 +108,8 @@ function App() {
         sessions.setProgressDrafts({})
         sessions.setMyJoinRequestStatus({})
         sessions.setSessionCategoryNames({})
+        sessions.setSessionFirstMedia({})
+        sessions.setSessionUploadedChapterCount({})
         sessions.setSessionReadChaptersByUsers({})
         profile.setProfile(null)
         profile.setNameDraft('')
@@ -129,7 +131,7 @@ function App() {
     } else {
       void auth.signUp()
     }
-  }, [auth.mode])
+  }, [auth.mode, auth.signIn, auth.signUp])
 
   const handleCreateSession = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -188,6 +190,9 @@ function App() {
     progressDrafts: sessions.progressDrafts,
     busySessionId: sessions.busySessionId,
     sessionCategoryNames: sessions.sessionCategoryNames,
+    sessionFirstMedia: sessions.sessionFirstMedia,
+    sessionUploadedChapterCount: sessions.sessionUploadedChapterCount,
+    latestProgress: sessions.latestProgress,
     sessionReadChaptersByUsers: sessions.sessionReadChaptersByUsers,
     onSessionSearchChange: setSessionSearch,
     onVisibilityFilterChange: setVisibilityFilter,
