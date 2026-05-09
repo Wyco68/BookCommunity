@@ -16,9 +16,9 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
   const [description, setDescription] = useState('')
   const [visibility, setVisibility] = useState<'public' | 'private'>('public')
   const [joinPolicy, setJoinPolicy] = useState<'open' | 'request'>('open')
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [mediaFile, setMediaFile] = useState<File | null>(null)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,7 +32,7 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
       })
   }, [])
 
-  const toggleCategory = useCallback((catId: string) => {
+  const toggleCategory = useCallback((catId: number) => {
     setSelectedCategoryIds((prev) =>
       prev.includes(catId) ? prev.filter((id) => id !== catId) : [...prev, catId],
     )
@@ -57,18 +57,22 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
       return
     }
 
-    if (mediaFile) {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'application/epub+zip']
-      if (!allowedTypes.includes(mediaFile.type)) {
-        setError('File must be an image, PDF, or EPUB')
+    if (selectedCategoryIds.length < 1) {
+      setError('Select at least one category')
+      return
+    }
+
+    if (coverFile) {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+      if (!allowedTypes.includes(coverFile.type)) {
+        setError('Cover image must be JPG, PNG, or WebP')
         return
       }
-      if (mediaFile.size > 50 * 1024 * 1024) {
-        setError('File must be under 50MB')
+      if (coverFile.size > 10 * 1024 * 1024) {
+        setError('Cover image must be under 10MB')
         return
       }
     }
-
     setCreating(true)
 
     const createResult = await supabase.rpc('create_reading_session', {
@@ -105,34 +109,42 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
       )
     }
 
-    // Upload media if provided
-    if (mediaFile) {
-      const userId = (await supabase.auth.getUser()).data.user?.id
-      if (userId) {
-        const filePath = `${session.id}/${Date.now()}-${mediaFile.name}`
-        const { error: uploadError } = await supabase.storage
-          .from('session-media')
-          .upload(filePath, mediaFile)
+    // Optional cover upload (separate from chapter media)
+    const userId = (await supabase.auth.getUser()).data.user?.id
+    if (!userId) {
+      setError('You must be signed in')
+      setCreating(false)
+      return
+    }
+    if (coverFile) {
+      const ext = coverFile.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const coverPath = `${userId}/${session.id}/cover.${ext}`
+      const coverUpload = await supabase.storage
+        .from('session-covers')
+        .upload(coverPath, coverFile, { upsert: true, contentType: coverFile.type })
 
-        if (!uploadError) {
-          const mediaType = mediaFile.type.startsWith('image/') ? 'image' : 'book_file'
-          await supabase.from('session_media').insert({
-            session_id: session.id,
-            uploader_id: userId,
-            media_type: mediaType,
-            file_path: filePath,
-            file_name: mediaFile.name,
-            file_size_bytes: mediaFile.size,
-            mime_type: mediaFile.type,
-          })
-        }
+      if (coverUpload.error) {
+        setError(coverUpload.error.message)
+        setCreating(false)
+        return
+      }
+
+      const coverUpdate = await supabase
+        .from('reading_sessions')
+        .update({ cover_image_path: coverPath })
+        .eq('id', session.id)
+
+      if (coverUpdate.error) {
+        setError(coverUpdate.error.message)
+        setCreating(false)
+        return
       }
     }
 
     setCreating(false)
     onClose()
     navigate(`/session/${session.id}`)
-  }, [title, author, chapters, description, visibility, joinPolicy, selectedCategoryIds, mediaFile, navigate, onClose])
+  }, [title, author, chapters, description, visibility, joinPolicy, selectedCategoryIds, coverFile, navigate, onClose])
 
   return (
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -205,7 +217,7 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
 
           {categories.length > 0 ? (
             <div className="field">
-              <span className="field-label">Categories</span>
+              <span className="field-label">Categories *</span>
               <div className="category-tab-bar">
                 {categories.map((cat) => (
                   <button
@@ -222,11 +234,11 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
           ) : null}
 
           <label className="field">
-            <span className="field-label">Media (image / pdf / ebook)</span>
+            <span className="field-label">Provide cover images</span>
             <input
               type="file"
-              accept="image/*,.pdf,.epub"
-              onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
             />
           </label>
 

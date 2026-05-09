@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useCategories } from '../../hooks/useCategories'
@@ -11,28 +11,42 @@ interface CategoriesPageProps {
 export function CategoriesPage({ userId }: CategoriesPageProps) {
   const {
     categories,
-    categoryMembers,
     loading,
     error,
-    joinCategory,
-    leaveCategory,
   } = useCategories({ userId })
 
   const navigate = useNavigate()
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
   const [categorySessions, setCategorySessions] = useState<ReadingSession[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
-  const [busyCategoryId, setBusyCategoryId] = useState<string | null>(null)
+  const [sessionsError, setSessionsError] = useState<string | null>(null)
+  const sessionsRequestIdRef = useRef(0)
 
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId) ?? null
-  const selectedIsMember = selectedCategoryId ? Boolean(categoryMembers[selectedCategoryId]) : false
 
-  const loadCategorySessions = useCallback(async (categoryId: string) => {
+  const loadCategorySessions = useCallback(async (categoryId: number) => {
+    const requestId = sessionsRequestIdRef.current + 1
+    sessionsRequestIdRef.current = requestId
     setLoadingSessions(true)
-    const { data: scData } = await supabase
+    setSessionsError(null)
+    setCategorySessions([])
+
+    const { data: scData, error: scError } = await supabase
       .from('session_categories')
-      .select('session_id')
+      .select('reading_sessions!inner(*)')
       .eq('category_id', categoryId)
+      .eq('reading_sessions.visibility', 'public')
+      .order('created_at', { ascending: false, referencedTable: 'reading_sessions' })
+
+    if (sessionsRequestIdRef.current !== requestId) {
+      return
+    }
+
+    if (scError) {
+      setSessionsError(scError.message)
+      setLoadingSessions(false)
+      return
+    }
 
     if (!scData || scData.length === 0) {
       setCategorySessions([])
@@ -40,15 +54,9 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
       return
     }
 
-    const sessionIds = scData.map((sc: { session_id: string }) => sc.session_id)
-    const { data: sessionsData } = await supabase
-      .from('reading_sessions')
-      .select('*')
-      .in('id', sessionIds)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-
-    setCategorySessions((sessionsData ?? []) as ReadingSession[])
+    const sessionsData = (scData as { reading_sessions: ReadingSession }[])
+      .map((row) => row.reading_sessions)
+    setCategorySessions(sessionsData)
     setLoadingSessions(false)
   }, [])
 
@@ -56,21 +64,11 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
     if (selectedCategoryId) {
       void loadCategorySessions(selectedCategoryId)
     } else {
+      sessionsRequestIdRef.current += 1
+      setSessionsError(null)
       setCategorySessions([])
     }
   }, [selectedCategoryId, loadCategorySessions])
-
-  async function handleJoin(categoryId: string) {
-    setBusyCategoryId(categoryId)
-    await joinCategory(categoryId)
-    setBusyCategoryId(null)
-  }
-
-  async function handleLeave(categoryId: string) {
-    setBusyCategoryId(categoryId)
-    await leaveCategory(categoryId)
-    setBusyCategoryId(null)
-  }
 
   return (
     <section className="page-tight">
@@ -113,30 +111,12 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
                 ) : null}
               </div>
               <div className="page-tight-actions">
-                <span className="pill">{selectedCategory.visibility}</span>
-                {selectedIsMember ? (
-                  <button
-                    type="button"
-                    className="btn-danger"
-                    disabled={busyCategoryId === selectedCategory.id}
-                    onClick={() => { void handleLeave(selectedCategory.id) }}
-                  >
-                    {busyCategoryId === selectedCategory.id ? 'Leaving…' : 'Leave'}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={busyCategoryId === selectedCategory.id}
-                    onClick={() => { void handleJoin(selectedCategory.id) }}
-                  >
-                    {busyCategoryId === selectedCategory.id ? 'Joining…' : 'Join'}
-                  </button>
-                )}
+                <span className="pill">System Category</span>
               </div>
             </div>
 
             <h3>Sessions</h3>
+            {sessionsError ? <p className="error">{sessionsError}</p> : null}
             {loadingSessions ? <p className="subtle">Loading sessions…</p> : null}
             {!loadingSessions && categorySessions.length === 0 ? (
               <p className="subtle">No sessions in this category yet.</p>

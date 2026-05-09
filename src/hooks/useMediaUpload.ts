@@ -34,6 +34,7 @@ interface UseMediaUploadReturn {
   canUpload: boolean
   mediaCount: number
   mediaLimit: number
+  maxUploadedChapter: number
 }
 
 const PAGE_SIZE = 20
@@ -50,7 +51,9 @@ export function useMediaUpload({
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(false)
+  const [page, setPage] = useState(0)
   const [totalMediaCount, setTotalMediaCount] = useState(0)
+  const [maxUploadedChapter, setMaxUploadedChapter] = useState(0)
 
   const isOwner = Boolean(userId && sessionOwnerId && userId === sessionOwnerId)
   const canUpload = isOwner && totalMediaCount < totalChapters
@@ -61,17 +64,24 @@ export function useMediaUpload({
     setLoading(true)
     setError(null)
 
-    const [mediaResult, countResult] = await Promise.all([
+    const [mediaResult, countResult, maxChapterResult] = await Promise.all([
       supabase
         .from('session_media')
-        .select('*')
+        .select('id,session_id,uploader_id,chapter_number,media_type,file_path,file_name,file_size_bytes,mime_type,description,created_at')
         .eq('session_id', sessionId)
-        .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE + 1),
+        .order('chapter_number', { ascending: true })
+        .order('created_at', { ascending: true })
+        .range(0, PAGE_SIZE - 1),
       supabase
         .from('session_media')
         .select('id', { count: 'exact', head: true })
         .eq('session_id', sessionId),
+      supabase
+        .from('session_media')
+        .select('chapter_number')
+        .eq('session_id', sessionId)
+        .order('chapter_number', { ascending: false })
+        .limit(1),
     ])
 
     if (mediaResult.error) {
@@ -81,15 +91,16 @@ export function useMediaUpload({
     }
 
     setTotalMediaCount(countResult.count ?? 0)
+    setMaxUploadedChapter(maxChapterResult.data?.[0]?.chapter_number ?? 0)
 
     const items = (mediaResult.data ?? []) as SessionMedia[]
-    const hasMoreItems = items.length > PAGE_SIZE
-    const pageItems = hasMoreItems ? items.slice(0, PAGE_SIZE) : items
+    const hasMoreItems = (countResult.count ?? 0) > items.length
 
-    setMedia(pageItems)
+    setPage(0)
+    setMedia(items)
     setHasMore(hasMoreItems)
 
-    const paths = pageItems.map((m) => m.file_path)
+    const paths = items.map((m) => m.file_path)
     const urls = await getSignedMediaUrlMap(paths)
     setMediaUrls(urls)
 
@@ -97,17 +108,18 @@ export function useMediaUpload({
   }, [sessionId])
 
   const loadMore = useCallback(async () => {
-    if (!sessionId || !hasMore || media.length === 0) return
-
-    const lastItem = media[media.length - 1]
+    if (!sessionId || !hasMore) return
+    const nextPage = page + 1
+    const start = nextPage * PAGE_SIZE
+    const end = start + PAGE_SIZE - 1
 
     const { data, error: fetchError } = await supabase
       .from('session_media')
-      .select('*')
+      .select('id,session_id,uploader_id,chapter_number,media_type,file_path,file_name,file_size_bytes,mime_type,description,created_at')
       .eq('session_id', sessionId)
-      .lt('created_at', lastItem.created_at)
-      .order('created_at', { ascending: false })
-      .limit(PAGE_SIZE + 1)
+      .order('chapter_number', { ascending: true })
+      .order('created_at', { ascending: true })
+      .range(start, end)
 
     if (fetchError) {
       setError(fetchError.message)
@@ -115,16 +127,16 @@ export function useMediaUpload({
     }
 
     const items = (data ?? []) as SessionMedia[]
-    const hasMoreItems = items.length > PAGE_SIZE
-    const pageItems = hasMoreItems ? items.slice(0, PAGE_SIZE) : items
 
-    const newPaths = pageItems.map((m) => m.file_path)
+    const newPaths = items.map((m) => m.file_path)
     const newUrls = await getSignedMediaUrlMap(newPaths)
 
-    setMedia((prev) => [...prev, ...pageItems])
+    setMedia((prev) => [...prev, ...items])
     setMediaUrls((prev) => ({ ...prev, ...newUrls }))
-    setHasMore(hasMoreItems)
-  }, [sessionId, hasMore, media])
+    const nextCount = start + items.length
+    setHasMore(nextCount < totalMediaCount)
+    setPage(nextPage)
+  }, [sessionId, hasMore, page, totalMediaCount])
 
   const uploadMedia = useCallback(async (
     file: File,
@@ -142,7 +154,6 @@ export function useMediaUpload({
       setError(`Media limit reached (${totalChapters} files max, one per chapter)`)
       return false
     }
-
     const fileValidation = validateMediaFile(file, mediaType)
     if (!fileValidation.valid) {
       setError(fileValidation.error)
@@ -170,6 +181,7 @@ export function useMediaUpload({
       .insert({
         session_id: sessionId,
         uploader_id: userId,
+        chapter_number: 1,
         media_type: mediaType,
         file_path: path,
         file_name: file.name,
@@ -232,5 +244,6 @@ export function useMediaUpload({
     canUpload,
     mediaCount: totalMediaCount,
     mediaLimit: totalChapters,
+    maxUploadedChapter,
   }
 }

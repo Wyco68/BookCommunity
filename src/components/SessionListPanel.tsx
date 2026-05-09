@@ -2,7 +2,7 @@ import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
-import type { ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
+import type { ReadingSession, SessionCardMediaPreview, SessionJoinRequest, SessionMembership } from '../types'
 
 type Copy = (typeof translations)[Language]
 
@@ -18,6 +18,9 @@ export interface SessionListPanelProps {
   myJoinRequestStatus: Record<string, SessionJoinRequest['status']>
   busySessionId: string | null
   sessionCategoryNames: Record<string, string[]>
+  sessionFirstMedia: Record<string, SessionCardMediaPreview>
+  sessionUploadedChapterCount: Record<string, number>
+  latestProgress: Record<string, number>
   sessionReadChaptersByUsers?: Record<string, number>
   onSessionSearchChange: (value: string) => void
   onVisibilityFilterChange: (value: 'all' | 'public' | 'private') => void
@@ -39,6 +42,9 @@ export const SessionListPanel = memo(function SessionListPanel({
   myJoinRequestStatus,
   busySessionId,
   sessionCategoryNames,
+  sessionFirstMedia,
+  sessionUploadedChapterCount,
+  latestProgress,
   sessionReadChaptersByUsers = {},
   onSessionSearchChange,
   onVisibilityFilterChange,
@@ -96,7 +102,10 @@ export const SessionListPanel = memo(function SessionListPanel({
           const membership = memberships[session.id]
           const requestStatus = myJoinRequestStatus[session.id]
           const categories = sessionCategoryNames[session.id] ?? []
-          const readByUsers = sessionReadChaptersByUsers[session.id] ?? 0
+          const firstMedia = sessionFirstMedia[session.id]
+          const myProgress = latestProgress[session.id] ?? 0
+          const uploadedCount = sessionUploadedChapterCount[session.id] ?? 0
+          const isOwner = membership?.role === 'owner'
 
           return (
             <li
@@ -108,6 +117,26 @@ export const SessionListPanel = memo(function SessionListPanel({
               }}
             >
               <div className="session-card-inner">
+                <div className="session-card-cover" aria-hidden="true">
+                  {firstMedia ? (
+                    firstMedia.is_image && firstMedia.signed_url ? (
+                      <img
+                        className="session-card-cover-image"
+                        src={firstMedia.signed_url}
+                        alt={`${session.book_title} cover`}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="session-card-cover-file">
+                        <span className="session-card-file-icon">FILE</span>
+                        <span className="session-card-file-name">{firstMedia.file_name}</span>
+                      </div>
+                    )
+                  ) : (
+                    <div className="session-card-cover-empty">No preview</div>
+                  )}
+                </div>
+
                 <div className="session-heading">
                   <h3>{session.book_title}</h3>
                   <span className="pill">{t.enums.visibility[session.visibility]}</span>
@@ -115,9 +144,18 @@ export const SessionListPanel = memo(function SessionListPanel({
 
                 <p className="subtle session-card-author">{t.sessions.byAuthor(session.book_author)}</p>
 
-                <div className="session-readby-strip" aria-label={t.sessions.readChaptersByUsersMetric}>
-                  <span className="session-readby-label">{t.sessions.readChaptersByUsersMetric}</span>
-                  <span className="session-readby-value">{readByUsers}</span>
+                <div className="session-readby-strip" aria-label={isOwner ? 'Uploaded chapters' : 'Your progress'}>
+                  <span className="session-readby-label">{isOwner ? 'Uploaded Chapters' : 'Your Progress'}</span>
+                  <span className="session-readby-value">{isOwner ? `${uploadedCount} chapters` : myProgress}</span>
+                </div>
+
+                <div className="session-meta-grid">
+                  <div className="session-meta-item">
+                    <span className="session-meta-label">Total Chapters</span>
+                    <span className="session-meta-value">
+                      {session.status_type === 'completed' ? 'Completed' : session.total_chapters}
+                    </span>
+                  </div>
                 </div>
 
                 {categories.length > 0 ? (

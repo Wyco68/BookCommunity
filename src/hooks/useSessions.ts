@@ -1,7 +1,15 @@
 import { useCallback, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { Category, ReadingSession, SessionMembership, SessionJoinRequest, ProgressUpdate } from '../types'
+import { getSignedMediaUrl } from '../lib/storage'
+import type {
+  Category,
+  ReadingSession,
+  SessionMembership,
+  SessionJoinRequest,
+  ProgressUpdate,
+  SessionCardMediaPreview,
+} from '../types'
 import {
   buildJoinRequestStatusLookup,
   buildLatestProgressBySession,
@@ -33,6 +41,8 @@ export interface UseSessionsReturn {
   progressDrafts: Record<string, number>
   myJoinRequestStatus: Record<string, SessionJoinRequest['status']>
   sessionCategoryNames: Record<string, string[]>
+  sessionFirstMedia: Record<string, SessionCardMediaPreview>
+  sessionUploadedChapterCount: Record<string, number>
   sessionReadChaptersByUsers: Record<string, number>
   loading: boolean
   error: string | null
@@ -49,6 +59,8 @@ export interface UseSessionsReturn {
   setProgressDrafts: React.Dispatch<React.SetStateAction<Record<string, number>>>
   setMyJoinRequestStatus: React.Dispatch<React.SetStateAction<Record<string, SessionJoinRequest['status']>>>
   setSessionCategoryNames: React.Dispatch<React.SetStateAction<Record<string, string[]>>>
+  setSessionFirstMedia: React.Dispatch<React.SetStateAction<Record<string, SessionCardMediaPreview>>>
+  setSessionUploadedChapterCount: React.Dispatch<React.SetStateAction<Record<string, number>>>
   setSessionReadChaptersByUsers: React.Dispatch<React.SetStateAction<Record<string, number>>>
   setError: (error: string | null) => void
 }
@@ -60,6 +72,8 @@ export function useSessions(): UseSessionsReturn {
   const [progressDrafts, setProgressDrafts] = useState<Record<string, number>>({})
   const [myJoinRequestStatus, setMyJoinRequestStatus] = useState<Record<string, SessionJoinRequest['status']>>({})
   const [sessionCategoryNames, setSessionCategoryNames] = useState<Record<string, string[]>>({})
+  const [sessionFirstMedia, setSessionFirstMedia] = useState<Record<string, SessionCardMediaPreview>>({})
+  const [sessionUploadedChapterCount, setSessionUploadedChapterCount] = useState<Record<string, number>>({})
   const [sessionReadChaptersByUsers, setSessionReadChaptersByUsers] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -76,7 +90,7 @@ export function useSessions(): UseSessionsReturn {
     setError(null)
 
     const [sessionsResult, membershipsResult, progressResult, requestsResult] = await Promise.all([
-      supabase.from('reading_sessions').select('*').eq('status', 'active').order('created_at', { ascending: false }),
+      supabase.from('reading_sessions').select('*').eq('status_type', 'ongoing').order('created_at', { ascending: false }),
       supabase.from('session_members').select('session_id,user_id,role').eq('user_id', user.id),
       supabase
         .from('progress_updates')
@@ -112,6 +126,8 @@ export function useSessions(): UseSessionsReturn {
     // Fetch category names per session
     const sessionIds = sessionsData.map((s) => s.id)
     const catLookup: Record<string, string[]> = {}
+    const firstMediaLookup: Record<string, SessionCardMediaPreview> = {}
+    const uploadedCountLookup: Record<string, number> = {}
     const readByUsersLookup: Record<string, number> = {}
     if (sessionIds.length > 0) {
       const { data: scData } = await supabase
@@ -119,16 +135,16 @@ export function useSessions(): UseSessionsReturn {
         .select('session_id, category_id')
         .in('session_id', sessionIds)
       if (scData && scData.length > 0) {
-        const catIds = [...new Set(scData.map((sc: { category_id: string }) => sc.category_id))]
+        const catIds = [...new Set(scData.map((sc: { category_id: number }) => sc.category_id))]
         const { data: catData } = await supabase
           .from('categories')
           .select('id, name')
           .in('id', catIds)
-        const catNameMap: Record<string, string> = {}
+        const catNameMap: Record<number, string> = {}
         for (const c of (catData ?? []) as Category[]) {
           catNameMap[c.id] = c.name
         }
-        for (const sc of scData as { session_id: string; category_id: string }[]) {
+        for (const sc of scData as { session_id: string; category_id: number }[]) {
           if (!catLookup[sc.session_id]) catLookup[sc.session_id] = []
           const name = catNameMap[sc.category_id]
           if (name) catLookup[sc.session_id].push(name)
@@ -155,6 +171,64 @@ export function useSessions(): UseSessionsReturn {
           readByUsersLookup[sessionId] = (readByUsersLookup[sessionId] ?? 0) + chapter
         }
       }
+
+      const firstMediaRows = await Promise.all(
+        sessionIds.map(async (sessionId) => {
+          const session = sessionsData.find((s) => s.id === sessionId)
+          if (session?.cover_image_path) {
+            return {
+              session_id: sessionId,
+              file_path: session.cover_image_path,
+              file_name: 'cover',
+              mime_type: 'image/jpeg',
+              media_type: 'image',
+              is_cover: true,
+            }
+          }
+          const { data } = await supabase
+            .from('session_media')
+            .select('session_id,file_path,file_name,mime_type,media_type')
+            .eq('session_id', sessionId)
+            .eq('media_type', 'image')
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+          return data
+        }),
+      )
+
+      for (const item of firstMediaRows) {
+        if (!item) continue
+        const isImage = item.mime_type.startsWith('image/')
+        firstMediaLookup[item.session_id] = {
+          session_id: item.session_id,
+          file_path: item.file_path,
+          file_name: item.file_name,
+          mime_type: item.mime_type,
+          media_type: item.media_type,
+          is_image: isImage,
+          signed_url: isImage ? await getSignedMediaUrl(item.file_path) : null,
+        }
+      }
+
+      const ownerSessionIds = sessionsData
+        .filter((s) => s.creator_id === user.id)
+        .map((s) => s.id)
+
+      if (ownerSessionIds.length > 0) {
+        const ownerCounts = await Promise.all(
+          ownerSessionIds.map(async (sessionId) => {
+            const result = await supabase
+              .from('session_media')
+              .select('id', { count: 'exact', head: true })
+              .eq('session_id', sessionId)
+            return { sessionId, count: result.count ?? 0 }
+          }),
+        )
+        for (const row of ownerCounts) {
+          uploadedCountLookup[row.sessionId] = row.count
+        }
+      }
     }
 
     setSessions(sessionsData)
@@ -163,6 +237,8 @@ export function useSessions(): UseSessionsReturn {
     setProgressDrafts(progressLookup)
     setMyJoinRequestStatus(requestLookup)
     setSessionCategoryNames(catLookup)
+    setSessionFirstMedia(firstMediaLookup)
+    setSessionUploadedChapterCount(uploadedCountLookup)
     setSessionReadChaptersByUsers(readByUsersLookup)
     setLoading(false)
   }, [])
@@ -307,6 +383,8 @@ export function useSessions(): UseSessionsReturn {
     progressDrafts,
     myJoinRequestStatus,
     sessionCategoryNames,
+    sessionFirstMedia,
+    sessionUploadedChapterCount,
     sessionReadChaptersByUsers,
     loading,
     error,
@@ -323,6 +401,8 @@ export function useSessions(): UseSessionsReturn {
     setProgressDrafts,
     setMyJoinRequestStatus,
     setSessionCategoryNames,
+    setSessionFirstMedia,
+    setSessionUploadedChapterCount,
     setSessionReadChaptersByUsers,
     setError: setError,
   }

@@ -20,6 +20,7 @@ export function MediaUpload({ onUpload, uploading, error }: MediaUploadProps) {
 
   async function handleUpload() {
     if (!selectedFile) return
+    if (!window.confirm('Upload this chapter file?')) return
 
     const success = await onUpload(selectedFile, mediaType, description)
     if (success) {
@@ -128,9 +129,19 @@ export function MediaGallery({
         {media.map((item) => {
           const url = mediaUrls[item.file_path]
           const canDelete = item.uploader_id === currentUserId || sessionOwnerId === currentUserId
+          const fileType = item.mime_type.includes('pdf')
+            ? 'pdf'
+            : item.mime_type.includes('epub')
+              ? 'epub'
+              : item.media_type
 
           return (
             <div key={item.id} className="media-item">
+              <div className="media-item-head">
+                <span className="pill">Chapter {item.chapter_number}</span>
+                <span className="pill">{String(fileType).toUpperCase()}</span>
+              </div>
+
               {item.media_type === 'image' && url ? (
                 <img
                   className="media-thumbnail"
@@ -138,9 +149,15 @@ export function MediaGallery({
                   alt={item.description || item.file_name}
                   loading="lazy"
                 />
+              ) : item.mime_type === 'application/pdf' && url ? (
+                <iframe
+                  className="media-pdf-frame"
+                  src={url}
+                  title={item.file_name}
+                />
               ) : (
                 <div className="media-file-icon">
-                  <span className="pill">{item.mime_type.split('/').pop()?.toUpperCase()}</span>
+                  <span className="pill">{item.mime_type.split('/').pop()?.toUpperCase() ?? 'FILE'}</span>
                   <p className="muted media-filename">{item.file_name}</p>
                 </div>
               )}
@@ -151,14 +168,23 @@ export function MediaGallery({
 
               <div className="media-actions">
                 {url ? (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="secondary media-download-link"
-                  >
-                    Open
-                  </a>
+                  <>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="secondary media-download-link"
+                    >
+                      View
+                    </a>
+                    <a
+                      href={url}
+                      download={item.file_name}
+                      className="ghost media-download-link"
+                    >
+                      Download
+                    </a>
+                  </>
                 ) : null}
 
                 {canDelete ? (
