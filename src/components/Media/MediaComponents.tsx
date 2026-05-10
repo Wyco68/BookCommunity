@@ -1,16 +1,26 @@
 import { useState, useRef } from 'react'
-import type { MediaType, SessionMedia } from '../../types'
+import type { MediaType } from '../../types'
+import { ConfirmModal } from '../ConfirmModal'
 
 interface MediaUploadProps {
   onUpload: (file: File, mediaType: MediaType, description?: string) => Promise<boolean>
   uploading: boolean
   error: string | null
+  nextChapter: number
+  totalChapters: number
 }
 
-export function MediaUpload({ onUpload, uploading, error }: MediaUploadProps) {
+export function MediaUpload({
+  onUpload,
+  uploading,
+  error,
+  nextChapter,
+  totalChapters,
+}: MediaUploadProps) {
   const [mediaType, setMediaType] = useState<MediaType>('image')
   const [description, setDescription] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [confirming, setConfirming] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const acceptMap: Record<MediaType, string> = {
@@ -18,200 +28,88 @@ export function MediaUpload({ onUpload, uploading, error }: MediaUploadProps) {
     book_file: 'application/pdf,application/epub+zip',
   }
 
-  async function handleUpload() {
+  function handleRequestUpload() {
     if (!selectedFile) return
-    if (!window.confirm('Upload this chapter file?')) return
+    setConfirming(true)
+  }
 
+  async function handleConfirmUpload() {
+    if (!selectedFile) return
+    setConfirming(false)
     const success = await onUpload(selectedFile, mediaType, description)
     if (success) {
       setSelectedFile(null)
       setDescription('')
-      if (inputRef.current) {
-        inputRef.current.value = ''
-      }
+      if (inputRef.current) inputRef.current.value = ''
     }
   }
 
   return (
-    <div className="stack gap-sm">
-      <div className="split">
-        <label className="field">
-          <span>Media Type</span>
-          <select
-            value={mediaType}
-            onChange={(e) => {
-              setMediaType(e.target.value as MediaType)
-              setSelectedFile(null)
-              if (inputRef.current) inputRef.current.value = ''
-            }}
-          >
-            <option value="image">Image</option>
-            <option value="book_file">Book File (PDF/EPUB)</option>
-          </select>
-        </label>
+    <>
+      {confirming ? (
+        <ConfirmModal
+          message={`Upload "${selectedFile?.name}" as Chapter ${nextChapter}?`}
+          confirmLabel={`Upload Chapter ${nextChapter}`}
+          onConfirm={() => { void handleConfirmUpload() }}
+          onCancel={() => setConfirming(false)}
+        />
+      ) : null}
+
+      <div className="owner-upload-block">
+        <div className="owner-upload-header">
+          <span className="owner-upload-title">Upload Chapter {nextChapter}</span>
+          <span className="owner-upload-progress">{nextChapter - 1} / {totalChapters} uploaded</span>
+        </div>
+
+        <div className="owner-upload-row">
+          <label className="field">
+            <span>Type</span>
+            <select
+              value={mediaType}
+              onChange={(e) => {
+                setMediaType(e.target.value as MediaType)
+                setSelectedFile(null)
+                if (inputRef.current) inputRef.current.value = ''
+              }}
+            >
+              <option value="image">Image</option>
+              <option value="book_file">Book File (PDF/EPUB)</option>
+            </select>
+          </label>
+
+          <label className="field owner-upload-file-label">
+            <span>File</span>
+            <input
+              ref={inputRef}
+              type="file"
+              accept={acceptMap[mediaType]}
+              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+        </div>
 
         <label className="field">
-          <span>File</span>
+          <span>Description (optional)</span>
           <input
-            ref={inputRef}
-            type="file"
-            accept={acceptMap[mediaType]}
-            onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Brief description"
+            maxLength={200}
           />
         </label>
-      </div>
 
-      <label className="field">
-        <span>Description (optional)</span>
-        <input
-          type="text"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Brief description of this file"
-          maxLength={200}
-        />
-      </label>
+        {error ? <p className="error">{error}</p> : null}
 
-      {error ? <p className="error">{error}</p> : null}
-
-      <button
-        type="button"
-        className="primary"
-        disabled={!selectedFile || uploading}
-        onClick={() => { void handleUpload() }}
-      >
-        {uploading ? 'Uploading…' : 'Upload'}
-      </button>
-    </div>
-  )
-}
-
-interface MediaGalleryProps {
-  media: SessionMedia[]
-  mediaUrls: Record<string, string>
-  loading: boolean
-  hasMore: boolean
-  onLoadMore: () => Promise<void>
-  onRemove: (item: SessionMedia) => Promise<boolean>
-  currentUserId: string
-  sessionOwnerId: string
-}
-
-export function MediaGallery({
-  media,
-  mediaUrls,
-  loading,
-  hasMore,
-  onLoadMore,
-  onRemove,
-  currentUserId,
-  sessionOwnerId,
-}: MediaGalleryProps) {
-  const [removingId, setRemovingId] = useState<string | null>(null)
-
-  async function handleRemove(item: SessionMedia) {
-    setRemovingId(item.id)
-    await onRemove(item)
-    setRemovingId(null)
-  }
-
-  if (loading && media.length === 0) {
-    return <p className="subtle">Loading media…</p>
-  }
-
-  if (media.length === 0) {
-    return <p className="subtle">No media uploaded yet.</p>
-  }
-
-  return (
-    <div className="stack">
-      <div className="media-grid">
-        {media.map((item) => {
-          const url = mediaUrls[item.file_path]
-          const canDelete = item.uploader_id === currentUserId || sessionOwnerId === currentUserId
-          const fileType = item.mime_type.includes('pdf')
-            ? 'pdf'
-            : item.mime_type.includes('epub')
-              ? 'epub'
-              : item.media_type
-
-          return (
-            <div key={item.id} className="media-item">
-              <div className="media-item-head">
-                <span className="pill">Chapter {item.chapter_number}</span>
-                <span className="pill">{String(fileType).toUpperCase()}</span>
-              </div>
-
-              {item.media_type === 'image' && url ? (
-                <img
-                  className="media-thumbnail"
-                  src={url}
-                  alt={item.description || item.file_name}
-                  loading="lazy"
-                />
-              ) : item.mime_type === 'application/pdf' && url ? (
-                <iframe
-                  className="media-pdf-frame"
-                  src={url}
-                  title={item.file_name}
-                />
-              ) : (
-                <div className="media-file-icon">
-                  <span className="pill">{item.mime_type.split('/').pop()?.toUpperCase() ?? 'FILE'}</span>
-                  <p className="muted media-filename">{item.file_name}</p>
-                </div>
-              )}
-
-              {item.description ? (
-                <p className="muted media-description">{item.description}</p>
-              ) : null}
-
-              <div className="media-actions">
-                {url ? (
-                  <>
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="secondary media-download-link"
-                    >
-                      View
-                    </a>
-                    <a
-                      href={url}
-                      download={item.file_name}
-                      className="ghost media-download-link"
-                    >
-                      Download
-                    </a>
-                  </>
-                ) : null}
-
-                {canDelete ? (
-                  <button
-                    type="button"
-                    className="ghost"
-                    disabled={removingId === item.id}
-                    onClick={() => { void handleRemove(item) }}
-                  >
-                    {removingId === item.id ? 'Removing…' : 'Remove'}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {hasMore ? (
         <button
           type="button"
-          className="secondary"
-          onClick={() => { void onLoadMore() }}
+          className="primary"
+          disabled={!selectedFile || uploading}
+          onClick={handleRequestUpload}
         >
-          Load More
+          {uploading ? `Uploading Chapter ${nextChapter}…` : `Upload Chapter ${nextChapter}`}
         </button>
-      ) : null}
-    </div>
+      </div>
+    </>
   )
 }

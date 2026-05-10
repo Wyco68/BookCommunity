@@ -2,27 +2,37 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useCategories } from '../../hooks/useCategories'
+import { getSignedMediaUrl, SESSION_COVERS_BUCKET } from '../../lib/storage'
 import type { ReadingSession } from '../../types'
 
 interface CategoriesPageProps {
   userId: string
 }
 
+interface SessionWithCover extends ReadingSession {
+  coverSignedUrl?: string | null
+}
+
 export function CategoriesPage({ userId }: CategoriesPageProps) {
-  const {
-    categories,
-    loading,
-    error,
-  } = useCategories({ userId })
+  const { categories, loading, error } = useCategories({ userId })
 
   const navigate = useNavigate()
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
-  const [categorySessions, setCategorySessions] = useState<ReadingSession[]>([])
+  const [categorySessions, setCategorySessions] = useState<SessionWithCover[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
   const [sessionsError, setSessionsError] = useState<string | null>(null)
   const sessionsRequestIdRef = useRef(0)
+  const autoSelectedRef = useRef(false)
 
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId) ?? null
+
+  // Auto-select "Action" (or first category) once categories load
+  useEffect(() => {
+    if (autoSelectedRef.current || categories.length === 0) return
+    autoSelectedRef.current = true
+    const action = categories.find((c) => c.name === 'Action') ?? categories[0]
+    setSelectedCategoryId(action.id)
+  }, [categories])
 
   const loadCategorySessions = useCallback(async (categoryId: number) => {
     const requestId = sessionsRequestIdRef.current + 1
@@ -38,9 +48,7 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
       .eq('reading_sessions.visibility', 'public')
       .order('created_at', { ascending: false, referencedTable: 'reading_sessions' })
 
-    if (sessionsRequestIdRef.current !== requestId) {
-      return
-    }
+    if (sessionsRequestIdRef.current !== requestId) return
 
     if (scError) {
       setSessionsError(scError.message)
@@ -54,9 +62,21 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
       return
     }
 
-    const sessionsData = (scData as { reading_sessions: ReadingSession }[])
-      .map((row) => row.reading_sessions)
-    setCategorySessions(sessionsData)
+    const sessionsData = (scData as { reading_sessions: ReadingSession }[]).map(
+      (row) => row.reading_sessions,
+    )
+
+    // Resolve cover image signed URLs in parallel
+    const sessionsWithCovers = await Promise.all(
+      sessionsData.map(async (session) => {
+        if (!session.cover_image_path) return { ...session, coverSignedUrl: null }
+        const signedUrl = await getSignedMediaUrl(session.cover_image_path, SESSION_COVERS_BUCKET)
+        return { ...session, coverSignedUrl: signedUrl }
+      }),
+    )
+
+    if (sessionsRequestIdRef.current !== requestId) return
+    setCategorySessions(sessionsWithCovers)
     setLoadingSessions(false)
   }, [])
 
@@ -104,18 +124,12 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
           <>
             <hr className="page-tight-rule" />
             <div className="detail-header">
-              <div>
-                <h3>{selectedCategory.name}</h3>
-                {selectedCategory.description ? (
-                  <p className="subtle">{selectedCategory.description}</p>
-                ) : null}
-              </div>
-              <div className="page-tight-actions">
-                <span className="pill">System Category</span>
-              </div>
+              <h3>{selectedCategory.name}</h3>
+              {selectedCategory.description ? (
+                <p className="subtle">{selectedCategory.description}</p>
+              ) : null}
             </div>
 
-            <h3>Sessions</h3>
             {sessionsError ? <p className="error">{sessionsError}</p> : null}
             {loadingSessions ? <p className="subtle">Loading sessions…</p> : null}
             {!loadingSessions && categorySessions.length === 0 ? (
@@ -127,22 +141,45 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
                 {categorySessions.map((session) => (
                   <li
                     key={session.id}
-                    className="session-item session-card-clickable"
+                    className="session-item session-card session-card-clickable"
                     onClick={() => navigate(`/session/${session.id}`)}
                   >
-                    <div className="page-tight-session-inner">
-                      <div className="session-heading">
-                        <h3>{session.book_title}</h3>
-                        <span className="pill">{session.visibility}</span>
+                    <div className="session-card-cols">
+                      <div className="session-card-col-cover" aria-hidden="true">
+                        {session.coverSignedUrl ? (
+                          <img
+                            className="session-card-cover-image"
+                            src={session.coverSignedUrl}
+                            alt={`${session.book_title} cover`}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="session-card-cover-empty">
+                            <span className="session-card-no-cover-icon">📖</span>
+                          </div>
+                        )}
                       </div>
-                      <p className="subtle">by {session.book_author}</p>
-                      <div className="session-meta-grid">
-                        <div className="session-meta-item">
-                          <span className="session-meta-label">Chapters</span>
-                          <span className="session-meta-value">{session.total_chapters}</span>
+
+                      <div className="session-card-col-info">
+                        <div className="session-heading">
+                          <h3 className="session-card-title">{session.book_title}</h3>
+                          <span className="pill">{session.visibility}</span>
                         </div>
+                        <p className="subtle session-card-author">by {session.book_author}</p>
+
+                        <div className="session-meta-grid">
+                          <div className="session-meta-item">
+                            <span className="session-meta-label">Chapters</span>
+                            <span className="session-meta-value">
+                              {session.status_type === 'completed' ? 'Completed' : session.total_chapters}
+                            </span>
+                          </div>
+                        </div>
+
+                        {session.description ? (
+                          <p className="muted session-card-desc">{session.description}</p>
+                        ) : null}
                       </div>
-                      {session.description ? <p className="muted">{session.description}</p> : null}
                     </div>
                   </li>
                 ))}

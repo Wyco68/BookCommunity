@@ -58,9 +58,14 @@ function App() {
     [searchFilteredSessions, joinedSearchSessions],
   )
 
+  // Home: ALL joined ongoing sessions — isolated from search/visibility state
   const joinedFilteredSessions = useMemo(
-    () => filteredSessions.filter((session) => Boolean(sessions.memberships[session.id])),
-    [filteredSessions, sessions.memberships],
+    () =>
+      sessions.sessions.filter(
+        (session) =>
+          session.status_type === 'ongoing' && Boolean(sessions.memberships[session.id]),
+      ),
+    [sessions.sessions, sessions.memberships],
   )
 
   useEffect(() => {

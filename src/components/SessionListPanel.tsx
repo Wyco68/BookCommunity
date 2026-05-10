@@ -27,7 +27,6 @@ export interface SessionListPanelProps {
   onSelectSession: (sessionId: string) => void
   onJoinSession: (sessionId: string) => Promise<void>
   showControls?: boolean
-  /** Flat panel inside a parent card (e.g. Search results); no outer card or duplicate title */
   embedded?: boolean
 }
 
@@ -45,7 +44,6 @@ export const SessionListPanel = memo(function SessionListPanel({
   sessionFirstMedia,
   sessionUploadedChapterCount,
   latestProgress,
-  sessionReadChaptersByUsers = {},
   onSessionSearchChange,
   onVisibilityFilterChange,
   onJoinSession,
@@ -59,13 +57,6 @@ export const SessionListPanel = memo(function SessionListPanel({
 
   return (
     <RootTag className={rootClassName}>
-      {embedded && !showControls ? null : (
-        <div>
-          <h2>{t.sessions.findSessions}</h2>
-          <p className="subtle">{t.sessions.activeSummary}</p>
-        </div>
-      )}
-
       {showControls ? (
         <div className="stack gap-sm">
           <label className="field">
@@ -94,7 +85,6 @@ export const SessionListPanel = memo(function SessionListPanel({
 
       {screenError ? <p className="error">{screenError}</p> : null}
       {loadingSessions ? <p className="subtle">{t.sessions.loading}</p> : null}
-
       {!loadingSessions && filteredSessions.length === 0 ? <p className="subtle">{t.sessions.noResults}</p> : null}
 
       <ul className="session-list">
@@ -116,78 +106,76 @@ export const SessionListPanel = memo(function SessionListPanel({
                 navigate(`/session/${session.id}`)
               }}
             >
-              <div className="session-card-inner">
-                <div className="session-card-cover" aria-hidden="true">
-                  {firstMedia ? (
-                    firstMedia.is_image && firstMedia.signed_url ? (
-                      <img
-                        className="session-card-cover-image"
-                        src={firstMedia.signed_url}
-                        alt={`${session.book_title} cover`}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="session-card-cover-file">
-                        <span className="session-card-file-icon">FILE</span>
-                        <span className="session-card-file-name">{firstMedia.file_name}</span>
-                      </div>
-                    )
+              <div className="session-card-cols">
+                <div className="session-card-col-cover" aria-hidden="true">
+                  {firstMedia?.is_image && firstMedia.signed_url ? (
+                    <img
+                      className="session-card-cover-image"
+                      src={firstMedia.signed_url}
+                      alt={`${session.book_title} cover`}
+                      loading="lazy"
+                    />
                   ) : (
-                    <div className="session-card-cover-empty">No preview</div>
+                    <div className="session-card-cover-empty">
+                      <span className="session-card-no-cover-icon">📖</span>
+                    </div>
                   )}
                 </div>
 
-                <div className="session-heading">
-                  <h3>{session.book_title}</h3>
-                  <span className="pill">{t.enums.visibility[session.visibility]}</span>
-                </div>
-
-                <p className="subtle session-card-author">{t.sessions.byAuthor(session.book_author)}</p>
-
-                <div className="session-readby-strip" aria-label={isOwner ? 'Uploaded chapters' : 'Your progress'}>
-                  <span className="session-readby-label">{isOwner ? 'Uploaded Chapters' : 'Your Progress'}</span>
-                  <span className="session-readby-value">{isOwner ? `${uploadedCount} chapters` : myProgress}</span>
-                </div>
-
-                <div className="session-meta-grid">
-                  <div className="session-meta-item">
-                    <span className="session-meta-label">Total Chapters</span>
-                    <span className="session-meta-value">
-                      {session.status_type === 'completed' ? 'Completed' : session.total_chapters}
-                    </span>
+                <div className="session-card-col-info">
+                  <div className="session-heading">
+                    <h3 className="session-card-title">{session.book_title}</h3>
+                    <span className="pill">{t.enums.visibility[session.visibility]}</span>
                   </div>
-                </div>
 
-                {categories.length > 0 ? (
-                  <div className="session-categories">
-                    {categories.map((cat) => (
-                      <span key={cat} className="category-pill">{cat}</span>
-                    ))}
+                  <p className="subtle session-card-author">{t.sessions.byAuthor(session.book_author)}</p>
+
+                  {categories.length > 0 ? (
+                    <div className="session-categories">
+                      {categories.map((cat) => (
+                        <span key={cat} className="category-pill">{cat}</span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="session-meta-grid">
+                    <div className="session-meta-item">
+                      <span className="session-meta-label">Chapters</span>
+                      <span className="session-meta-value">
+                        {session.status_type === 'completed' ? 'Completed' : session.total_chapters}
+                      </span>
+                    </div>
+                    <div className="session-meta-item">
+                      <span className="session-meta-label">{isOwner ? 'Uploaded' : 'My Progress'}</span>
+                      <span className="session-meta-value">
+                        {isOwner ? uploadedCount : myProgress}
+                      </span>
+                    </div>
                   </div>
-                ) : null}
 
-                {session.description ? <p className="muted session-card-desc">{session.description}</p> : null}
+                  {session.description ? (
+                    <p className="muted session-card-desc">{session.description}</p>
+                  ) : null}
 
-                {!membership ? (
-                  <button
-                    type="button"
-                    className="secondary session-card-cta"
-                    disabled={busySessionId === session.id || requestStatus === 'pending'}
-                    onClick={() => {
-                      void onJoinSession(session.id)
-                    }}
-                  >
-                    {session.join_policy === 'request'
-                      ? requestStatus === 'pending'
-                        ? t.sessions.requestPending
-                        : t.sessions.requestToJoin
-                      : busySessionId === session.id
-                        ? t.sessions.joining
-                        : t.sessions.joinSession}
-                  </button>
-                ) : (
-                  <p className="muted session-card-hint">{t.sessions.openDetails}</p>
-                )}
+                  {!membership ? (
+                    <button
+                      type="button"
+                      className="secondary session-card-cta"
+                      disabled={busySessionId === session.id || requestStatus === 'pending'}
+                      onClick={() => { void onJoinSession(session.id) }}
+                    >
+                      {session.join_policy === 'request'
+                        ? requestStatus === 'pending'
+                          ? t.sessions.requestPending
+                          : t.sessions.requestToJoin
+                        : busySessionId === session.id
+                          ? t.sessions.joining
+                          : t.sessions.joinSession}
+                    </button>
+                  ) : (
+                    <p className="muted session-card-hint">{t.sessions.openDetails}</p>
+                  )}
+                </div>
               </div>
             </li>
           )

@@ -8,11 +8,10 @@ import type {
   Profile,
   ReadingSession,
   SessionJoinRequest,
-  SessionMedia,
   SessionMembership,
 } from '../types'
 import { Avatar } from './Avatar'
-import { MediaUpload, MediaGallery } from './Media/MediaComponents'
+import { MediaUpload } from './Media/MediaComponents'
 
 type Copy = (typeof translations)[Language]
 
@@ -43,19 +42,14 @@ export interface SessionDetailPanelProps {
   onCommentDraftChange: (value: string) => void
   onToggleLike: (commentId: string) => Promise<void>
   fullWidth?: boolean
-  media?: SessionMedia[]
-  mediaUrls?: Record<string, string>
-  mediaLoading?: boolean
   mediaUploading?: boolean
   mediaError?: string | null
-  mediaHasMore?: boolean
   onUploadMedia?: (file: File, mediaType: MediaType, description?: string) => Promise<boolean>
-  onRemoveMedia?: (item: SessionMedia) => Promise<boolean>
-  onLoadMoreMedia?: () => Promise<void>
   currentUserId?: string
   canUploadMedia?: boolean
   mediaCount?: number
   mediaLimit?: number
+  nextChapter?: number
   readChaptersByUsers?: number
   onLeaveSession?: () => Promise<void>
   leavingSession?: boolean
@@ -96,19 +90,14 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
   onCommentDraftChange,
   onToggleLike,
   fullWidth = true,
-  media,
-  mediaUrls,
-  mediaLoading,
-  mediaUploading,
-  mediaError,
-  mediaHasMore,
+  mediaUploading = false,
+  mediaError = null,
   onUploadMedia,
-  onRemoveMedia,
-  onLoadMoreMedia,
   currentUserId,
-  canUploadMedia,
-  mediaCount,
-  mediaLimit,
+  canUploadMedia = false,
+  mediaCount = 0,
+  mediaLimit = 0,
+  nextChapter = 1,
   readChaptersByUsers = 0,
   onLeaveSession,
   leavingSession = false,
@@ -132,15 +121,38 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
         <p className="subtle">{t.sessions.selectSessionPrompt}</p>
       ) : (
         <>
+          {/* Header */}
           <div className="detail-header">
             <div>
               <h2>{selectedSession.book_title}</h2>
-              <p className="subtle">{t.sessions.singleThread}</p>
+              <p className="subtle">{selectedSession.book_author}</p>
             </div>
-            <span className="detail-stat-pill">Read chapters by users: {readChaptersByUsers}</span>
+            <span className="detail-stat-pill">
+              {readChaptersByUsers > 0 ? `${readChaptersByUsers} chapters read by members` : null}
+            </span>
           </div>
 
-          {selectedIsMember && !selectedIsOwner && selectedSession && onSaveMyProgress && onMyProgressChapterDraftChange ? (
+          {/* Owner upload */}
+          {selectedIsOwner && onUploadMedia ? (
+            <section className="detail-pane stack">
+              {canUploadMedia ? (
+                <MediaUpload
+                  onUpload={onUploadMedia}
+                  uploading={mediaUploading}
+                  error={mediaError}
+                  nextChapter={nextChapter}
+                  totalChapters={mediaLimit}
+                />
+              ) : (
+                <p className="subtle">
+                  All {mediaLimit} chapter{mediaLimit !== 1 ? 's' : ''} uploaded.
+                </p>
+              )}
+            </section>
+          ) : null}
+
+          {/* Member reading progress */}
+          {selectedIsMember && !selectedIsOwner && onSaveMyProgress && onMyProgressChapterDraftChange ? (
             <section className="detail-pane stack detail-my-reading">
               <h3>{t.sessions.yourReading}</h3>
               <div className="detail-my-reading-row">
@@ -151,7 +163,6 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                     min={1}
                     max={maxProgressChapter ?? selectedSession.total_chapters}
                     value={myProgressChapterDraft}
-                    disabled={selectedIsOwner}
                     onChange={(event) => {
                       const n = Number(event.target.value)
                       onMyProgressChapterDraftChange(Number.isNaN(n) ? 1 : n)
@@ -161,17 +172,12 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                 <button
                   type="button"
                   className="secondary detail-save-progress-btn"
-                  disabled={selectedIsOwner || savingMyProgress || (maxProgressChapter ?? selectedSession.total_chapters) < 1}
-                  onClick={() => {
-                    void onSaveMyProgress()
-                  }}
+                  disabled={savingMyProgress || (maxProgressChapter ?? 0) < 1}
+                  onClick={() => { void onSaveMyProgress() }}
                 >
                   {savingMyProgress ? t.common.saving : t.sessions.saveProgress}
                 </button>
               </div>
-              {selectedIsOwner ? (
-                <p className="subtle">Session owners cannot submit progress; upload chapters via media library.</p>
-              ) : null}
               {onLeaveSession ? (
                 <div className="detail-leave-row">
                   <button
@@ -179,9 +185,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                     className="btn-danger"
                     disabled={leavingSession || leaveSessionDisabled}
                     title={leaveSessionDisabled ? t.sessions.cannotLeaveOwnerSole : undefined}
-                    onClick={() => {
-                      void onLeaveSession()
-                    }}
+                    onClick={() => { void onLeaveSession() }}
                   >
                     {leavingSession ? t.common.working : t.sessions.leave}
                   </button>
@@ -190,13 +194,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
             </section>
           ) : null}
 
-          {selectedIsOwner ? (
-            <section className="detail-pane stack detail-my-reading">
-              <h3>{t.sessions.yourReading}</h3>
-              <p className="subtle">Owners cannot submit progress. Upload chapters to manage session content.</p>
-            </section>
-          ) : null}
-
+          {/* Member list + join requests */}
           <div className="detail-grid detail-two-col">
             <section className="detail-pane stack">
               <h3>{t.sessions.memberProgress}</h3>
@@ -205,7 +203,6 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                 {sessionMembers.map((member) => {
                   const profile = sessionProfiles[member.user_id]
                   const chapter = memberLatestProgress[member.user_id] ?? 0
-
                   return (
                     <li key={member.user_id} className="member-item member-progress-row">
                       <div className="session-user-cols member-progress-cols" aria-label={t.sessions.memberProgress}>
@@ -235,7 +232,9 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
             {selectedIsOwner ? (
               <section className="detail-pane stack">
                 <h3>{t.sessions.joinRequests}</h3>
-                {pendingRequests.length === 0 ? <p className="subtle">{t.sessions.noPendingRequests}</p> : null}
+                {pendingRequests.length === 0 ? (
+                  <p className="subtle">{t.sessions.noPendingRequests}</p>
+                ) : null}
                 <ul className="member-list">
                   {pendingRequests.map((request) => {
                     const profile = sessionProfiles[request.user_id]
@@ -243,7 +242,11 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                       <li key={request.id} className="member-item stack gap-sm">
                         <div className="member-head">
                           <div className="identity-row">
-                            <Avatar imageUrl={profile?.avatar_url ?? null} label={profile?.display_name || request.user_id.slice(0, 8)} size="sm" />
+                            <Avatar
+                              imageUrl={profile?.avatar_url ?? null}
+                              label={profile?.display_name || request.user_id.slice(0, 8)}
+                              size="sm"
+                            />
                             <strong>{profile?.display_name || request.user_id.slice(0, 8)}</strong>
                           </div>
                           <span className="subtle">{new Date(request.created_at).toLocaleString()}</span>
@@ -253,9 +256,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                             type="button"
                             className="secondary"
                             disabled={requestBusyId === request.id}
-                            onClick={() => {
-                              void onApproveJoinRequest(request)
-                            }}
+                            onClick={() => { void onApproveJoinRequest(request) }}
                           >
                             {requestBusyId === request.id ? t.common.processing : t.sessions.approve}
                           </button>
@@ -263,9 +264,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                             type="button"
                             className="ghost"
                             disabled={requestBusyId === request.id}
-                            onClick={() => {
-                              void onRejectJoinRequest(request)
-                            }}
+                            onClick={() => { void onRejectJoinRequest(request) }}
                           >
                             {t.sessions.reject}
                           </button>
@@ -277,6 +276,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
               </section>
             ) : null}
 
+            {/* Discussion */}
             <section className="detail-pane stack span-full">
               <h3>{t.sessions.discussion}</h3>
               {!selectedIsMember ? (
@@ -302,12 +302,15 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                       const profile = sessionProfiles[comment.user_id]
                       const likes = commentMeta.likeCounts[comment.id] ?? 0
                       const likedByMe = Boolean(commentMeta.likedByMe[comment.id])
-
                       return (
                         <li key={comment.id} className="comment-item">
                           <div className="comment-head">
                             <div className="identity-row">
-                              <Avatar imageUrl={profile?.avatar_url ?? null} label={profile?.display_name || comment.user_id.slice(0, 8)} size="sm" />
+                              <Avatar
+                                imageUrl={profile?.avatar_url ?? null}
+                                label={profile?.display_name || comment.user_id.slice(0, 8)}
+                                size="sm"
+                              />
                               <strong>{profile?.display_name || comment.user_id.slice(0, 8)}</strong>
                             </div>
                             <span className="subtle">{new Date(comment.created_at).toLocaleString()}</span>
@@ -317,9 +320,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                             type="button"
                             className={`like-button ${likedByMe ? 'like-button-active' : ''}`}
                             disabled={likingCommentId === comment.id}
-                            onClick={() => {
-                              void onToggleLike(comment.id)
-                            }}
+                            onClick={() => { void onToggleLike(comment.id) }}
                           >
                             {likingCommentId === comment.id
                               ? t.common.updating
@@ -336,73 +337,66 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
             </section>
           </div>
 
-          {selectedIsMember && media && onRemoveMedia && onLoadMoreMedia && currentUserId ? (
-            <section className="detail-pane stack">
-              <div className="detail-header">
-                <h3>Chapters / Media Library</h3>
-                {mediaLimit != null && mediaCount != null ? (
-                  <span className="pill">{mediaCount} / {mediaLimit}</span>
-                ) : null}
+          {/* Chapter viewer — bottom section */}
+          {selectedIsMember && maxChapter > 0 ? (
+            <section className="detail-pane chapter-viewer">
+              <div className="chapter-viewer-nav">
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!onPrevChapter || activeChapter <= 1 || loadingChapter}
+                  onClick={() => { void onPrevChapter?.() }}
+                >
+                  ← Prev
+                </button>
+                <span className="chapter-viewer-label">
+                  Chapter {activeChapter} <span className="subtle">/ {maxChapter}</span>
+                </span>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!onNextChapter || activeChapter >= maxChapter || loadingChapter}
+                  onClick={() => { void onNextChapter?.() }}
+                >
+                  Next →
+                </button>
               </div>
 
-              <div className="detail-pane stack">
-                <div className="split compact">
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={!onPrevChapter || activeChapter <= 1 || loadingChapter}
-                    onClick={() => { void onPrevChapter?.() }}
-                  >
-                    Prev
-                  </button>
-                  <span className="pill">Chapter {activeChapter} / {maxChapter}</span>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={!onNextChapter || activeChapter >= maxChapter || loadingChapter}
-                    onClick={() => { void onNextChapter?.() }}
-                  >
-                    Next
-                  </button>
-                </div>
-
-                {loadingChapter ? <p className="subtle">Loading chapter…</p> : null}
-                {!loadingChapter && activeChapterMedia && activeChapterUrl ? (
-                  activeChapterMedia.media_type === 'image' ? (
-                    <img className="media-thumbnail" src={activeChapterUrl} alt={activeChapterMedia.file_name} loading="lazy" />
+              {loadingChapter ? (
+                <div className="chapter-viewer-loading">Loading chapter…</div>
+              ) : activeChapterMedia && activeChapterUrl ? (
+                <div className="chapter-viewer-content">
+                  {activeChapterMedia.media_type === 'image' ? (
+                    <img
+                      className="chapter-viewer-image"
+                      src={activeChapterUrl}
+                      alt={activeChapterMedia.file_name}
+                    />
                   ) : activeChapterMedia.mime_type === 'application/pdf' ? (
-                    <iframe className="media-pdf-frame" src={activeChapterUrl} title={activeChapterMedia.file_name} />
+                    <iframe
+                      className="chapter-viewer-pdf"
+                      src={activeChapterUrl}
+                      title={activeChapterMedia.file_name}
+                    />
                   ) : (
-                    <div className="media-file-icon">
-                      <p className="muted media-filename">{activeChapterMedia.file_name}</p>
-                      <a href={activeChapterUrl} target="_blank" rel="noopener noreferrer" className="secondary media-download-link">Open / Download</a>
+                    <div className="chapter-viewer-file">
+                      <p className="muted">{activeChapterMedia.file_name}</p>
+                      <a
+                        href={activeChapterUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="secondary"
+                      >
+                        Open / Download
+                      </a>
                     </div>
-                  )
-                ) : null}
-              </div>
-
-              {canUploadMedia && onUploadMedia ? (
-                <MediaUpload
-                  onUpload={onUploadMedia}
-                  uploading={mediaUploading ?? false}
-                  error={mediaError ?? null}
-                />
-              ) : null}
-
-              {!canUploadMedia && selectedIsOwner && mediaCount != null && mediaLimit != null && mediaCount >= mediaLimit ? (
-                <p className="subtle">Media limit reached ({mediaLimit} files, one per chapter).</p>
-              ) : null}
-
-              <MediaGallery
-                media={media}
-                mediaUrls={mediaUrls ?? {}}
-                loading={mediaLoading ?? false}
-                hasMore={mediaHasMore ?? false}
-                onLoadMore={onLoadMoreMedia}
-                onRemove={onRemoveMedia}
-                currentUserId={currentUserId}
-                sessionOwnerId={selectedSession.creator_id}
-              />
+                  )}
+                </div>
+              ) : (
+                <div className="chapter-viewer-empty">
+                  <p className="subtle">No content for this chapter yet.</p>
+                </div>
+              )}
             </section>
           ) : null}
         </>

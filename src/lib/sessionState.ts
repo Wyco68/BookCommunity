@@ -13,8 +13,8 @@ export function getPreferredSelectedSessionId(
     return selectedSessionId
   }
 
-  const joinedSession = sessions.find((session) => memberships[session.id] && session.status === 'active')
-  const firstInView = sessions.find((session) => session.status === 'active')
+  const joinedSession = sessions.find((session) => memberships[session.id] && session.status_type === 'ongoing')
+  const firstInView = sessions.find((session) => session.status_type === 'ongoing')
   return joinedSession?.id ?? firstInView?.id ?? sessions[0]?.id ?? null
 }
 
@@ -26,7 +26,7 @@ export function filterSessions(
   const query = sessionSearch.trim().toLowerCase()
 
   return sessions.filter((session) => {
-    if (session.status !== 'active') {
+    if (session.status_type !== 'ongoing') {
       return false
     }
 
