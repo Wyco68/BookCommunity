@@ -149,8 +149,20 @@ export function useProfile(): UseProfileReturn {
     setNotice(null)
     setError(null)
 
+    if (!ALLOWED_AVATAR_TYPES.includes(avatarFile.type)) {
+      setError('Invalid file type. Use PNG, JPEG, or WebP.')
+      setUploading(false)
+      return
+    }
+
+    if (avatarFile.size > MAX_AVATAR_BYTES) {
+      setError('File too large. Maximum 2MB.')
+      setUploading(false)
+      return
+    }
+
     const extension = getAvatarExtension(avatarFile)
-    const nextPath = `${userId}/${crypto.randomUUID()}.${extension}`
+    const nextPath = `${userId}/avatar.${extension}`
     const previousPath = profile?.avatar_url && !isRemoteUrl(profile.avatar_url) ? profile.avatar_url : null
 
     const uploadResult = await supabase.storage.from(AVATAR_BUCKET).upload(nextPath, avatarFile, {
@@ -160,14 +172,18 @@ export function useProfile(): UseProfileReturn {
     })
 
     if (uploadResult.error) {
-      setError(uploadResult.error.message)
+      setError(`Storage upload failed: ${uploadResult.error.message}`)
       setUploading(false)
       return
     }
 
-    const updateResult = await supabase.from('profiles').update({ avatar_url: nextPath }).eq('id', userId)
+    const updateResult = await supabase
+      .from('profiles')
+      .update({ avatar_url: nextPath })
+      .eq('id', userId)
+
     if (updateResult.error) {
-      setError(updateResult.error.message)
+      setError(`Profile update failed: ${updateResult.error.message}`)
       setUploading(false)
       return
     }
@@ -190,10 +206,12 @@ export function useProfile(): UseProfileReturn {
 
     setProfile(updatedProfile)
     setAvatarFile(null)
-    if (avatarPreviewUrl) {
+
+    const resolvedUrl = await resolveAvatarUrl(nextPath)
+    if (avatarPreviewUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(avatarPreviewUrl)
     }
-    setAvatarPreviewUrl(null)
+    setAvatarPreviewUrl(resolvedUrl)
     setAvatarInputKey((current) => current + 1)
     setNotice('Avatar updated')
     setUploading(false)

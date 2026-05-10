@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { getSignedMediaUrl } from '../lib/storage'
+import { getSignedMediaUrl, SESSION_COVERS_BUCKET } from '../lib/storage'
 import type {
   Category,
   ReadingSession,
@@ -200,6 +200,7 @@ export function useSessions(): UseSessionsReturn {
       for (const item of firstMediaRows) {
         if (!item) continue
         const isImage = item.mime_type.startsWith('image/')
+        const isCover = 'is_cover' in item && item.is_cover === true
         firstMediaLookup[item.session_id] = {
           session_id: item.session_id,
           file_path: item.file_path,
@@ -207,7 +208,9 @@ export function useSessions(): UseSessionsReturn {
           mime_type: item.mime_type,
           media_type: item.media_type,
           is_image: isImage,
-          signed_url: isImage ? await getSignedMediaUrl(item.file_path) : null,
+          signed_url: isImage
+            ? await getSignedMediaUrl(item.file_path, isCover ? SESSION_COVERS_BUCKET : undefined)
+            : null,
         }
       }
 
@@ -259,30 +262,44 @@ export function useSessions(): UseSessionsReturn {
       return
     }
 
-    const createResult = await supabase.rpc('create_reading_session', {
-      p_book_title: form.bookTitle.trim(),
-      p_book_author: form.bookAuthor.trim(),
-      p_total_chapters: form.totalChapters,
-      p_description: form.description.trim() || null,
-      p_visibility: form.visibility,
-      p_join_policy: form.joinPolicy,
-    })
+    const rpcPayloads = [
+      {
+        p_book_title: form.bookTitle.trim(),
+        p_book_author: form.bookAuthor.trim(),
+        p_total_chapters: form.totalChapters,
+        p_description: form.description.trim() || null,
+        p_visibility: form.visibility,
+        p_join_policy: form.joinPolicy,
+        p_category_ids: [],
+      },
+      {
+        p_book_title: form.bookTitle.trim(),
+        p_book_author: form.bookAuthor.trim(),
+        p_total_chapters: form.totalChapters,
+        p_description: form.description.trim() || null,
+        p_visibility: form.visibility,
+        p_join_policy: form.joinPolicy,
+      },
+      {
+        p_book_title: form.bookTitle.trim(),
+        p_book_author: form.bookAuthor.trim(),
+        p_total_chapters: form.totalChapters,
+        p_visibility: form.visibility,
+        p_join_policy: form.joinPolicy,
+        p_category_ids: [],
+      },
+    ] as const
+
+    let createResult = await supabase.rpc('create_reading_session', rpcPayloads[0])
+    if (createResult.error?.message?.includes('Could not find the function')) {
+      createResult = await supabase.rpc('create_reading_session', rpcPayloads[1])
+    }
+    if (createResult.error?.message?.includes('Could not find the function')) {
+      createResult = await supabase.rpc('create_reading_session', rpcPayloads[2])
+    }
 
     if (createResult.error) {
       setError(createResult.error.message)
-      setCreating(false)
-      return
-    }
-
-    const createdSession = createResult.data as ReadingSession
-    const membershipResult = await supabase.from('session_members').insert({
-      session_id: createdSession.id,
-      user_id: user.id,
-      role: 'owner',
-    })
-
-    if (membershipResult.error) {
-      setError(membershipResult.error.message)
       setCreating(false)
       return
     }

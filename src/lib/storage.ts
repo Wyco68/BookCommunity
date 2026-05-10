@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import type { MediaType } from '../types'
 
 export const SESSION_MEDIA_BUCKET = 'session-media'
+export const SESSION_COVERS_BUCKET = 'session-covers'
 const SIGNED_URL_EXPIRY_SECONDS = 15 * 60
 
 export async function uploadSessionMedia(
@@ -38,13 +39,16 @@ export async function uploadSessionMedia(
   return { path, error: null }
 }
 
-export async function getSignedMediaUrl(filePath: string): Promise<string | null> {
+export async function getSignedMediaUrl(
+  filePath: string,
+  bucket: string = SESSION_MEDIA_BUCKET,
+): Promise<string | null> {
   if (!filePath) {
     return null
   }
 
   const { data, error } = await supabase.storage
-    .from(SESSION_MEDIA_BUCKET)
+    .from(bucket)
     .createSignedUrl(filePath, SIGNED_URL_EXPIRY_SECONDS)
 
   if (error || !data?.signedUrl) {

@@ -36,7 +36,11 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
   const [savingProgress, setSavingProgress] = useState(false)
   const [myMembershipCount, setMyMembershipCount] = useState(0)
   const [activeChapter, setActiveChapter] = useState(1)
-  const [activeChapterMedia, setActiveChapterMedia] = useState<{ file_name: string; mime_type: string; media_type: 'image' | 'book_file' } | null>(null)
+  const [activeChapterMedia, setActiveChapterMedia] = useState<{
+    file_name: string
+    mime_type: string
+    media_type: 'image' | 'book_file'
+  } | null>(null)
   const [activeChapterUrl, setActiveChapterUrl] = useState<string | null>(null)
   const [loadingChapter, setLoadingChapter] = useState(false)
 
@@ -61,19 +65,21 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
       .then(({ count }) => {
         if (alive) setMyMembershipCount(count ?? 0)
       })
-    return () => {
-      alive = false
-    }
+    return () => { alive = false }
   }, [userId])
 
   // Load session + membership
   useEffect(() => {
     if (!sessionId) return
     setLoadingSession(true)
-
     Promise.all([
       supabase.from('reading_sessions').select('*').eq('id', sessionId).single(),
-      supabase.from('session_members').select('session_id,user_id,role').eq('session_id', sessionId).eq('user_id', userId).maybeSingle(),
+      supabase
+        .from('session_members')
+        .select('session_id,user_id,role')
+        .eq('session_id', sessionId)
+        .eq('user_id', userId)
+        .maybeSingle(),
     ]).then(([sessionResult, memberResult]) => {
       if (sessionResult.data) setSession(sessionResult.data as ReadingSession)
       if (memberResult.data) setMembership(memberResult.data as SessionMembership)
@@ -81,11 +87,11 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
     })
   }, [sessionId, userId])
 
-  // Load detail
+  // Load detail + media meta (lightweight)
   useEffect(() => {
     if (!sessionId) return
     void detail.loadDetail(sessionId)
-    void sessionMedia.loadMedia()
+    void sessionMedia.loadMediaMeta()
   }, [sessionId])
 
   // Realtime
@@ -109,8 +115,12 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
         { event: '*', schema: 'public', table: 'session_members', filter: `session_id=eq.${sessionId}` },
         () => {
           void detail.loadDetail(sessionId)
-          // Refresh membership status
-          supabase.from('session_members').select('session_id,user_id,role').eq('session_id', sessionId).eq('user_id', userId).maybeSingle()
+          supabase
+            .from('session_members')
+            .select('session_id,user_id,role')
+            .eq('session_id', sessionId)
+            .eq('user_id', userId)
+            .maybeSingle()
             .then(({ data }) => setMembership(data as SessionMembership | null))
         },
       )
@@ -123,6 +133,11 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'session_join_requests', filter: `session_id=eq.${sessionId}` },
         () => { void detail.loadDetail(sessionId) },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'session_media', filter: `session_id=eq.${sessionId}` },
+        () => { void sessionMedia.loadMediaMeta() },
       )
 
     channel.subscribe()
@@ -147,34 +162,38 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
   )
   const leaveSessionDisabled = Boolean(membership?.role === 'owner' && myMembershipCount === 1)
 
-  const loadChapterMedia = useCallback(async (chapterNumber: number) => {
-    if (!sessionId) return
-    setLoadingChapter(true)
-    const { data } = await supabase
-      .from('session_media')
-      .select('file_name,mime_type,media_type,file_path')
-      .eq('session_id', sessionId)
-      .eq('chapter_number', chapterNumber)
-      .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle()
+  const loadChapterMedia = useCallback(
+    async (chapterNumber: number) => {
+      if (!sessionId) return
+      setLoadingChapter(true)
 
-    if (!data) {
-      setActiveChapterMedia(null)
-      setActiveChapterUrl(null)
+      const { data } = await supabase
+        .from('session_media')
+        .select('file_name,mime_type,media_type,file_path')
+        .eq('session_id', sessionId)
+        .eq('chapter_number', chapterNumber)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
+      if (!data) {
+        setActiveChapterMedia(null)
+        setActiveChapterUrl(null)
+        setLoadingChapter(false)
+        return
+      }
+
+      const signed = await getSignedMediaUrl(data.file_path)
+      setActiveChapterMedia({
+        file_name: data.file_name,
+        mime_type: data.mime_type,
+        media_type: data.media_type,
+      })
+      setActiveChapterUrl(signed)
       setLoadingChapter(false)
-      return
-    }
-
-    const signed = await getSignedMediaUrl(data.file_path)
-    setActiveChapterMedia({
-      file_name: data.file_name,
-      mime_type: data.mime_type,
-      media_type: data.media_type,
-    })
-    setActiveChapterUrl(signed)
-    setLoadingChapter(false)
-  }, [sessionId])
+    },
+    [sessionId],
+  )
 
   useEffect(() => {
     if (!session || !membership || !userId) return
@@ -182,32 +201,44 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
   }, [session?.id, membership, userId, myLatestChapter])
 
   useEffect(() => {
-    if (!sessionId || maxProgressChapter < 1) return
+    if (!sessionId || sessionMedia.maxUploadedChapter < 1) return
     setActiveChapter(1)
     void loadChapterMedia(1)
-  }, [sessionId, maxProgressChapter, loadChapterMedia])
+  }, [sessionId, sessionMedia.maxUploadedChapter, loadChapterMedia])
 
-  const handleSubmitComment = useCallback(async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    if (!userId || !sessionId || !commentDraft.trim()) return
-    await detail.submitComment(sessionId, userId, commentDraft)
-    setCommentDraft('')
-  }, [userId, sessionId, commentDraft, detail])
+  const handleSubmitComment = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      if (!userId || !sessionId || !commentDraft.trim()) return
+      await detail.submitComment(sessionId, userId, commentDraft)
+      setCommentDraft('')
+    },
+    [userId, sessionId, commentDraft, detail],
+  )
 
-  const handleToggleLike = useCallback(async (commentId: string) => {
-    if (!userId || !sessionId) return
-    await detail.toggleLike(sessionId, userId, commentId)
-  }, [userId, sessionId, detail])
+  const handleToggleLike = useCallback(
+    async (commentId: string) => {
+      if (!userId || !sessionId) return
+      await detail.toggleLike(sessionId, userId, commentId)
+    },
+    [userId, sessionId, detail],
+  )
 
-  const handleApproveJoinRequest = useCallback(async (request: SessionJoinRequest) => {
-    if (!sessionId || !userId) return
-    await detail.approveRequest(sessionId, request)
-  }, [sessionId, userId, detail])
+  const handleApproveJoinRequest = useCallback(
+    async (request: SessionJoinRequest) => {
+      if (!sessionId || !userId) return
+      await detail.approveRequest(sessionId, request)
+    },
+    [sessionId, userId, detail],
+  )
 
-  const handleRejectJoinRequest = useCallback(async (request: SessionJoinRequest) => {
-    if (!sessionId || !userId) return
-    await detail.rejectRequest(sessionId, request)
-  }, [sessionId, userId, detail])
+  const handleRejectJoinRequest = useCallback(
+    async (request: SessionJoinRequest) => {
+      if (!sessionId || !userId) return
+      await detail.rejectRequest(sessionId, request)
+    },
+    [sessionId, userId, detail],
+  )
 
   const handleLeaveSession = useCallback(async () => {
     if (!sessionId || !userId || !membership) return
@@ -218,9 +249,7 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
       .eq('session_id', sessionId)
       .eq('user_id', userId)
     setLeaving(false)
-    if (!error) {
-      navigate(-1)
-    }
+    if (!error) navigate(-1)
   }, [sessionId, userId, membership, navigate])
 
   const handleSaveMyProgress = useCallback(async () => {
@@ -233,9 +262,7 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
       chapter_number: myChapterDraft,
     })
     setSavingProgress(false)
-    if (!error) {
-      void detail.loadDetail(sessionId)
-    }
+    if (!error) void detail.loadDetail(sessionId)
   }, [session, userId, membership, sessionId, myChapterDraft, maxProgressChapter, detail])
 
   if (loadingSession) {
@@ -261,9 +288,11 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
 
   return (
     <section className="stack">
-      <button type="button" className="btn-back-compact" onClick={() => navigate(-1)}>
-        ⬅ back
-      </button>
+      <div className="detail-back-bar">
+        <button type="button" className="btn-back-compact" onClick={() => navigate(-1)}>
+          ⬅ back
+        </button>
+      </div>
 
       <SessionDetailPanel
         t={t}
@@ -286,18 +315,13 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
         onSubmitComment={handleSubmitComment}
         onCommentDraftChange={setCommentDraft}
         onToggleLike={handleToggleLike}
-        media={sessionMedia.media}
-        mediaUrls={sessionMedia.mediaUrls}
-        mediaLoading={sessionMedia.loading}
         mediaUploading={sessionMedia.uploading}
         mediaError={sessionMedia.error}
-        mediaHasMore={sessionMedia.hasMore}
         onUploadMedia={sessionMedia.uploadMedia}
-        onRemoveMedia={sessionMedia.removeMedia}
-        onLoadMoreMedia={sessionMedia.loadMore}
         canUploadMedia={sessionMedia.canUpload}
         mediaCount={sessionMedia.mediaCount}
         mediaLimit={sessionMedia.mediaLimit}
+        nextChapter={sessionMedia.nextChapter}
         currentUserId={userId}
         readChaptersByUsers={readChaptersByUsers}
         onLeaveSession={handleLeaveSession}
