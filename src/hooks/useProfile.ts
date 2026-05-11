@@ -1,19 +1,18 @@
 import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../types'
-import { resolveAvatarUrl } from '../lib/avatar'
+import { uploadAvatarFile } from '../lib/storage'
 import {
   ALLOWED_AVATAR_TYPES,
-  AVATAR_BUCKET,
   MAX_AVATAR_BYTES,
-  getAvatarExtension,
-  isRemoteUrl,
+  resolveAvatarUrl,
 } from '../lib/avatar'
 
 export interface UseProfileReturn {
   profile: Profile | null
   loading: boolean
   error: string | null
+  avatarFile: File | null
   avatarPreviewUrl: string | null
   avatarInputKey: number
   nameDraft: string
@@ -28,6 +27,7 @@ export interface UseProfileReturn {
   setNotice: (notice: string | null) => void
   setProfile: React.Dispatch<React.SetStateAction<Profile | null>>
   setAvatarInputKey: React.Dispatch<React.SetStateAction<number>>
+  setAvatarPreviewUrl: React.Dispatch<React.SetStateAction<string | null>>
 }
 
 export function useProfile(): UseProfileReturn {
@@ -46,13 +46,7 @@ export function useProfile(): UseProfileReturn {
     setLoading(true)
     setError(null)
 
-    const upsertResult = await supabase.from('profiles').upsert({ id: userId }, { onConflict: 'id' })
-    if (upsertResult.error) {
-      setError(upsertResult.error.message)
-      setLoading(false)
-      return
-    }
-
+    // SELECT only — never upsert on load (upsert can overwrite avatar_url with null)
     const profileResult = await supabase
       .from('profiles')
       .select('*')
@@ -63,6 +57,19 @@ export function useProfile(): UseProfileReturn {
       setError(profileResult.error.message)
       setLoading(false)
       return
+    }
+
+    // If the profile row is missing (shouldn't happen — handle_new_user trigger creates it),
+    // insert a minimal row so the rest of the app has something to work with.
+    if (!profileResult.data) {
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({ id: userId })
+      if (insertError && !insertError.message.toLowerCase().includes('duplicate')) {
+        setError(insertError.message)
+        setLoading(false)
+        return
+      }
     }
 
     const loadedProfile = (profileResult.data ?? {
@@ -76,6 +83,8 @@ export function useProfile(): UseProfileReturn {
       is_private: false,
       created_at: '',
     }) as Profile
+
+    // avatar_url is stored as a storage path; generate a fresh signed URL on every load
     const avatarUrl = await resolveAvatarUrl(loadedProfile.avatar_url)
 
     setProfile(loadedProfile)
@@ -161,18 +170,10 @@ export function useProfile(): UseProfileReturn {
       return
     }
 
-    const extension = getAvatarExtension(avatarFile)
-    const nextPath = `${userId}/avatar.${extension}`
-    const previousPath = profile?.avatar_url && !isRemoteUrl(profile.avatar_url) ? profile.avatar_url : null
+    const { path: nextPath, error: uploadError } = await uploadAvatarFile(userId, avatarFile)
 
-    const uploadResult = await supabase.storage.from(AVATAR_BUCKET).upload(nextPath, avatarFile, {
-      cacheControl: '3600',
-      upsert: true,
-      contentType: avatarFile.type,
-    })
-
-    if (uploadResult.error) {
-      setError(`Storage upload failed: ${uploadResult.error.message}`)
+    if (uploadError) {
+      setError(`Storage upload failed: ${uploadError}`)
       setUploading(false)
       return
     }
@@ -186,10 +187,6 @@ export function useProfile(): UseProfileReturn {
       setError(`Profile update failed: ${updateResult.error.message}`)
       setUploading(false)
       return
-    }
-
-    if (previousPath && previousPath !== nextPath) {
-      await supabase.storage.from(AVATAR_BUCKET).remove([previousPath])
     }
 
     const updatedProfile: Profile = {
@@ -221,6 +218,7 @@ export function useProfile(): UseProfileReturn {
     profile,
     loading,
     error,
+    avatarFile,
     avatarPreviewUrl,
     avatarInputKey,
     nameDraft,
@@ -235,5 +233,6 @@ export function useProfile(): UseProfileReturn {
     setNotice,
     setProfile,
     setAvatarInputKey,
+    setAvatarPreviewUrl,
   }
 }

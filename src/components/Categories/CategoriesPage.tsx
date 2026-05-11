@@ -41,32 +41,30 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
     setSessionsError(null)
     setCategorySessions([])
 
-    const { data: scData, error: scError } = await supabase
-      .from('session_categories')
-      .select('reading_sessions!inner(*)')
+    const { data, error } = await supabase
+      .from('reading_sessions')
+      .select('*')
       .eq('category_id', categoryId)
-      .eq('reading_sessions.visibility', 'public')
-      .order('created_at', { ascending: false, referencedTable: 'reading_sessions' })
+      .eq('visibility', 'public')
+      .eq('status_type', 'ongoing')
+      .order('created_at', { ascending: false })
 
     if (sessionsRequestIdRef.current !== requestId) return
 
-    if (scError) {
-      setSessionsError(scError.message)
+    if (error) {
+      setSessionsError(error.message)
       setLoadingSessions(false)
       return
     }
 
-    if (!scData || scData.length === 0) {
+    if (!data || data.length === 0) {
       setCategorySessions([])
       setLoadingSessions(false)
       return
     }
 
-    const sessionsData = (scData as { reading_sessions: ReadingSession }[]).map(
-      (row) => row.reading_sessions,
-    )
+    const sessionsData = data as ReadingSession[]
 
-    // Resolve cover image signed URLs in parallel
     const sessionsWithCovers = await Promise.all(
       sessionsData.map(async (session) => {
         if (!session.cover_image_path) return { ...session, coverSignedUrl: null }
@@ -112,7 +110,7 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
                 role="tab"
                 aria-selected={selectedCategoryId === cat.id}
                 className={`category-tab ${selectedCategoryId === cat.id ? 'category-tab-active' : ''}`}
-                onClick={() => setSelectedCategoryId(selectedCategoryId === cat.id ? null : cat.id)}
+                onClick={() => setSelectedCategoryId(cat.id)}
               >
                 {cat.name}
               </button>

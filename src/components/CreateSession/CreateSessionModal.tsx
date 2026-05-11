@@ -16,7 +16,7 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
   const [description, setDescription] = useState('')
   const [visibility, setVisibility] = useState<'public' | 'private'>('public')
   const [joinPolicy, setJoinPolicy] = useState<'open' | 'request'>('open')
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([])
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [coverFile, setCoverFile] = useState<File | null>(null)
   const [creating, setCreating] = useState(false)
@@ -28,151 +28,84 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
       .select('id, name')
       .order('name')
       .then(({ data }) => {
-        if (data) setCategories(data as Category[])
+        if (data && data.length > 0) {
+          const cats = data as Category[]
+          setCategories(cats)
+          const action = cats.find((c) => c.name === 'Action') ?? cats[0]
+          setSelectedCategoryId(action.id)
+        }
       })
-  }, [])
-
-  const toggleCategory = useCallback((catId: number) => {
-    setSelectedCategoryIds((prev) =>
-      prev.includes(catId) ? prev.filter((id) => id !== catId) : [...prev, catId],
-    )
   }, [])
 
   const handleSubmit = useCallback(async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError(null)
 
-    if (!title.trim()) {
-      setError('Title is required')
-      return
-    }
-    if (!author.trim()) {
-      setError('Author is required')
-      return
-    }
+    if (!title.trim()) { setError('Title is required'); return }
+    if (!author.trim()) { setError('Author is required'); return }
 
     const totalChapters = chapters === '' ? null : Number(chapters)
     if (totalChapters !== null && (totalChapters < 1 || !Number.isInteger(totalChapters))) {
       setError('Chapters must be a positive integer or left empty')
       return
     }
-
-    if (selectedCategoryIds.length < 1) {
-      setError('Select at least one category')
-      return
-    }
-
+    if (selectedCategoryId === null) { setError('Select a category'); return }
     if (coverFile) {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
-      if (!allowedTypes.includes(coverFile.type)) {
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(coverFile.type)) {
         setError('Cover image must be JPG, PNG, or WebP')
         return
       }
-      if (coverFile.size > 10 * 1024 * 1024) {
-        setError('Cover image must be under 10MB')
-        return
-      }
+      if (coverFile.size > 10 * 1024 * 1024) { setError('Cover image must be under 10MB'); return }
     }
+
     setCreating(true)
 
-    const rpcPayloads = [
+    const { data: sessionData, error: sessionError } = await supabase.rpc(
+      'create_reading_session',
       {
-        p_book_title: title.trim(),
-        p_book_author: author.trim(),
+        p_book_title:     title.trim(),
+        p_book_author:    author.trim(),
         p_total_chapters: totalChapters ?? 12,
-        p_description: description.trim() || null,
-        p_visibility: visibility,
-        p_join_policy: joinPolicy,
-        p_category_ids: selectedCategoryIds,
+        p_visibility:     visibility,
+        p_join_policy:    joinPolicy,
+        p_category_id:    selectedCategoryId,
+        p_description:    description.trim() || null,
       },
-      {
-        p_book_title: title.trim(),
-        p_book_author: author.trim(),
-        p_total_chapters: totalChapters ?? 12,
-        p_description: description.trim() || null,
-        p_visibility: visibility,
-        p_join_policy: joinPolicy,
-      },
-      {
-        p_book_title: title.trim(),
-        p_book_author: author.trim(),
-        p_total_chapters: totalChapters ?? 12,
-        p_visibility: visibility,
-        p_join_policy: joinPolicy,
-        p_category_ids: selectedCategoryIds,
-      },
-    ] as const
+    )
 
-    let createResult = await supabase.rpc('create_reading_session', rpcPayloads[0])
-    let usedFallbackWithoutCategories = false
-    if (createResult.error?.message?.includes('Could not find the function')) {
-      createResult = await supabase.rpc('create_reading_session', rpcPayloads[1])
-      usedFallbackWithoutCategories = !createResult.error
-    }
-    if (createResult.error?.message?.includes('Could not find the function')) {
-      createResult = await supabase.rpc('create_reading_session', rpcPayloads[2])
-    }
-
-    if (createResult.error) {
-      setError(createResult.error.message)
+    if (sessionError) {
+      setError(sessionError.message)
       setCreating(false)
       return
     }
 
-    const session = createResult.data as ReadingSession
+    const session = sessionData as ReadingSession
 
-    if (usedFallbackWithoutCategories && selectedCategoryIds.length > 0) {
-      const categoriesInsert = await supabase.from('session_categories').upsert(
-        selectedCategoryIds.map((categoryId) => ({
-          session_id: session.id,
-          category_id: categoryId,
-        })),
-        { onConflict: 'session_id,category_id' },
-      )
+    const { data: userData } = await supabase.auth.getUser()
+    const userId = userData.user?.id
+    if (!userId) { setError('You must be signed in'); setCreating(false); return }
 
-      if (categoriesInsert.error) {
-        setError(categoriesInsert.error.message)
-        setCreating(false)
-        return
-      }
-    }
-
-    // Optional cover upload (separate from chapter media)
-    const userId = (await supabase.auth.getUser()).data.user?.id
-    if (!userId) {
-      setError('You must be signed in')
-      setCreating(false)
-      return
-    }
     if (coverFile) {
-      const ext = coverFile.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const ext = coverFile.name.split('.').pop()?.toLowerCase() ?? 'jpg'
       const coverPath = `${userId}/${session.id}/cover.${ext}`
-      const coverUpload = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('session-covers')
         .upload(coverPath, coverFile, { upsert: true, contentType: coverFile.type })
 
-      if (coverUpload.error) {
-        setError(coverUpload.error.message)
-        setCreating(false)
-        return
-      }
+      if (uploadError) { setError(uploadError.message); setCreating(false); return }
 
-      const coverUpdate = await supabase
+      const { error: updateError } = await supabase
         .from('reading_sessions')
         .update({ cover_image_path: coverPath })
         .eq('id', session.id)
 
-      if (coverUpdate.error) {
-        setError(coverUpdate.error.message)
-        setCreating(false)
-        return
-      }
+      if (updateError) { setError(updateError.message); setCreating(false); return }
     }
 
     setCreating(false)
     onClose()
     navigate(`/session/${session.id}`)
-  }, [title, author, chapters, description, visibility, joinPolicy, selectedCategoryIds, coverFile, navigate, onClose])
+  }, [title, author, chapters, description, visibility, joinPolicy, selectedCategoryId, coverFile, navigate, onClose])
 
   return (
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -250,14 +183,14 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
 
           {categories.length > 0 ? (
             <div className="field">
-              <span className="field-label">Categories *</span>
+              <span className="field-label">Category *</span>
               <div className="category-tab-bar">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
                     type="button"
-                    className={`category-tab ${selectedCategoryIds.includes(cat.id) ? 'category-tab-active' : ''}`}
-                    onClick={() => toggleCategory(cat.id)}
+                    className={`category-tab ${selectedCategoryId === cat.id ? 'category-tab-active' : ''}`}
+                    onClick={() => setSelectedCategoryId(cat.id)}
                   >
                     {cat.name}
                   </button>

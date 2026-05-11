@@ -14,6 +14,7 @@ export interface ReadingSession {
   status: SessionStatus
   status_type: SessionStatusType
   cover_image_path: string | null
+  category_id: number
   created_at: string
 }
 
@@ -83,34 +84,11 @@ export interface SessionJoinRequest {
 }
 
 
-export type CategoryVisibility = 'public' | 'private'
-export type CategoryMemberRole = 'owner' | 'moderator' | 'member'
 export type MediaType = 'image' | 'book_file'
 
 export interface Category {
   id: number
   name: string
-  description?: string | null
-  visibility?: CategoryVisibility
-  creator_id?: string
-  cover_image_path?: string | null
-  created_at?: string
-  updated_at?: string
-}
-
-export interface CategoryMember {
-  id: string
-  category_id: number
-  user_id: string
-  role: CategoryMemberRole
-  joined_at: string
-}
-
-export interface SessionCategory {
-  id: string
-  session_id: string
-  category_id: number
-  created_at: string
 }
 
 export interface SessionMedia {

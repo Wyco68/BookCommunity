@@ -23,6 +23,7 @@ export interface SessionFormState {
   description: string
   visibility: 'public' | 'private'
   joinPolicy: 'open' | 'request'
+  categoryId: number
 }
 
 export const defaultSessionForm: SessionFormState = {
@@ -32,6 +33,7 @@ export const defaultSessionForm: SessionFormState = {
   description: '',
   visibility: 'public',
   joinPolicy: 'open',
+  categoryId: 0,
 }
 
 export interface UseSessionsReturn {
@@ -62,6 +64,7 @@ export interface UseSessionsReturn {
   setSessionFirstMedia: React.Dispatch<React.SetStateAction<Record<string, SessionCardMediaPreview>>>
   setSessionUploadedChapterCount: React.Dispatch<React.SetStateAction<Record<string, number>>>
   setSessionReadChaptersByUsers: React.Dispatch<React.SetStateAction<Record<string, number>>>
+  removeSession: (sessionId: string) => void
   setError: (error: string | null) => void
 }
 
@@ -123,32 +126,25 @@ export function useSessions(): UseSessionsReturn {
     const progressLookup = buildLatestProgressBySession((progressResult.data ?? []) as ProgressUpdate[])
     const requestLookup = buildJoinRequestStatusLookup((requestsResult.data ?? []) as SessionJoinRequest[])
 
-    // Fetch category names per session
+    // Build category name lookup directly from session.category_id
     const sessionIds = sessionsData.map((s) => s.id)
     const catLookup: Record<string, string[]> = {}
     const firstMediaLookup: Record<string, SessionCardMediaPreview> = {}
     const uploadedCountLookup: Record<string, number> = {}
     const readByUsersLookup: Record<string, number> = {}
     if (sessionIds.length > 0) {
-      const { data: scData } = await supabase
-        .from('session_categories')
-        .select('session_id, category_id')
-        .in('session_id', sessionIds)
-      if (scData && scData.length > 0) {
-        const catIds = [...new Set(scData.map((sc: { category_id: number }) => sc.category_id))]
-        const { data: catData } = await supabase
-          .from('categories')
-          .select('id, name')
-          .in('id', catIds)
-        const catNameMap: Record<number, string> = {}
-        for (const c of (catData ?? []) as Category[]) {
-          catNameMap[c.id] = c.name
-        }
-        for (const sc of scData as { session_id: string; category_id: number }[]) {
-          if (!catLookup[sc.session_id]) catLookup[sc.session_id] = []
-          const name = catNameMap[sc.category_id]
-          if (name) catLookup[sc.session_id].push(name)
-        }
+      const categoryIds = [...new Set(sessionsData.map((s) => s.category_id))]
+      const { data: catData } = await supabase
+        .from('categories')
+        .select('id, name')
+        .in('id', categoryIds)
+      const catNameMap: Record<number, string> = {}
+      for (const c of (catData ?? []) as Category[]) {
+        catNameMap[c.id] = c.name
+      }
+      for (const session of sessionsData) {
+        const name = catNameMap[session.category_id]
+        if (name) catLookup[session.id] = [name]
       }
 
       const { data: progressByUsers } = await supabase
@@ -262,41 +258,15 @@ export function useSessions(): UseSessionsReturn {
       return
     }
 
-    const rpcPayloads = [
-      {
-        p_book_title: form.bookTitle.trim(),
-        p_book_author: form.bookAuthor.trim(),
-        p_total_chapters: form.totalChapters,
-        p_description: form.description.trim() || null,
-        p_visibility: form.visibility,
-        p_join_policy: form.joinPolicy,
-        p_category_ids: [],
-      },
-      {
-        p_book_title: form.bookTitle.trim(),
-        p_book_author: form.bookAuthor.trim(),
-        p_total_chapters: form.totalChapters,
-        p_description: form.description.trim() || null,
-        p_visibility: form.visibility,
-        p_join_policy: form.joinPolicy,
-      },
-      {
-        p_book_title: form.bookTitle.trim(),
-        p_book_author: form.bookAuthor.trim(),
-        p_total_chapters: form.totalChapters,
-        p_visibility: form.visibility,
-        p_join_policy: form.joinPolicy,
-        p_category_ids: [],
-      },
-    ] as const
-
-    let createResult = await supabase.rpc('create_reading_session', rpcPayloads[0])
-    if (createResult.error?.message?.includes('Could not find the function')) {
-      createResult = await supabase.rpc('create_reading_session', rpcPayloads[1])
-    }
-    if (createResult.error?.message?.includes('Could not find the function')) {
-      createResult = await supabase.rpc('create_reading_session', rpcPayloads[2])
-    }
+    const createResult = await supabase.rpc('create_reading_session', {
+      p_book_title: form.bookTitle.trim(),
+      p_book_author: form.bookAuthor.trim(),
+      p_total_chapters: form.totalChapters,
+      p_description: form.description.trim() || null,
+      p_visibility: form.visibility,
+      p_join_policy: form.joinPolicy,
+      p_category_id: form.categoryId,
+    })
 
     if (createResult.error) {
       setError(createResult.error.message)
@@ -366,6 +336,18 @@ export function useSessions(): UseSessionsReturn {
     setBusySessionId(null)
   }, [])
 
+  const removeSession = useCallback((sessionId: string) => {
+    setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+    setMemberships((prev) => { const next = { ...prev }; delete next[sessionId]; return next })
+    setLatestProgress((prev) => { const next = { ...prev }; delete next[sessionId]; return next })
+    setProgressDrafts((prev) => { const next = { ...prev }; delete next[sessionId]; return next })
+    setMyJoinRequestStatus((prev) => { const next = { ...prev }; delete next[sessionId]; return next })
+    setSessionCategoryNames((prev) => { const next = { ...prev }; delete next[sessionId]; return next })
+    setSessionFirstMedia((prev) => { const next = { ...prev }; delete next[sessionId]; return next })
+    setSessionUploadedChapterCount((prev) => { const next = { ...prev }; delete next[sessionId]; return next })
+    setSessionReadChaptersByUsers((prev) => { const next = { ...prev }; delete next[sessionId]; return next })
+  }, [])
+
   const updateProgress = useCallback(
     async (session: ReadingSession, chapter: number, user: User) => {
       if (!chapter || chapter < 1 || chapter > session.total_chapters) {
@@ -412,6 +394,7 @@ export function useSessions(): UseSessionsReturn {
     joinSession,
     leaveSession,
     updateProgress,
+    removeSession,
     setSessions,
     setMemberships,
     setLatestProgress,

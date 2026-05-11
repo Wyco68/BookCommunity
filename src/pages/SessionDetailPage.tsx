@@ -2,14 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { getSignedMediaUrl } from '../lib/storage'
+import { deleteSessionMediaForSession, getSignedMediaUrl } from '../lib/storage'
 import { useSessionDetail } from '../hooks/useSessionDetail'
 import { useMediaUpload } from '../hooks/useMediaUpload'
 import { buildLatestChapterByUser, buildCommentMeta } from '../lib/sessionState'
 import { SessionDetailPanel, type SessionDetailPanelTranslations } from '../components/SessionDetailPanel'
+import { ConfirmModal } from '../components/ConfirmModal'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
-import type { ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
+import type { Comment, ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
 
 const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
@@ -20,9 +21,10 @@ function getLanguage(): Language {
 
 interface SessionDetailPageProps {
   userId: string
+  onSessionDeleted?: (sessionId: string) => void
 }
 
-export function SessionDetailPage({ userId }: SessionDetailPageProps) {
+export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPageProps) {
   const { id: sessionId } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const t: SessionDetailPanelTranslations = translations[getLanguage()]
@@ -43,6 +45,11 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
   } | null>(null)
   const [activeChapterUrl, setActiveChapterUrl] = useState<string | null>(null)
   const [loadingChapter, setLoadingChapter] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deletingSession, setDeletingSession] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [updatingVisibility, setUpdatingVisibility] = useState(false)
 
   const detail = useSessionDetail()
   const sessionMedia = useMediaUpload({
@@ -100,9 +107,24 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
 
     const channel = supabase
       .channel(`session-detail-${sessionId}`)
+      // Comments: append new rows instantly; only reload on update/delete
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'comments', filter: `session_id=eq.${sessionId}` },
+        { event: 'INSERT', schema: 'public', table: 'comments', filter: `session_id=eq.${sessionId}` },
+        async (payload) => {
+          const newComment = payload.new as Comment
+          await detail.ensureProfile(newComment.user_id)
+          detail.appendComment(newComment)
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'comments', filter: `session_id=eq.${sessionId}` },
+        () => { void detail.loadDetail(sessionId) },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'comments', filter: `session_id=eq.${sessionId}` },
         () => { void detail.loadDetail(sessionId) },
       )
       .on(
@@ -252,6 +274,62 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
     if (!error) navigate(-1)
   }, [sessionId, userId, membership, navigate])
 
+  const handleUpdateVisibility = useCallback(async (newVisibility: 'public' | 'private') => {
+    if (!sessionId || !isOwner) return
+    setUpdatingVisibility(true)
+    const { error } = await supabase
+      .from('reading_sessions')
+      .update({ visibility: newVisibility })
+      .eq('id', sessionId)
+    setUpdatingVisibility(false)
+    if (!error) setSession((prev) => prev ? { ...prev, visibility: newVisibility } : prev)
+  }, [sessionId, isOwner])
+
+  const handleRemoveMember = useCallback(async (memberId: string) => {
+    if (!sessionId || !isOwner || memberId === userId) return
+    setRemovingMemberId(memberId)
+    await supabase.from('session_members').delete().eq('session_id', sessionId).eq('user_id', memberId)
+    setRemovingMemberId(null)
+    void detail.loadDetail(sessionId)
+  }, [sessionId, isOwner, userId, detail])
+
+  const handleDeleteSession = useCallback(async () => {
+    if (!sessionId || !isOwner) return
+    setDeletingSession(true)
+    setDeleteError(null)
+
+    const { data: mediaRows, error: mediaLoadError } = await supabase
+      .from('session_media')
+      .select('file_path')
+      .eq('session_id', sessionId)
+
+    if (mediaLoadError) {
+      setDeleteError(mediaLoadError.message)
+      setDeletingSession(false)
+      return
+    }
+
+    const filePaths = (mediaRows ?? [])
+      .map((row) => row.file_path)
+      .filter((filePath): filePath is string => typeof filePath === 'string' && filePath.length > 0)
+
+    const storageDeleteError = await deleteSessionMediaForSession(sessionId, filePaths)
+    if (storageDeleteError) {
+      setDeleteError(`Storage cleanup failed: ${storageDeleteError}`)
+      setDeletingSession(false)
+      return
+    }
+
+    const { error } = await supabase.from('reading_sessions').delete().eq('id', sessionId)
+    setDeletingSession(false)
+    if (!error) {
+      onSessionDeleted?.(sessionId)
+      navigate(-1)
+      return
+    }
+    setDeleteError(error.message)
+  }, [sessionId, isOwner, navigate, onSessionDeleted])
+
   const handleSaveMyProgress = useCallback(async () => {
     if (!session || !userId || !membership || !sessionId) return
     if (myChapterDraft < 1 || myChapterDraft > maxProgressChapter) return
@@ -349,7 +427,27 @@ export function SessionDetailPage({ userId }: SessionDetailPageProps) {
           setActiveChapter(next)
           await loadChapterMedia(next)
         }}
+        onUpdateVisibility={handleUpdateVisibility}
+        updatingVisibility={updatingVisibility}
+        onRemoveMember={handleRemoveMember}
+        removingMemberId={removingMemberId}
+        onDeleteSession={() => setShowDeleteConfirm(true)}
       />
+      {deleteError ? <p className="error">{deleteError}</p> : null}
+
+      {showDeleteConfirm ? (
+        <ConfirmModal
+          message="Delete this session? This cannot be undone and will remove all members, media, and progress."
+          confirmLabel={deletingSession ? 'Deleting…' : 'Delete'}
+          cancelLabel="Cancel"
+          dangerous
+          onConfirm={() => {
+            setShowDeleteConfirm(false)
+            void handleDeleteSession()
+          }}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      ) : null}
     </section>
   )
 }

@@ -3,7 +3,32 @@ import type { MediaType } from '../types'
 
 export const SESSION_MEDIA_BUCKET = 'session-media'
 export const SESSION_COVERS_BUCKET = 'session-covers'
+export const PROFILE_AVATARS_BUCKET = 'profile-avatars'
 const SIGNED_URL_EXPIRY_SECONDS = 15 * 60
+
+const AVATAR_MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+}
+
+export async function uploadAvatarFile(
+  userId: string,
+  file: File,
+): Promise<{ path: string; error: string | null }> {
+  const ext = AVATAR_MIME_TO_EXT[file.type] ?? file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+  const path = `${userId}/avatar.${ext}`
+
+  const { error } = await supabase.storage
+    .from(PROFILE_AVATARS_BUCKET)
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: file.type,
+    })
+
+  return error ? { path: '', error: error.message } : { path, error: null }
+}
 
 export async function uploadSessionMedia(
   sessionId: string,
@@ -87,6 +112,41 @@ export async function deleteSessionMedia(filePath: string): Promise<string | nul
     .remove([filePath])
 
   return error ? error.message : null
+}
+
+function pathContainsSessionId(filePath: string, sessionId: string): boolean {
+  const parts = filePath.split('/').filter(Boolean)
+  return parts.includes(sessionId)
+}
+
+export async function deleteSessionMediaForSession(
+  sessionId: string,
+  filePaths: string[],
+): Promise<string | null> {
+  const uniquePaths = Array.from(new Set(filePaths.filter(Boolean)))
+
+  if (uniquePaths.length === 0) {
+    return null
+  }
+
+  const invalidPath = uniquePaths.find((filePath) => !pathContainsSessionId(filePath, sessionId))
+  if (invalidPath) {
+    return `Invalid media path for session cleanup: ${invalidPath}`
+  }
+
+  const chunkSize = 100
+  for (let i = 0; i < uniquePaths.length; i += chunkSize) {
+    const chunk = uniquePaths.slice(i, i + chunkSize)
+    const { error } = await supabase.storage
+      .from(SESSION_MEDIA_BUCKET)
+      .remove(chunk)
+
+    if (error) {
+      return error.message
+    }
+  }
+
+  return null
 }
 
 async function compressImage(file: File, quality: number, maxDimension: number): Promise<File> {
