@@ -27,7 +27,7 @@ skills-lock.json
 *.sw?
 
 
-/supabase/schema.sql   
+/supabase
 
 AGENTS.md
 DESIGN.md 

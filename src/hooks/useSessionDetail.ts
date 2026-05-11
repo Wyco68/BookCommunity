@@ -18,6 +18,8 @@ export interface UseSessionDetailReturn {
   approveRequest: (sessionId: string, request: SessionJoinRequest) => Promise<void>
   rejectRequest: (sessionId: string, request: SessionJoinRequest) => Promise<void>
   clearDetail: () => void
+  appendComment: (comment: Comment) => void
+  ensureProfile: (userId: string) => Promise<void>
 }
 
 export function useSessionDetail(): UseSessionDetailReturn {
@@ -207,6 +209,44 @@ export function useSessionDetail(): UseSessionDetailReturn {
     setError(null)
   }, [])
 
+  // Append a single comment directly (used by realtime INSERT to avoid full reload)
+  const appendComment = useCallback((comment: Comment) => {
+    setComments((prev) => {
+      if (prev.some((c) => c.id === comment.id)) return prev
+      return [...prev, comment]
+    })
+  }, [])
+
+  // Fetch a profile into the cache if not already present (used for realtime new-commenter)
+  const ensureProfile = useCallback(async (userId: string) => {
+    setProfiles((prev) => {
+      if (prev[userId]) return prev
+      return prev
+    })
+    // Read current profiles outside setState to avoid stale closure
+    const result = await supabase
+      .from('profiles')
+      .select('id,display_name,avatar_url')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (!result.data) return
+
+    const p = result.data as Profile
+    const avatarPaths = p.avatar_url && !isRemoteUrl(p.avatar_url) ? [p.avatar_url] : []
+    const resolved = avatarPaths.length > 0 ? await resolveAvatarUrlMap(avatarPaths) : {}
+
+    const resolvedProfile: Profile =
+      p.avatar_url && !isRemoteUrl(p.avatar_url) && resolved[p.avatar_url]
+        ? { ...p, avatar_url: resolved[p.avatar_url] }
+        : p
+
+    setProfiles((prev) => {
+      if (prev[userId]) return prev
+      return { ...prev, [userId]: resolvedProfile }
+    })
+  }, [])
+
   return {
     comments,
     likes,
@@ -222,5 +262,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
     approveRequest,
     rejectRequest,
     clearDetail,
+    appendComment,
+    ensureProfile,
   }
 }

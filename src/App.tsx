@@ -120,6 +120,7 @@ function App() {
         profile.setNameDraft('')
         profile.setNotice(null)
         profile.setAvatarInputKey(0)
+        profile.setAvatarPreviewUrl(null)
       }
     })
 
@@ -233,7 +234,7 @@ function App() {
     myAvatarImage: profile.avatarPreviewUrl,
     myAvatarLabel: profile.profile?.display_name || auth.user?.email || t.auth.signedInAs,
     avatarInputKey: profile.avatarInputKey,
-    avatarFile: null,
+    avatarFile: profile.avatarFile,
     avatarUploadBusy: profile.uploading,
     profileNameDraft: profile.nameDraft,
     profileSaving: profile.saving,
@@ -246,14 +247,14 @@ function App() {
     },
     onUploadAvatar: () => {
       if (auth.user) {
-        profile.uploadAvatar(auth.user.id)
+        return profile.uploadAvatar(auth.user.id)
       }
       return Promise.resolve()
     },
     onProfileNameDraftChange: profile.setNameDraft,
     onSaveProfile: () => {
       if (auth.user) {
-        profile.saveProfile(auth.user.id)
+        return profile.saveProfile(auth.user.id)
       }
       return Promise.resolve()
     },
@@ -281,6 +282,7 @@ function App() {
       searchSectionProps={searchSectionProps}
       sectionsAndDetailsProps={sectionsAndDetailsProps}
       userId={activeUserId}
+      onSessionDeleted={sessions.removeSession}
     />
   )
 }

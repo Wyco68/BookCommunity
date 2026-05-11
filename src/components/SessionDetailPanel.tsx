@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
@@ -66,6 +66,11 @@ export interface SessionDetailPanelProps {
   loadingChapter?: boolean
   onPrevChapter?: () => Promise<void>
   onNextChapter?: () => Promise<void>
+  onUpdateVisibility?: (v: 'public' | 'private') => Promise<void>
+  updatingVisibility?: boolean
+  onRemoveMember?: (userId: string) => Promise<void>
+  removingMemberId?: string | null
+  onDeleteSession?: () => void
 }
 
 export const SessionDetailPanel = memo(function SessionDetailPanel({
@@ -95,7 +100,6 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
   onUploadMedia,
   currentUserId,
   canUploadMedia = false,
-  mediaCount = 0,
   mediaLimit = 0,
   nextChapter = 1,
   readChaptersByUsers = 0,
@@ -114,7 +118,20 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
   loadingChapter = false,
   onPrevChapter,
   onNextChapter,
+  onUpdateVisibility,
+  updatingVisibility = false,
+  onRemoveMember,
+  removingMemberId = null,
+  onDeleteSession,
 }: SessionDetailPanelProps) {
+  const [visibilityDraft, setVisibilityDraft] = useState<'public' | 'private'>(
+    selectedSession?.visibility ?? 'public',
+  )
+
+  useEffect(() => {
+    if (selectedSession?.visibility) setVisibilityDraft(selectedSession.visibility)
+  }, [selectedSession?.id, selectedSession?.visibility])
+
   return (
     <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
       {!selectedSession ? (
@@ -148,6 +165,84 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                   All {mediaLimit} chapter{mediaLimit !== 1 ? 's' : ''} uploaded.
                 </p>
               )}
+            </section>
+          ) : null}
+
+          {/* Owner management panel */}
+          {selectedIsOwner && (onUpdateVisibility ?? onRemoveMember ?? onDeleteSession) ? (
+            <section className="detail-pane stack owner-panel">
+              <h3 className="owner-panel-title">Manage Session</h3>
+
+              {onUpdateVisibility ? (
+                <div className="owner-panel-row">
+                  <label className="field" style={{ flex: 1, margin: 0 }}>
+                    <span>Visibility</span>
+                    <select
+                      value={visibilityDraft}
+                      onChange={(e) => setVisibilityDraft(e.target.value as 'public' | 'private')}
+                    >
+                      <option value="public">Public</option>
+                      <option value="private">Private</option>
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={updatingVisibility || visibilityDraft === selectedSession.visibility}
+                    onClick={() => { void onUpdateVisibility(visibilityDraft) }}
+                  >
+                    {updatingVisibility ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              ) : null}
+
+              {onRemoveMember ? (
+                <div>
+                  <p className="owner-panel-label">Members</p>
+                  {sessionMembers.filter((m) => m.user_id !== currentUserId).length === 0 ? (
+                    <p className="subtle">No other members.</p>
+                  ) : (
+                    <ul className="member-list owner-member-list">
+                      {sessionMembers
+                        .filter((m) => m.user_id !== currentUserId)
+                        .map((member) => {
+                          const profile = sessionProfiles[member.user_id]
+                          return (
+                            <li key={member.user_id} className="member-item owner-member-item">
+                              <div className="identity-row">
+                                <Avatar
+                                  imageUrl={profile?.avatar_url ?? null}
+                                  label={profile?.display_name || member.user_id.slice(0, 8)}
+                                  size="sm"
+                                />
+                                <span className="owner-member-name">
+                                  {profile?.display_name || member.user_id.slice(0, 8)}
+                                </span>
+                                <span className="subtle">({t.enums.role[member.role]})</span>
+                              </div>
+                              <button
+                                type="button"
+                                className="ghost owner-remove-btn"
+                                disabled={removingMemberId === member.user_id}
+                                onClick={() => { void onRemoveMember(member.user_id) }}
+                              >
+                                {removingMemberId === member.user_id ? 'Removing…' : 'Remove'}
+                              </button>
+                            </li>
+                          )
+                        })}
+                    </ul>
+                  )}
+                </div>
+              ) : null}
+
+              {onDeleteSession ? (
+                <div className="danger-zone">
+                  <button type="button" className="btn-danger" onClick={onDeleteSession}>
+                    Delete Session
+                  </button>
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -191,6 +286,71 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                   </button>
                 </div>
               ) : null}
+            </section>
+          ) : null}
+
+          {/* Chapter viewer — fixed-height section above discussion to prevent layout shift */}
+          {selectedIsMember && maxChapter > 0 ? (
+            <section className="detail-pane chapter-viewer-fixed">
+              <div className="chapter-viewer-nav">
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!onPrevChapter || activeChapter <= 1 || loadingChapter}
+                  onClick={() => { void onPrevChapter?.() }}
+                >
+                  ← Prev
+                </button>
+                <span className="chapter-viewer-label">
+                  Chapter {activeChapter} <span className="subtle">/ {maxChapter}</span>
+                </span>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={!onNextChapter || activeChapter >= maxChapter || loadingChapter}
+                  onClick={() => { void onNextChapter?.() }}
+                >
+                  Next →
+                </button>
+              </div>
+
+              <div className="chapter-viewer-body">
+                {loadingChapter ? (
+                  <div className="chapter-viewer-loading">Loading chapter…</div>
+                ) : activeChapterMedia && activeChapterUrl ? (
+                  <div className="chapter-viewer-content">
+                    {activeChapterMedia.media_type === 'image' ? (
+                      <img
+                        className="chapter-viewer-image"
+                        src={activeChapterUrl}
+                        alt={activeChapterMedia.file_name}
+                      />
+                    ) : activeChapterMedia.mime_type === 'application/pdf' ? (
+                      <iframe
+                        className="chapter-viewer-pdf"
+                        src={activeChapterUrl}
+                        title={activeChapterMedia.file_name}
+                      />
+                    ) : (
+                      <div className="chapter-viewer-file">
+                        <p className="muted">{activeChapterMedia.file_name}</p>
+                        <a
+                          href={activeChapterUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="secondary"
+                        >
+                          Open / Download
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="chapter-viewer-empty">
+                    <p className="subtle">No content for this chapter yet.</p>
+                  </div>
+                )}
+              </div>
             </section>
           ) : null}
 
@@ -297,7 +457,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                     </button>
                   </form>
 
-                  <ul className="comment-list">
+                  <ul className="comment-list comment-list-scroll">
                     {sessionComments.map((comment) => {
                       const profile = sessionProfiles[comment.user_id]
                       const likes = commentMeta.likeCounts[comment.id] ?? 0
@@ -337,68 +497,6 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
             </section>
           </div>
 
-          {/* Chapter viewer — bottom section */}
-          {selectedIsMember && maxChapter > 0 ? (
-            <section className="detail-pane chapter-viewer">
-              <div className="chapter-viewer-nav">
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={!onPrevChapter || activeChapter <= 1 || loadingChapter}
-                  onClick={() => { void onPrevChapter?.() }}
-                >
-                  ← Prev
-                </button>
-                <span className="chapter-viewer-label">
-                  Chapter {activeChapter} <span className="subtle">/ {maxChapter}</span>
-                </span>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={!onNextChapter || activeChapter >= maxChapter || loadingChapter}
-                  onClick={() => { void onNextChapter?.() }}
-                >
-                  Next →
-                </button>
-              </div>
-
-              {loadingChapter ? (
-                <div className="chapter-viewer-loading">Loading chapter…</div>
-              ) : activeChapterMedia && activeChapterUrl ? (
-                <div className="chapter-viewer-content">
-                  {activeChapterMedia.media_type === 'image' ? (
-                    <img
-                      className="chapter-viewer-image"
-                      src={activeChapterUrl}
-                      alt={activeChapterMedia.file_name}
-                    />
-                  ) : activeChapterMedia.mime_type === 'application/pdf' ? (
-                    <iframe
-                      className="chapter-viewer-pdf"
-                      src={activeChapterUrl}
-                      title={activeChapterMedia.file_name}
-                    />
-                  ) : (
-                    <div className="chapter-viewer-file">
-                      <p className="muted">{activeChapterMedia.file_name}</p>
-                      <a
-                        href={activeChapterUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="secondary"
-                      >
-                        Open / Download
-                      </a>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="chapter-viewer-empty">
-                  <p className="subtle">No content for this chapter yet.</p>
-                </div>
-              )}
-            </section>
-          ) : null}
         </>
       )}
     </article>
