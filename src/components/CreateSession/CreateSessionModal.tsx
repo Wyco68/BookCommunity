@@ -2,7 +2,17 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { translations } from '../../i18n'
+import type { Language } from '../../i18n'
 import type { Category, ReadingSession } from '../../types'
+
+const LANGUAGE_STORAGE_KEY = 'bookcom-language'
+
+function getLanguage(): Language {
+  const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
+  if (saved === 'de' || saved === 'my') return saved
+  return 'en'
+}
 
 interface CreateSessionModalProps {
   onClose: () => void
@@ -10,6 +20,7 @@ interface CreateSessionModalProps {
 
 export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
   const navigate = useNavigate()
+  const t = translations[getLanguage()]
   const [title, setTitle] = useState('')
   const [author, setAuthor] = useState('')
   const [chapters, setChapters] = useState<number | ''>('')
@@ -41,21 +52,21 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
     event.preventDefault()
     setError(null)
 
-    if (!title.trim()) { setError('Title is required'); return }
-    if (!author.trim()) { setError('Author is required'); return }
+    if (!title.trim()) { setError(t.sessionForm.titleRequired); return }
+    if (!author.trim()) { setError(t.sessionForm.authorRequired); return }
 
     const totalChapters = chapters === '' ? null : Number(chapters)
     if (totalChapters !== null && (totalChapters < 1 || !Number.isInteger(totalChapters))) {
-      setError('Chapters must be a positive integer or left empty')
+      setError(t.sessionForm.chaptersPositiveInt)
       return
     }
-    if (selectedCategoryId === null) { setError('Select a category'); return }
+    if (selectedCategoryId === null) { setError(t.sessionForm.selectCategory); return }
     if (coverFile) {
       if (!['image/jpeg', 'image/png', 'image/webp'].includes(coverFile.type)) {
-        setError('Cover image must be JPG, PNG, or WebP')
+        setError(t.sessionForm.coverImageInvalidType)
         return
       }
-      if (coverFile.size > 10 * 1024 * 1024) { setError('Cover image must be under 10MB'); return }
+      if (coverFile.size > 10 * 1024 * 1024) { setError(t.sessionForm.coverImageTooLarge); return }
     }
 
     setCreating(true)
@@ -83,7 +94,7 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
 
     const { data: userData } = await supabase.auth.getUser()
     const userId = userData.user?.id
-    if (!userId) { setError('You must be signed in'); setCreating(false); return }
+    if (!userId) { setError(t.sessionForm.mustBeSignedIn); setCreating(false); return }
 
     if (coverFile) {
       const ext = coverFile.name.split('.').pop()?.toLowerCase() ?? 'jpg'
@@ -105,85 +116,78 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
     setCreating(false)
     onClose()
     navigate(`/session/${session.id}`)
-  }, [title, author, chapters, description, visibility, joinPolicy, selectedCategoryId, coverFile, navigate, onClose])
+  }, [title, author, chapters, description, visibility, joinPolicy, selectedCategoryId, coverFile, navigate, onClose, t])
 
   return (
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal-content modal-create-session">
         <div className="modal-header">
-          <h2>Create Reading Session</h2>
-          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+          <h2>{t.sessionForm.title}</h2>
+          <button type="button" className="modal-close" onClick={onClose} aria-label={t.nav.closeMenu}>✕</button>
         </div>
 
         {error ? <p className="error">{error}</p> : null}
 
         <form className="create-session-form" onSubmit={(e) => { void handleSubmit(e) }}>
           <div className="create-session-row">
-            <label className="field">
-              <span className="field-label">Title *</span>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Book title"
-                required
-              />
-            </label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder={t.sessionForm.bookTitlePlaceholder}
+              aria-label={t.sessionForm.bookTitle}
+              required
+            />
 
-            <label className="field">
-              <span className="field-label">Author *</span>
-              <input
-                type="text"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                placeholder="Author name"
-                required
-              />
-            </label>
+            <input
+              type="text"
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder={t.sessionForm.authorPlaceholder}
+              aria-label={t.sessionForm.author}
+              required
+            />
           </div>
 
           <div className="create-session-row">
-            <label className="field">
-              <span className="field-label">Total Chapters *</span>
-              <input
-                type="number"
-                min={1}
-                value={chapters}
-                onChange={(e) => setChapters(e.target.value === '' ? '' : Number(e.target.value))}
-                placeholder="e.g. 20"
-              />
-            </label>
+            <input
+              type="number"
+              min={1}
+              value={chapters}
+              onChange={(e) => setChapters(e.target.value === '' ? '' : Number(e.target.value))}
+              placeholder={t.sessionForm.totalChaptersPlaceholder}
+              aria-label={t.sessionForm.totalChapters}
+            />
 
-            <label className="field">
-              <span className="field-label">Visibility</span>
-              <select value={visibility} onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}>
-                <option value="public">Public</option>
-                <option value="private">Private</option>
-              </select>
-            </label>
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
+              aria-label={t.sessionForm.visibility}
+            >
+              <option value="public">{t.enums.visibility.public}</option>
+              <option value="private">{t.enums.visibility.private}</option>
+            </select>
 
-            <label className="field">
-              <span className="field-label">Join Policy</span>
-              <select value={joinPolicy} onChange={(e) => setJoinPolicy(e.target.value as 'open' | 'request')}>
-                <option value="open">Open</option>
-                <option value="request">Request to Join</option>
-              </select>
-            </label>
+            <select
+              value={joinPolicy}
+              onChange={(e) => setJoinPolicy(e.target.value as 'open' | 'request')}
+              aria-label={t.sessionForm.joinPolicy}
+            >
+              <option value="open">{t.sessionForm.openJoin}</option>
+              <option value="request">{t.sessionForm.requestToJoin}</option>
+            </select>
           </div>
 
-          <label className="field">
-            <span className="field-label">Description</span>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What is this session about?"
-              rows={3}
-            />
-          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder={t.sessionForm.descriptionPlaceholder}
+            aria-label={t.sessionForm.description}
+            rows={3}
+          />
 
           {categories.length > 0 ? (
             <div className="field">
-              <span className="field-label">Category *</span>
               <div className="category-tab-bar">
                 {categories.map((cat) => (
                   <button
@@ -199,22 +203,22 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
             </div>
           ) : null}
 
-          <label className="field">
-            <span className="field-label">Cover Image</span>
+          <div className="field">
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+              aria-label={t.sessionForm.coverImage}
             />
-            <span className="field-hint">JPG, PNG or WebP · max 10 MB · optional</span>
-          </label>
+            <span className="field-hint">{t.sessionForm.coverImageHint}</span>
+          </div>
 
           <div className="create-session-footer">
             <button type="button" className="secondary" onClick={onClose} disabled={creating}>
-              Cancel
+              {t.common.cancel}
             </button>
             <button type="submit" className="primary" disabled={creating}>
-              {creating ? 'Creating…' : 'Create Session'}
+              {creating ? t.sessionForm.creating : t.sessionForm.createSession}
             </button>
           </div>
         </form>

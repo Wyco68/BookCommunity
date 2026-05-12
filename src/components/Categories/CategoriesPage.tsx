@@ -3,7 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useCategories } from '../../hooks/useCategories'
 import { getSignedMediaUrl, SESSION_COVERS_BUCKET } from '../../lib/storage'
+import { translations } from '../../i18n'
+import type { Language } from '../../i18n'
 import type { ReadingSession } from '../../types'
+
+const LANGUAGE_STORAGE_KEY = 'bookcom-language'
+
+function getLanguage(): Language {
+  const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
+  if (saved === 'de' || saved === 'my') return saved
+  return 'en'
+}
 
 interface CategoriesPageProps {
   userId: string
@@ -15,6 +25,7 @@ interface SessionWithCover extends ReadingSession {
 
 export function CategoriesPage({ userId }: CategoriesPageProps) {
   const { categories, loading, error } = useCategories({ userId })
+  const t = translations[getLanguage()]
 
   const navigate = useNavigate()
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
@@ -91,18 +102,17 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
   return (
     <section className="page-tight">
       <article className="card page-tight-card">
-        <h2>Categories</h2>
-        <p className="subtle">Browse reading sessions by category.</p>
+        <h2>{t.categories.title}</h2>
 
         {error ? <p className="error">{error}</p> : null}
-        {loading ? <p className="subtle">Loading categories…</p> : null}
+        {loading ? <p className="subtle">{t.categories.loading}</p> : null}
 
         {!loading && categories.length === 0 ? (
-          <p className="subtle">No categories available yet.</p>
+          <p className="subtle">{t.categories.noCategories}</p>
         ) : null}
 
         {categories.length > 0 ? (
-          <div className="category-tab-bar page-tight-tabs" role="tablist" aria-label="Category filter">
+          <div className="category-tab-bar page-tight-tabs" role="tablist" aria-label={t.categories.categoryFilter}>
             {categories.map((cat) => (
               <button
                 key={cat.id}
@@ -129,9 +139,9 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
             </div>
 
             {sessionsError ? <p className="error">{sessionsError}</p> : null}
-            {loadingSessions ? <p className="subtle">Loading sessions…</p> : null}
+            {loadingSessions ? <p className="subtle">{t.categories.loadingSessions}</p> : null}
             {!loadingSessions && categorySessions.length === 0 ? (
-              <p className="subtle">No sessions in this category yet.</p>
+              <p className="subtle">{t.categories.noSessions}</p>
             ) : null}
 
             {!loadingSessions && categorySessions.length > 0 ? (
@@ -161,15 +171,15 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
                       <div className="session-card-col-info">
                         <div className="session-heading">
                           <h3 className="session-card-title">{session.book_title}</h3>
-                          <span className="pill">{session.visibility}</span>
+                          <span className="pill">{t.enums.visibility[session.visibility]}</span>
                         </div>
-                        <p className="subtle session-card-author">by {session.book_author}</p>
+                        <p className="subtle session-card-author">{t.sessions.byAuthor(session.book_author)}</p>
 
                         <div className="session-meta-grid">
                           <div className="session-meta-item">
-                            <span className="session-meta-label">Chapters</span>
+                            <span className="session-meta-label">{t.sessions.chapters}</span>
                             <span className="session-meta-value">
-                              {session.status_type === 'completed' ? 'Completed' : session.total_chapters}
+                              {session.status_type === 'completed' ? t.sessions.completed : session.total_chapters}
                             </span>
                           </div>
                         </div>

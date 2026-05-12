@@ -59,27 +59,23 @@ export const SessionListPanel = memo(function SessionListPanel({
     <RootTag className={rootClassName}>
       {showControls ? (
         <div className="stack gap-sm">
-          <label className="field">
-            <span>{t.sessions.searchLabel}</span>
-            <input
-              type="text"
-              value={sessionSearch}
-              onChange={(event) => onSessionSearchChange(event.target.value)}
-              placeholder={t.sessions.searchPlaceholder}
-            />
-          </label>
+          <input
+            type="text"
+            value={sessionSearch}
+            onChange={(event) => onSessionSearchChange(event.target.value)}
+            placeholder={t.sessions.searchPlaceholder}
+            aria-label={t.sessions.searchLabel}
+          />
 
-          <label className="field">
-            <span>{t.sessions.visibility}</span>
-            <select
-              value={visibilityFilter}
-              onChange={(event) => onVisibilityFilterChange(event.target.value as 'all' | 'public' | 'private')}
-            >
-              <option value="all">{t.sessions.all}</option>
-              <option value="public">{t.enums.visibility.public}</option>
-              <option value="private">{t.enums.visibility.private}</option>
-            </select>
-          </label>
+          <select
+            value={visibilityFilter}
+            onChange={(event) => onVisibilityFilterChange(event.target.value as 'all' | 'public' | 'private')}
+            aria-label={t.sessions.visibility}
+          >
+            <option value="all">{t.sessions.all}</option>
+            <option value="public">{t.enums.visibility.public}</option>
+            <option value="private">{t.enums.visibility.private}</option>
+          </select>
         </div>
       ) : null}
 
@@ -140,13 +136,13 @@ export const SessionListPanel = memo(function SessionListPanel({
 
                   <div className="session-meta-grid">
                     <div className="session-meta-item">
-                      <span className="session-meta-label">Chapters</span>
+                      <span className="session-meta-label">{t.sessions.chapters}</span>
                       <span className="session-meta-value">
-                        {session.status_type === 'completed' ? 'Completed' : session.total_chapters}
+                        {session.status_type === 'completed' ? t.sessions.completed : session.total_chapters}
                       </span>
                     </div>
                     <div className="session-meta-item">
-                      <span className="session-meta-label">{isOwner ? 'Uploaded' : 'My Progress'}</span>
+                      <span className="session-meta-label">{isOwner ? t.sessions.uploaded : t.sessions.myProgress}</span>
                       <span className="session-meta-value">
                         {isOwner ? uploadedCount : myProgress}
                       </span>

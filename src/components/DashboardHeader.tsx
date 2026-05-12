@@ -40,20 +40,20 @@ export function DashboardHeader({
 
           <nav className="top-nav-links" aria-label="Main navigation">
             <NavLink to={APP_PATHS.home} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-              Home
+              {t.nav.home}
             </NavLink>
             <NavLink to={APP_PATHS.search} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-              Search
+              {t.nav.search}
             </NavLink>
             <NavLink to={APP_PATHS.categories} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
-              Categories
+              {t.nav.categories}
             </NavLink>
           </nav>
 
           <div className="top-nav-actions">
             {onCreateClick ? (
               <button type="button" className="sidebar-create-btn top-nav-create-btn" onClick={onCreateClick}>
-                + Create Session
+                {t.nav.createSession}
               </button>
             ) : null}
             <Link to={APP_PATHS.profileEdit} className="header-identity-link top-nav-profile">
@@ -72,6 +72,13 @@ export function DashboardHeader({
               </button>
               <button
                 type="button"
+                className={`auth-switch-option ${language === 'de' ? 'auth-switch-option-active' : ''}`}
+                onClick={() => onLanguageChange('de')}
+              >
+                DE
+              </button>
+              <button
+                type="button"
                 className={`auth-switch-option ${language === 'my' ? 'auth-switch-option-active' : ''}`}
                 onClick={() => onLanguageChange('my')}
               >
@@ -83,7 +90,7 @@ export function DashboardHeader({
           <button
             className="mobile-menu-toggle"
             onClick={() => setMobileMenuOpen((open) => !open)}
-            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-label={mobileMenuOpen ? t.nav.closeMenu : t.nav.openMenu}
             aria-expanded={mobileMenuOpen}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -95,27 +102,27 @@ export function DashboardHeader({
 
       <nav className={`top-nav-mobile-menu ${mobileMenuOpen ? 'open' : ''}`} aria-label="Mobile navigation">
         <div className="mobile-sidebar-header">
-          <span className="top-nav-brand">Menu</span>
+          <span className="top-nav-brand">{t.nav.menu}</span>
           <button
             className="sidebar-close-btn"
             onClick={closeMobileMenu}
-            aria-label="Close menu"
+            aria-label={t.nav.closeMenu}
           >
             ✕
           </button>
         </div>
         <div className="sidebar-nav">
           <Link to={APP_PATHS.home} className="sidebar-link" onClick={closeMobileMenu}>
-            Home
+            {t.nav.home}
           </Link>
           <Link to={APP_PATHS.search} className="sidebar-link" onClick={closeMobileMenu}>
-            Search
+            {t.nav.search}
           </Link>
           <Link to={APP_PATHS.categories} className="sidebar-link" onClick={closeMobileMenu}>
-            Categories
+            {t.nav.categories}
           </Link>
           <Link to={APP_PATHS.profileEdit} className="sidebar-link" onClick={closeMobileMenu}>
-            Profile
+            {t.nav.profile}
           </Link>
           {onCreateClick ? (
             <button
@@ -126,7 +133,7 @@ export function DashboardHeader({
                 onCreateClick()
               }}
             >
-              + Create Session
+              {t.nav.createSession}
             </button>
           ) : null}
         </div>
@@ -142,6 +149,13 @@ export function DashboardHeader({
               onClick={() => onLanguageChange('en')}
             >
               EN
+            </button>
+            <button
+              type="button"
+              className={`auth-switch-option ${language === 'de' ? 'auth-switch-option-active' : ''}`}
+              onClick={() => onLanguageChange('de')}
+            >
+              DE
             </button>
             <button
               type="button"

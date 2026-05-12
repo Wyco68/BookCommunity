@@ -1,8 +1,13 @@
 import { useState, useRef } from 'react'
 import type { MediaType } from '../../types'
 import { ConfirmModal } from '../ConfirmModal'
+import { translations } from '../../i18n'
+import type { Language } from '../../i18n'
+
+type Copy = (typeof translations)[Language]
 
 interface MediaUploadProps {
+  t: Copy
   onUpload: (file: File, mediaType: MediaType, description?: string) => Promise<boolean>
   uploading: boolean
   error: string | null
@@ -11,6 +16,7 @@ interface MediaUploadProps {
 }
 
 export function MediaUpload({
+  t,
   onUpload,
   uploading,
   error,
@@ -48,8 +54,9 @@ export function MediaUpload({
     <>
       {confirming ? (
         <ConfirmModal
-          message={`Upload "${selectedFile?.name}" as Chapter ${nextChapter}?`}
-          confirmLabel={`Upload Chapter ${nextChapter}`}
+          message={t.media.confirmUpload(selectedFile?.name ?? '', nextChapter)}
+          confirmLabel={t.media.uploadChapter(nextChapter)}
+          cancelLabel={t.common.cancel}
           onConfirm={() => { void handleConfirmUpload() }}
           onCancel={() => setConfirming(false)}
         />
@@ -57,47 +64,41 @@ export function MediaUpload({
 
       <div className="owner-upload-block">
         <div className="owner-upload-header">
-          <span className="owner-upload-title">Upload Chapter {nextChapter}</span>
-          <span className="owner-upload-progress">{nextChapter - 1} / {totalChapters} uploaded</span>
+          <span className="owner-upload-title">{t.media.uploadChapter(nextChapter)}</span>
+          <span className="owner-upload-progress">{t.media.uploadProgress(nextChapter - 1, totalChapters)}</span>
         </div>
 
         <div className="owner-upload-row">
-          <label className="field">
-            <span>Type</span>
-            <select
-              value={mediaType}
-              onChange={(e) => {
-                setMediaType(e.target.value as MediaType)
-                setSelectedFile(null)
-                if (inputRef.current) inputRef.current.value = ''
-              }}
-            >
-              <option value="image">Image</option>
-              <option value="book_file">Book File (PDF/EPUB)</option>
-            </select>
-          </label>
+          <select
+            value={mediaType}
+            onChange={(e) => {
+              setMediaType(e.target.value as MediaType)
+              setSelectedFile(null)
+              if (inputRef.current) inputRef.current.value = ''
+            }}
+            aria-label={t.media.type}
+          >
+            <option value="image">{t.media.typeImage}</option>
+            <option value="book_file">{t.media.typeBookFile}</option>
+          </select>
 
-          <label className="field owner-upload-file-label">
-            <span>File</span>
-            <input
-              ref={inputRef}
-              type="file"
-              accept={acceptMap[mediaType]}
-              onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={acceptMap[mediaType]}
+            onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+            aria-label={t.media.file}
+          />
         </div>
 
-        <label className="field">
-          <span>Description (optional)</span>
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Brief description"
-            maxLength={200}
-          />
-        </label>
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t.media.descriptionPlaceholder}
+          aria-label={t.media.descriptionOptional}
+          maxLength={200}
+        />
 
         {error ? <p className="error">{error}</p> : null}
 
@@ -107,7 +108,7 @@ export function MediaUpload({
           disabled={!selectedFile || uploading}
           onClick={handleRequestUpload}
         >
-          {uploading ? `Uploading Chapter ${nextChapter}…` : `Upload Chapter ${nextChapter}`}
+          {uploading ? t.media.uploading(nextChapter) : t.media.uploadChapter(nextChapter)}
         </button>
       </div>
     </>

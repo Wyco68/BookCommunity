@@ -2,29 +2,13 @@ import { useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { Avatar } from '../Avatar'
 import { supabase } from '../../lib/supabase'
+import { translations } from '../../i18n'
+import type { Language } from '../../i18n'
 
-interface ProfileField {
-  title: string
-  subtitle: string
-  avatarImage: string
-  uploadAvatar: string
-  avatarHelp: string
-  displayName: string
-  displayNamePlaceholder: string
-  saveProfile: string
-}
-
-interface CommonField {
-  saving: string
-  uploading: string
-}
-
-interface AuthField {
-  signOut: string
-}
+type Copy = (typeof translations)[Language]
 
 interface ProfileEditProps {
-  t: { profile: ProfileField; common: CommonField; auth: AuthField }
+  t: Copy
   myAvatarImage: string | null
   myAvatarLabel: string
   avatarInputKey: number
@@ -66,17 +50,17 @@ export function ProfileEdit({
 
   async function handleChangePassword() {
     if (!oldPassword.trim()) {
-      setPasswordNotice('Old password is required.')
+      setPasswordNotice(t.profile.oldPasswordRequired)
       return
     }
 
     if (!newPassword.trim() || newPassword.length < 6) {
-      setPasswordNotice('Password must be at least 6 characters.')
+      setPasswordNotice(t.profile.passwordMinLength)
       return
     }
 
     if (oldPassword === newPassword) {
-      setPasswordNotice('New password must be different from old password.')
+      setPasswordNotice(t.profile.passwordMustDiffer)
       return
     }
 
@@ -86,7 +70,7 @@ export function ProfileEdit({
     const { data: userResult, error: userError } = await supabase.auth.getUser()
     const email = userResult.user?.email
     if (userError || !email) {
-      setPasswordNotice(userError?.message || 'Unable to verify current user.')
+      setPasswordNotice(userError?.message || t.profile.unableToVerifyUser)
       setPasswordBusy(false)
       return
     }
@@ -96,7 +80,7 @@ export function ProfileEdit({
       password: oldPassword,
     })
     if (reauthError) {
-      setPasswordNotice('Old password is incorrect.')
+      setPasswordNotice(t.profile.oldPasswordIncorrect)
       setPasswordBusy(false)
       return
     }
@@ -105,7 +89,7 @@ export function ProfileEdit({
     if (error) {
       setPasswordNotice(error.message)
     } else {
-      setPasswordNotice('Password updated successfully.')
+      setPasswordNotice(t.profile.passwordUpdated)
       setOldPassword('')
       setNewPassword('')
     }
@@ -126,22 +110,18 @@ export function ProfileEdit({
       </div>
       <div className="feed-content">
         <article className="card" style={{ maxWidth: '100%', width: '100%' }}>
-          <p className="subtle" style={{ marginBottom: '1.5rem' }}>{t.profile.subtitle}</p>
-
           <div className="profile-card stack" style={{ border: 'none', padding: 0, background: 'transparent' }}>
             {/* Avatar section */}
             <div className="profile-row">
               <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="lg" />
               <div className="stack gap-sm profile-upload-stack">
-                <label className="field">
-                  <span className="field-label">{t.profile.avatarImage}</span>
-                  <input
-                    key={avatarInputKey}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={onAvatarFileChange}
-                  />
-                </label>
+                <input
+                  key={avatarInputKey}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={onAvatarFileChange}
+                  aria-label={t.profile.avatarImage}
+                />
                 <button
                   type="button"
                   className="btn-secondary"
@@ -152,7 +132,6 @@ export function ProfileEdit({
                 >
                   {avatarUploadBusy ? t.common.uploading : t.profile.uploadAvatar}
                 </button>
-                <p className="muted">{t.profile.avatarHelp}</p>
               </div>
             </div>
 
@@ -164,16 +143,14 @@ export function ProfileEdit({
                 void onSaveProfile()
               }}
             >
-              <label className="field">
-                <span className="field-label">{t.profile.displayName}</span>
-                <input
-                  type="text"
-                  value={profileNameDraft}
-                  onChange={(event) => onProfileNameDraftChange(event.target.value)}
-                  placeholder={t.profile.displayNamePlaceholder}
-                  maxLength={80}
-                />
-              </label>
+              <input
+                type="text"
+                value={profileNameDraft}
+                onChange={(event) => onProfileNameDraftChange(event.target.value)}
+                placeholder={t.profile.displayNamePlaceholder}
+                aria-label={t.profile.displayName}
+                maxLength={80}
+              />
               <button type="submit" className="btn-primary" disabled={profileSaving}>
                 {profileSaving ? t.common.saving : t.profile.saveProfile}
               </button>
@@ -185,42 +162,38 @@ export function ProfileEdit({
 
         {/* Change password */}
         <article className="card stack" style={{ maxWidth: '100%', width: '100%', marginTop: '1rem' }}>
-          <h3>Change Password</h3>
-          <label className="field">
-            <span className="field-label">Old password</span>
-            <input
-              type="password"
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-              placeholder="Current password"
-              autoComplete="current-password"
-            />
-          </label>
-          <label className="field">
-            <span className="field-label">New password</span>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="At least 6 characters"
-              minLength={6}
-              autoComplete="new-password"
-            />
-          </label>
+          <h3>{t.profile.changePassword}</h3>
+          <input
+            type="password"
+            value={oldPassword}
+            onChange={(e) => setOldPassword(e.target.value)}
+            placeholder={t.profile.oldPasswordPlaceholder}
+            autoComplete="current-password"
+            aria-label={t.profile.oldPassword}
+          />
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder={t.profile.newPasswordPlaceholder}
+            minLength={6}
+            autoComplete="new-password"
+            aria-label={t.profile.newPassword}
+          />
           <button
             type="button"
             className="btn-primary"
             disabled={passwordBusy || !oldPassword.trim() || !newPassword.trim()}
             onClick={() => { void handleChangePassword() }}
           >
-            {passwordBusy ? t.common.saving : 'Update Password'}
+            {passwordBusy ? t.common.saving : t.profile.updatePassword}
           </button>
           {passwordNotice ? <p className="subtle">{passwordNotice}</p> : null}
         </article>
 
         {/* Account actions */}
         <article className="card stack" style={{ maxWidth: '100%', width: '100%', marginTop: '1rem' }}>
-          <h3>Account</h3>
+          <h3>{t.profile.account}</h3>
 
           <button
             type="button"
@@ -239,12 +212,12 @@ export function ProfileEdit({
                 onClick={() => setDeleteConfirm(true)}
                 style={{ width: '100%' }}
               >
-                Delete Account
+                {t.profile.deleteAccount}
               </button>
             ) : (
               <div className="stack gap-sm">
                 <p className="subtle" style={{ margin: 0, color: '#ef4444' }}>
-                  Are you sure? This action cannot be undone.
+                  {t.profile.deleteConfirm}
                 </p>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <button
@@ -254,7 +227,7 @@ export function ProfileEdit({
                     onClick={() => { void handleDeleteAccount() }}
                     style={{ flex: 1 }}
                   >
-                    {deleteBusy ? 'Deleting…' : 'Yes, Delete'}
+                    {deleteBusy ? t.profile.deleting : t.profile.yesDelete}
                   </button>
                   <button
                     type="button"
@@ -262,7 +235,7 @@ export function ProfileEdit({
                     onClick={() => setDeleteConfirm(false)}
                     style={{ flex: 1 }}
                   >
-                    Cancel
+                    {t.common.cancel}
                   </button>
                 </div>
               </div>

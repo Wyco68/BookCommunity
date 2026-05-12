@@ -29,10 +29,16 @@ export interface UseAuthReturn {
 export function useAuth(): UseAuthReturn {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const [language, setLanguage] = useState<Language>(() => {
+  const [language, setLanguageRaw] = useState<Language>(() => {
     const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
-    return saved === 'my' ? 'my' : 'en'
+    if (saved === 'de' || saved === 'my') return saved
+    return 'en'
   })
+
+  const setLanguage = useCallback((lang: Language) => {
+    setLanguageRaw(lang)
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
+  }, [])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [email, setEmail] = useState('')

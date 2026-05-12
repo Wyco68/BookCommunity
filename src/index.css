@@ -1,61 +1,71 @@
+/* ═══════════════════════════════════════════════════════════════════
+   BookCom Design System — Tesla-inspired, dark mode
+   DESIGN.md color palette + typography rules
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── 1. Design Tokens ──────────────────────────────────────────── */
 :root {
+  /* Brand */
   --electric-blue: #3E6AE1;
-  --pure-white: #FFFFFF;
-  --light-ash: #F4F4F4;
-  --carbon-dark: #171A20;
-  --graphite: #393C41;
-  --pewter: #5C5E62;
-  --silver-fog: #8E8E8E;
---cloud-gray: #EEEEEE;
-  --pale-silver: #D0D1D2;
-  
-  --dark-bg: #121212;
-  --dark-surface: #1e1e1e;
-  --dark-card: #252525;
-  --dark-border: #3a3a3a;
-  
-  --dark-border-subtle: rgba(255, 255, 255, 0.1);
-  
-  --brand: var(--electric-blue);
-  --brand-soft: rgba(62, 106, 225, 0.15);
---brand-deep: #2d4a9e;
-  
-  --black: var(--pure-white);
-  --white: var(--dark-bg);
-  
-  --text-primary: var(--pure-white);
-  --text-secondary: var(--silver-fog);
-  --text-muted: var(--pewter);
-  
-  --line: var(--dark-border);
-  --line-strong: #4a4a4a;
-  --card-bg: var(--dark-card);
-  
-  --hero-bg: var(--carbon-dark);
-  --surface: var(--dark-surface);
-  --surface-alt: var(--dark-card);
-  
-  --shadow-sm: none;
-  --shadow-md: none;
-  
+  --brand-deep: #2d4a9e;
+  --brand-soft: rgba(62, 106, 225, 0.12);
+
+  /* Surfaces (dark mode) */
+  --bg: #0e0e10;
+  --surface: #18181b;
+  --surface-raised: #1e1f23;
+  --surface-overlay: #27272a;
+
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-interactive: rgba(255, 255, 255, 0.18);
+
+  /* Text — DESIGN.md hierarchy */
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-placeholder: #52525b;
+
+  /* Semantic */
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.1);
+
+  /* Radius — DESIGN.md: 4px interactive, 12px cards */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
   --radius-full: 9999px;
---radius-lg: 4px;
-  --radius-md: 4px;
-  --radius-sm: 4px;
-  
-  font-family: -apple-system, Arial, sans-serif;
+
+  /* Spacing — 8px base unit */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+
+  /* Typography — DESIGN.md: only 400 + 500 */
+  font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
   line-height: 1.43;
   font-weight: 400;
+  font-size: 14px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Motion — DESIGN.md: 0.33s for all interactive states */
+  --transition: 0.33s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ─── 2. Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
 
 *::selection {
-  color: var(--pure-white);
+  color: #fff;
   background: var(--electric-blue);
 }
 
@@ -66,10 +76,35 @@ html, body, #root {
 body {
   margin: 0;
   color: var(--text-primary);
-  background: var(--dark-bg);
+  background: var(--bg);
 }
 
+/* ─── 3. Typography ─────────────────────────────────────────────── */
+h1, h2, h3 {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: normal;
+}
 
+h1 { font-size: 2rem; line-height: 1.15; }
+h2 { font-size: 1.25rem; line-height: 1.2; }
+h3 { font-size: 1.06rem; line-height: 1.25; }
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--electric-blue);
+}
+
+.subtle { margin: 0; color: var(--text-secondary); font-weight: 400; font-size: 0.875rem; }
+.muted  { margin: 0; color: var(--text-muted); font-weight: 400; font-size: 0.82rem; }
+.error  { margin: 0; color: var(--danger); font-size: 0.875rem; padding: var(--space-3); border: 1px solid rgba(239,68,68,0.25); border-radius: var(--radius-xs); background: var(--danger-soft); }
+
+/* ─── 4. Layout Primitives ──────────────────────────────────────── */
 .shell {
   max-width: 1440px;
   margin: 0 auto;
@@ -80,213 +115,93 @@ body {
   min-height: 100vh;
 }
 
-/* Header navigation links */
-.sidebar-link {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
+.stack    { display: grid; gap: var(--space-4); }
+.gap-sm   { gap: var(--space-2); }
+.grid     { display: grid; gap: var(--space-4); }
+.span-full { grid-column: 1 / -1; }
+
+/* ─── 5. Links ──────────────────────────────────────────────────── */
+a {
   color: var(--text-secondary);
   text-decoration: none;
-  font-weight: 460;
-  font-size: 1rem;
+  transition: color var(--transition);
 }
+a:hover { color: var(--electric-blue); }
 
-.sidebar-link:hover {
-  background: var(--brand-soft);
-  color: var(--electric-blue);
-}
-
-.sidebar-link.active {
-  background: var(--brand-soft);
-  color: var(--electric-blue);
-  font-weight: 600;
-}
-
-.sidebar-link svg {
-  width: 20px;
-  height: 20px;
-  fill: var(--text-secondary);
-}
-
-.sidebar-link:hover svg,
-.sidebar-link.active svg {
-  fill: var(--electric-blue);
-}
-
-/* Mobile responsive */
-@media (max-width: 500px) {
-  .shell {
-    grid-template-columns: 1fr;
-  }
-  .feed-header { padding-left: 1rem; }
-}
-
-/* Feed */
-.feed {
-  min-height: 100vh;
-}
-
-.feed-header {
-  position: sticky;
-  top: 0;
-  padding: 0.75rem 1rem;
-  background: var(--dark-surface);
-  border-bottom: 1px solid var(--dark-border);
-  z-index: 5;
-}
-
-.feed-title {
-  font-size: 1.25rem;
-  font-weight: 500;
-  margin: 0;
-  color: var(--text-primary);
-}
-
-.feed-content {
-  padding: 1rem;
-  background: var(--dark-bg);
-  min-height: 100vh;
-}
-
-.feed-post {
-  padding: 1rem;
-  border-bottom: 1px solid var(--dark-border);
-  color: var(--text-secondary);
-}
-
-.feed-post:hover {
-  background: var(--dark-card);
-}
-
-.feed-tab {
-  flex: 1;
-  padding: 0.75rem;
-  text-align: center;
-  font-weight: 500;
-  color: var(--pewter);
-  border-bottom: 3px solid transparent;
-  background: none;
-  cursor: pointer;
-}
-
-.feed-tab:hover {
-  background: var(--dark-card);
-}
-
-.feed-tab-active {
-  border-bottom-color: var(--electric-blue);
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-/* Buttons - Dark */
+/* ─── 6. Buttons — DESIGN.md: 4px radius, weight 500, 0.33s ──── */
 button {
   font: inherit;
   font-weight: 500;
+  font-size: 0.875rem;
   cursor: pointer;
   border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  transition: all 0.33s ease;
+  border-radius: var(--radius-xs);
+  padding: var(--space-2) var(--space-4);
+  min-height: 36px;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-.btn-primary {
+/* Primary CTA — Electric Blue */
+.primary, .btn-primary {
   background: var(--electric-blue);
-  color: var(--pure-white);
+  color: #fff;
 }
-
+.primary:hover:not(:disabled),
 .btn-primary:hover:not(:disabled) {
   background: var(--brand-deep);
 }
 
-/* .primary used by CreateSectionButton */
-.primary {
-  background: var(--electric-blue);
-  color: var(--pure-white);
-  font-weight: 500;
-}
-
-.primary:hover:not(:disabled) {
-  background: var(--brand-deep);
-}
-
-/* .secondary used by SearchButton */
-.secondary {
-  background: var(--electric-blue);
-  color: var(--cloud-gray);
-  border: 1px solid var(--dark-border);
-}
-
-.secondary:hover:not(:disabled) {
-  background: var(--brand-soft);
-}
-
-.btn-secondary {
-  background: var(--dark-surface);
+/* Secondary */
+.secondary, .btn-secondary {
+  background: var(--surface-raised);
   color: var(--text-primary);
-  border: 1px solid var(--dark-border);
+  border: 1px solid var(--border-strong);
 }
-
+.secondary:hover:not(:disabled),
 .btn-secondary:hover:not(:disabled) {
   background: var(--brand-soft);
-}
-
-.btn-ghost {
-  background: transparent;
+  border-color: var(--electric-blue);
   color: var(--electric-blue);
-  padding: 0.5rem 1rem;
 }
 
+/* Ghost */
+.ghost, .btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: var(--space-2) var(--space-3);
+}
+.ghost:hover:not(:disabled),
 .btn-ghost:hover:not(:disabled) {
-  background: var(--brand-soft);
-}
-
-.btn-outline {
-  background: transparent;
   color: var(--electric-blue);
-  border: 1px solid var(--electric-blue);
-}
-
-.btn-outline:hover:not(:disabled) {
   background: var(--brand-soft);
 }
 
-/* Danger button */
+/* Danger */
 .btn-danger {
   background: transparent;
-  color: #ef4444;
-  border: 1px solid #ef4444;
+  color: var(--danger);
+  border: 1px solid var(--danger);
 }
-
 .btn-danger:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.1);
+  background: var(--danger-soft);
 }
 
-/* Cards - Tesla style (white, minimal) */
-.card {
-  background: var(--dark-card);
-  border: 1px solid var(--dark-border);
-  border-radius: 4px;
-  padding: 1rem;
-}
-
-/* Input fields - Dark */
+/* ─── 7. Inputs & Forms ─────────────────────────────────────────── */
 input, textarea {
   font: inherit;
   width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--dark-border);
-  border-radius: 4px;
-  background: var(--dark-surface);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
   color: var(--text-primary);
   font-weight: 400;
+  transition: border-color var(--transition);
 }
 
 input:focus, textarea:focus {
@@ -295,15 +210,79 @@ input:focus, textarea:focus {
 }
 
 input::placeholder, textarea::placeholder {
-  color: var(--text-muted);
+  color: var(--text-placeholder);
 }
 
-/* Avatars */
+select {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+select:focus { outline: none; border-color: var(--electric-blue); }
+select option { background: var(--surface); color: var(--text-primary); }
+
+.field { display: flex; flex-direction: column; gap: var(--space-2); }
+.field-label { font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.field-hint { font-size: 0.75rem; color: var(--text-muted); }
+
+/* ─── 8. Cards — DESIGN.md: 12px radius, no shadow, no border ── */
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+/* ─── 9. Auth Card ──────────────────────────────────────────────── */
+.auth-card {
+  max-width: 400px;
+  margin: 6vh auto;
+  padding: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+.auth-card h1 { font-size: 1.75rem; line-height: 1.15; }
+
+/* Auth mode switcher */
+.auth-switch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.auth-switch-option {
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.875rem;
+  min-height: 32px;
+}
+
+.auth-switch-option-active {
+  background: var(--electric-blue);
+  color: #fff;
+}
+
+/* ─── 10. Avatars ───────────────────────────────────────────────── */
 .avatar {
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
 }
-
 .avatar-xs { width: 24px; height: 24px; }
 .avatar-sm { width: 32px; height: 32px; }
 .avatar-md { width: 40px; height: 40px; }
@@ -315,213 +294,20 @@ input::placeholder, textarea::placeholder {
   justify-content: center;
   background: var(--brand-soft);
   color: var(--text-muted);
-  font-weight: 540;
-  border-radius: 50%;
-}
-
-/* Typography */
-h1, h2, h3 {
-  font-weight: 460;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-h1 {
-  font-size: 2.5rem;
-  line-height: 0.96;
-  letter-spacing: -0.02em;
-}
-
-h2 {
-  font-size: 1.5rem;
-  line-height: 0.96;
-}
-
-h3 {
-  font-size: 1.25rem;
-  line-height: 1.14;
-}
-
-.text-secondary {
-  color: var(--text-secondary);
-}
-
-.text-muted {
-  color: var(--text-muted);
-}
-
-/* Select dropdowns - Dark */
-select {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid var(--dark-border);
-  border-radius: 4px;
-  background: var(--dark-surface);
-  color: var(--text-primary);
-  font: inherit;
-  font-weight: 400;
-  cursor: pointer;
-}
-
-select:focus {
-  outline: none;
-  border-color: var(--electric-blue);
-}
-
-select option {
-  background: var(--dark-surface);
-  color: var(--text-primary);
-}
-
-/* Links */
-a {
-  color: var(--text-muted);
-  text-decoration: underline;
-}
-
-a:hover {
-  text-decoration: none;
-}
-
-/* Field - Dark */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.field-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-/* Progress */
-.progress-track {
-  height: 4px;
-  background: var(--dark-border);
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: var(--lavender-glow);
-}
-
-/* Auth switch - Dark */
-.auth-switch {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.25rem;
-  padding: 0.2rem;
-  border-radius: 4px;
-  border: 1px solid var(--dark-border-subtle);
-  background: var(--dark-surface);
-}
-
-.auth-switch-option {
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-muted);
   font-weight: 500;
-  padding-block: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.auth-switch-option-active {
-  background: var(--electric-blue);
-  color: var(--pure-white);
-}
-
-/* Identity row - Dark */
+/* ─── 11. Identity Row ──────────────────────────────────────────── */
 .identity-row {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem;
-  border: 1px solid var(--dark-border);
-  border-radius: 8px;
-  background: var(--dark-surface);
-}
-
-/* Grid */
-.grid {
-  display: grid;
-  gap: 1rem;
-}
-
-/* Empty */
-.empty {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--text-muted);
-}
-
-/* Hero gradient for branding */
-.hero-gradient {
-  background: linear-gradient(180deg, #1b1938 0%, #2d2a4a 50%, var(--dark-bg) 100%);
-}
-
-/* Accent badge - Dark */
-.pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  background: var(--lavender-glow);
-  color: var(--hero-bg);
-}
-
-.pill-default {
-  background: var(--dark-surface);
-  color: var(--lavender-glow);
-  border: 1px solid var(--dark-border);
-}
-
-.field-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Progress */
-.progress-track {
-  height: 4px;
-  background: var(--white);
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: var(--dark-surface);
-}
-
-/* List */
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.list-item {
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--dark-border);
-}
-
-/* Identity row */
-.identity-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem;
-  border: 1px solid var(--dark-border);
-  border-radius: 8px;
-  background: var(--lavender-glow);
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
 }
 
 .header-identity-link {
@@ -529,216 +315,324 @@ a:hover {
   color: inherit;
 }
 
-/* Grid */
-.grid {
-  display: grid;
-  gap: 1rem;
-}
-
-/* Empty */
-.empty {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--text-primary);
-}
-
-/* Hero gradient for branding */
-.hero-gradient {
-  background: linear-gradient(180deg, #1b1938 0%, #2d2a4a 50%, var(--lavender-glow) 100%);
-}
-
-/* Accent badge */
+/* ─── 12. Pills & Badges ───────────────────────────────────────── */
 .pill {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.7rem;
+  font-weight: 500;
   text-transform: uppercase;
-  background: var(--dark-surface);
-  color: var(--text-primary);
+  letter-spacing: 0.04em;
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
 }
 
-.pill-default {
-  background: var(--white);
-  color: var(--text-primary);
-  border: 1px solid var(--dark-border);
-}
-
-/* Profile card */
-.profile-card {
-  border: 1px solid var(--dark-border);
-  border-radius: 8px;
-  background: var(--lavender-glow);
-  padding: 0.85rem;
-}
-
-.profile-row {
-  display: flex;
+.category-pill {
+  display: inline-flex;
   align-items: center;
-  gap: 0.85rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--brand-soft);
+  color: var(--electric-blue);
+  border: 1px solid rgba(62, 106, 225, 0.2);
 }
 
-/* Session list */
+/* ─── 13. Empty / Centered ──────────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: var(--space-10) var(--space-4);
+  color: var(--text-muted);
+}
+
+.centered {
+  text-align: center;
+  padding: var(--space-10) var(--space-4);
+}
+
+/* ─── 14. Progress Track ────────────────────────────────────────── */
+.progress-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--electric-blue);
+  border-radius: var(--radius-full);
+  transition: width var(--transition);
+}
+
+/* ─── 15. Like Button ───────────────────────────────────────────── */
+.like-button {
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  padding: var(--space-1) var(--space-3);
+  min-height: 28px;
+}
+
+.like-button-active {
+  background: var(--brand-soft);
+  color: var(--electric-blue);
+  border-color: rgba(62, 106, 225, 0.3);
+}
+
+/* ─── 16. Feed (Profile page) ───────────────────────────────────── */
+.feed { min-height: 100vh; }
+.feed-header {
+  position: sticky;
+  top: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 5;
+}
+.feed-title { font-size: 1.06rem; font-weight: 500; margin: 0; }
+.feed-content { padding: var(--space-4); background: var(--bg); }
+
+/* ─── 17. Session List ──────────────────────────────────────────── */
 .session-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 0.7rem;
+  gap: var(--space-3);
 }
 
 .session-item {
-  border: 1px solid var(--dark-border);
-  border-radius: 16px;
-  background: var(--lavender-glow);
-  padding: 0.8rem;
-}
-
-.session-item-selected {
-  border-color: var(--lavender-glow);
-  box-shadow: inset 0 0 0 2px var(--lavender-glow);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  padding: var(--space-3);
 }
 
 .session-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: var(--space-2);
 }
 
-/* Pill badge */
-.pill {
-  border: 1px solid var(--dark-border);
-  background: var(--white);
-  color: var(--text-primary);
-  border-radius: 8px;
-  padding: 0.25rem 0.625rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+/* ─── 18. Session Cards ─────────────────────────────────────────── */
+.session-item.session-card {
+  border-radius: var(--radius-lg);
+  padding: 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
 }
 
-/* Progress */
-.progress-row {
+.session-card-cols {
   display: grid;
-  gap: 0.35rem;
+  grid-template-columns: 2fr 3fr;
+  gap: 0;
+  min-height: 164px;
 }
 
-.progress-label {
-  font-size: 0.875rem;
-  color: var(--text-primary);
+.session-card-col-cover {
+  min-height: 164px;
+  overflow: hidden;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Error */
-.error {
+.session-card-cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.session-card-cover-empty {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-content: center;
+}
+
+.session-card-no-cover-icon {
+  font-size: 2.5rem;
+  opacity: 0.2;
+}
+
+.session-card-col-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.session-card-title {
   margin: 0;
-  color: #d45656;
-  background: var(--white);
-  border: 1px solid #d45656;
-  border-radius: 8px;
-  padding: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
-/* Detail layout */
+.session-card-author { margin: 0; font-size: 0.82rem; color: var(--text-secondary); }
+.session-card-desc { font-size: 0.82rem; line-height: 1.4; color: var(--text-muted); margin: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.session-card-hint { margin: 0; font-size: 0.75rem; color: var(--text-muted); }
+
+.session-card-cta {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  padding: var(--space-1) var(--space-3);
+  min-height: 28px;
+}
+
+.session-card-clickable {
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+.session-card-clickable:hover {
+  border-color: var(--electric-blue);
+}
+
+.session-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.session-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1) var(--space-3);
+}
+
+.session-meta-item { display: grid; gap: 2px; }
+.session-meta-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
+.session-meta-value { font-size: 0.875rem; color: var(--text-primary); font-weight: 500; }
+
+/* ─── 19. Session Detail ────────────────────────────────────────── */
 .detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.8rem;
+  gap: var(--space-3);
 }
 
-.detail-grid {
-  display: grid;
-  gap: 1rem;
+.detail-stat-pill {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
+
+.detail-grid { display: grid; gap: var(--space-4); }
+.detail-two-col { display: grid; gap: var(--space-4); }
 
 .detail-pane {
-  border: 1px solid var(--dark-border);
-  border-radius: 16px;
-  background: var(--lavender-glow);
-  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-4);
 }
 
-/* Member/comment lists */
-.member-list,
-.comment-list {
-  margin: 0;
-  padding: 0;
+/* ─── 20. Member / Comment Lists ────────────────────────────────── */
+.member-list, .comment-list {
+  margin: 0; padding: 0;
   list-style: none;
   display: grid;
-  gap: 0.55rem;
+  gap: var(--space-2);
 }
 
-.member-item,
-.comment-item {
-  border: 1px solid var(--dark-border);
-  border-radius: 8px;
-  padding: 0.625rem;
-  background: var(--lavender-glow);
+.member-item, .comment-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  background: var(--surface-raised);
 }
 
-.member-head,
-.comment-head {
+.member-head, .comment-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .comment-body {
-  margin: 0.4rem 0;
+  margin: var(--space-2) 0;
   white-space: pre-wrap;
   color: var(--text-primary);
-}
-
-/* Like button */
-.like-button {
-  background: var(--white);
-  color: var(--text-primary);
-  border: 1px solid var(--dark-border);
   font-size: 0.875rem;
-  padding: 0.375rem 0.75rem;
+  line-height: 1.5;
 }
 
-.like-button-active {
-  background: var(--dark-surface);
-  color: var(--text-primary);
-  border-color: var(--text-primary);
+/* Member progress */
+.session-user-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
 }
 
-/* Search toolbar */
+.session-user-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.session-col-label { font-size: 0.65rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.session-col-value { font-size: 0.875rem; font-weight: 500; color: var(--text-primary); line-height: 1.25; }
+.session-col-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.member-item.member-progress-row { padding: 0; overflow: hidden; }
+.member-item.member-progress-row .member-progress-cols.session-user-cols { margin: 0; border: none; border-radius: 0; }
+
+/* ─── 21. Profile ───────────────────────────────────────────────── */
+.profile-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-4);
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.profile-upload-stack { flex: 1; min-width: 0; }
+
+/* ─── 22. Search Toolbar ────────────────────────────────────────── */
 .search-toolbar {
   display: grid;
-  gap: 0.75rem;
+  gap: var(--space-3);
   align-items: end;
 }
 
-/* Sections grid */
-.sections-grid {
-  display: grid;
-  gap: 1rem;
-  align-items: start;
+/* ─── 23. Danger Zone ───────────────────────────────────────────── */
+.danger-zone {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  margin-top: var(--space-2);
 }
 
-/* Full width */
-.span-full {
-  grid-column: 1 / -1;
+/* ─── Responsive: mobile ≤640 ────────────────────────────────────── */
+@media (max-width: 640px) {
+  .session-card-cols { grid-template-columns: 1fr; min-height: auto; }
+  .session-card-col-cover { min-height: 140px; max-height: 180px; border-right: none; border-bottom: 1px solid var(--border); }
+  .session-meta-grid, .session-user-cols { grid-template-columns: 1fr; }
+  .session-heading, .detail-header, .member-head, .comment-head { flex-wrap: wrap; }
 }
 
-/* Auth card */
-.auth-card {
-  max-width: 400px;
-  margin: 4vh auto;
-  padding: 2rem;
-  border: 1px solid var(--dark-border);
-  border-radius: 16px;
-  background: var(--lavender-glow);
-}
-
-.auth-card h1 {
-  font-size: 2rem;
-  line-height: 1;
+@media (max-width: 500px) {
+  .feed-header { padding-left: var(--space-4); }
 }

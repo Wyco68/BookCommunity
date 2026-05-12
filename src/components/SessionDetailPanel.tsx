@@ -145,7 +145,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
               <p className="subtle">{selectedSession.book_author}</p>
             </div>
             <span className="detail-stat-pill">
-              {readChaptersByUsers > 0 ? `${readChaptersByUsers} chapters read by members` : null}
+              {readChaptersByUsers > 0 ? t.sessions.chaptersReadByMembers(readChaptersByUsers) : null}
             </span>
           </div>
 
@@ -154,6 +154,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
             <section className="detail-pane stack">
               {canUploadMedia ? (
                 <MediaUpload
+                  t={t}
                   onUpload={onUploadMedia}
                   uploading={mediaUploading}
                   error={mediaError}
@@ -162,7 +163,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                 />
               ) : (
                 <p className="subtle">
-                  All {mediaLimit} chapter{mediaLimit !== 1 ? 's' : ''} uploaded.
+                  {t.sessions.allChaptersUploaded(mediaLimit)}
                 </p>
               )}
             </section>
@@ -171,36 +172,35 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
           {/* Owner management panel */}
           {selectedIsOwner && (onUpdateVisibility ?? onRemoveMember ?? onDeleteSession) ? (
             <section className="detail-pane stack owner-panel">
-              <h3 className="owner-panel-title">Manage Session</h3>
+              <h3 className="owner-panel-title">{t.manage.title}</h3>
 
               {onUpdateVisibility ? (
                 <div className="owner-panel-row">
-                  <label className="field" style={{ flex: 1, margin: 0 }}>
-                    <span>Visibility</span>
-                    <select
-                      value={visibilityDraft}
-                      onChange={(e) => setVisibilityDraft(e.target.value as 'public' | 'private')}
-                    >
-                      <option value="public">Public</option>
-                      <option value="private">Private</option>
-                    </select>
-                  </label>
+                  <select
+                    value={visibilityDraft}
+                    onChange={(e) => setVisibilityDraft(e.target.value as 'public' | 'private')}
+                    aria-label={t.manage.visibility}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="public">{t.enums.visibility.public}</option>
+                    <option value="private">{t.enums.visibility.private}</option>
+                  </select>
                   <button
                     type="button"
                     className="secondary"
                     disabled={updatingVisibility || visibilityDraft === selectedSession.visibility}
                     onClick={() => { void onUpdateVisibility(visibilityDraft) }}
                   >
-                    {updatingVisibility ? 'Saving…' : 'Save'}
+                    {updatingVisibility ? t.common.saving : t.common.save}
                   </button>
                 </div>
               ) : null}
 
               {onRemoveMember ? (
                 <div>
-                  <p className="owner-panel-label">Members</p>
+                  <p className="owner-panel-label">{t.manage.members}</p>
                   {sessionMembers.filter((m) => m.user_id !== currentUserId).length === 0 ? (
-                    <p className="subtle">No other members.</p>
+                    <p className="subtle">{t.manage.noOtherMembers}</p>
                   ) : (
                     <ul className="member-list owner-member-list">
                       {sessionMembers
@@ -226,7 +226,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                                 disabled={removingMemberId === member.user_id}
                                 onClick={() => { void onRemoveMember(member.user_id) }}
                               >
-                                {removingMemberId === member.user_id ? 'Removing…' : 'Remove'}
+                                {removingMemberId === member.user_id ? t.manage.removing : t.manage.remove}
                               </button>
                             </li>
                           )
@@ -239,7 +239,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
               {onDeleteSession ? (
                 <div className="danger-zone">
                   <button type="button" className="btn-danger" onClick={onDeleteSession}>
-                    Delete Session
+                    {t.manage.deleteSession}
                   </button>
                 </div>
               ) : null}
@@ -251,19 +251,18 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
             <section className="detail-pane stack detail-my-reading">
               <h3>{t.sessions.yourReading}</h3>
               <div className="detail-my-reading-row">
-                <label className="field">
-                  <span>{t.sessions.updateChapter}</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={maxProgressChapter ?? selectedSession.total_chapters}
-                    value={myProgressChapterDraft}
-                    onChange={(event) => {
-                      const n = Number(event.target.value)
-                      onMyProgressChapterDraftChange(Number.isNaN(n) ? 1 : n)
-                    }}
-                  />
-                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={maxProgressChapter ?? selectedSession.total_chapters}
+                  value={myProgressChapterDraft}
+                  onChange={(event) => {
+                    const n = Number(event.target.value)
+                    onMyProgressChapterDraftChange(Number.isNaN(n) ? 1 : n)
+                  }}
+                  aria-label={t.sessions.updateChapter}
+                  style={{ flex: 1 }}
+                />
                 <button
                   type="button"
                   className="secondary detail-save-progress-btn"
@@ -289,7 +288,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
             </section>
           ) : null}
 
-          {/* Chapter viewer — fixed-height section above discussion to prevent layout shift */}
+          {/* Chapter viewer */}
           {selectedIsMember && maxChapter > 0 ? (
             <section className="detail-pane chapter-viewer-fixed">
               <div className="chapter-viewer-nav">
@@ -299,10 +298,10 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                   disabled={!onPrevChapter || activeChapter <= 1 || loadingChapter}
                   onClick={() => { void onPrevChapter?.() }}
                 >
-                  ← Prev
+                  {t.media.prev}
                 </button>
                 <span className="chapter-viewer-label">
-                  Chapter {activeChapter} <span className="subtle">/ {maxChapter}</span>
+                  {t.media.chapter(activeChapter)} <span className="subtle">/ {maxChapter}</span>
                 </span>
                 <button
                   type="button"
@@ -310,13 +309,13 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                   disabled={!onNextChapter || activeChapter >= maxChapter || loadingChapter}
                   onClick={() => { void onNextChapter?.() }}
                 >
-                  Next →
+                  {t.media.next}
                 </button>
               </div>
 
               <div className="chapter-viewer-body">
                 {loadingChapter ? (
-                  <div className="chapter-viewer-loading">Loading chapter…</div>
+                  <div className="chapter-viewer-loading">{t.media.loadingChapter}</div>
                 ) : activeChapterMedia && activeChapterUrl ? (
                   <div className="chapter-viewer-content">
                     {activeChapterMedia.media_type === 'image' ? (
@@ -340,14 +339,14 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                           rel="noopener noreferrer"
                           className="secondary"
                         >
-                          Open / Download
+                          {t.media.openDownload}
                         </a>
                       </div>
                     )}
                   </div>
                 ) : (
                   <div className="chapter-viewer-empty">
-                    <p className="subtle">No content for this chapter yet.</p>
+                    <p className="subtle">{t.sessions.noContentForChapter}</p>
                   </div>
                 )}
               </div>
@@ -444,14 +443,12 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
               ) : (
                 <>
                   <form className="stack" onSubmit={onSubmitComment}>
-                    <label className="field">
-                      <span>{t.sessions.yourComment}</span>
-                      <textarea
-                        value={commentDraft}
-                        onChange={(event) => onCommentDraftChange(event.target.value)}
-                        placeholder={t.sessions.commentPlaceholder}
-                      />
-                    </label>
+                    <textarea
+                      value={commentDraft}
+                      onChange={(event) => onCommentDraftChange(event.target.value)}
+                      placeholder={t.sessions.commentPlaceholder}
+                      aria-label={t.sessions.yourComment}
+                    />
                     <button type="submit" className="primary" disabled={postingComment}>
                       {postingComment ? t.common.posting : t.sessions.postComment}
                     </button>
