@@ -41,7 +41,6 @@ export function AuthView({
         <div>
           <p className="eyebrow">BookCom</p>
           <h1>{t.auth.welcome}</h1>
-          <p className="subtle">{t.auth.subtitle}</p>
         </div>
 
         <form className="stack" onSubmit={onSubmit}>
@@ -62,27 +61,23 @@ export function AuthView({
             </button>
           </div>
 
-          <label className="field">
-            <span>{t.auth.email}</span>
-            <input
-              type="email"
-              value={authEmail}
-              onChange={(event) => onAuthEmailChange(event.target.value)}
-              placeholder={t.auth.emailPlaceholder}
-              autoComplete="email"
-            />
-          </label>
+          <input
+            type="email"
+            value={authEmail}
+            onChange={(event) => onAuthEmailChange(event.target.value)}
+            placeholder={t.auth.emailPlaceholder}
+            autoComplete="email"
+            aria-label={t.auth.email}
+          />
 
-          <label className="field">
-            <span>{t.auth.password}</span>
-            <input
-              type="password"
-              value={authPassword}
-              onChange={(event) => onAuthPasswordChange(event.target.value)}
-              placeholder={t.auth.passwordPlaceholder}
-              autoComplete={authMode === 'sign-in' ? 'current-password' : 'new-password'}
-            />
-          </label>
+          <input
+            type="password"
+            value={authPassword}
+            onChange={(event) => onAuthPasswordChange(event.target.value)}
+            placeholder={t.auth.passwordPlaceholder}
+            autoComplete={authMode === 'sign-in' ? 'current-password' : 'new-password'}
+            aria-label={t.auth.password}
+          />
 
           {authError ? <p className="error">{authError}</p> : null}
 
@@ -98,6 +93,13 @@ export function AuthView({
             onClick={() => onLanguageChange('en')}
           >
             EN
+          </button>
+          <button
+            type="button"
+            className={`auth-switch-option auth-switch-option-mini ${language === 'de' ? 'auth-switch-option-active' : ''}`}
+            onClick={() => onLanguageChange('de')}
+          >
+            DE
           </button>
           <button
             type="button"

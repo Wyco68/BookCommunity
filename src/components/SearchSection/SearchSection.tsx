@@ -33,8 +33,7 @@ export function SearchSection({
   return (
     <section className="page-tight">
       <article className="card page-tight-card">
-        <h2>Search</h2>
-        <p className="subtle">Find reading sessions by title or author.</p>
+        <h2>{t.nav.search}</h2>
         <form
           className="search-toolbar page-tight-toolbar"
           onSubmit={(event) => {
@@ -54,7 +53,7 @@ export function SearchSection({
         {hasSearched ? (
           <>
             <hr className="page-tight-rule" />
-            <h3>Search Results</h3>
+            <h3>{t.sessions.searchResults}</h3>
             <SessionListPanel {...listProps} showControls={false} embedded />
           </>
         ) : null}

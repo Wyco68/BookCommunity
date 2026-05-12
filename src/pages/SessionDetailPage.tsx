@@ -16,7 +16,8 @@ const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
 function getLanguage(): Language {
   const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY)
-  return saved === 'my' ? 'my' : 'en'
+  if (saved === 'de' || saved === 'my') return saved
+  return 'en'
 }
 
 interface SessionDetailPageProps {
@@ -346,7 +347,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   if (loadingSession) {
     return (
       <section className="stack">
-        <p className="subtle">Loading session…</p>
+        <p className="subtle">{t.sessions.loadingSession}</p>
       </section>
     )
   }
@@ -355,9 +356,9 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
     return (
       <section className="stack">
         <article className="card stack">
-          <p className="subtle">Session not found.</p>
+          <p className="subtle">{t.sessions.sessionNotFound}</p>
           <button type="button" className="btn-back-compact" onClick={() => navigate(-1)}>
-            ⬅ back
+            ⬅ {t.common.back}
           </button>
         </article>
       </section>
@@ -368,7 +369,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
     <section className="stack">
       <div className="detail-back-bar">
         <button type="button" className="btn-back-compact" onClick={() => navigate(-1)}>
-          ⬅ back
+          ⬅ {t.common.back}
         </button>
       </div>
 
@@ -437,9 +438,9 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
 
       {showDeleteConfirm ? (
         <ConfirmModal
-          message="Delete this session? This cannot be undone and will remove all members, media, and progress."
-          confirmLabel={deletingSession ? 'Deleting…' : 'Delete'}
-          cancelLabel="Cancel"
+          message={t.manage.deleteConfirm}
+          confirmLabel={deletingSession ? t.common.working : t.common.delete}
+          cancelLabel={t.common.cancel}
           dangerous
           onConfirm={() => {
             setShowDeleteConfirm(false)

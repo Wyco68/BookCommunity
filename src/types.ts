@@ -89,6 +89,7 @@ export type MediaType = 'image' | 'book_file'
 export interface Category {
   id: number
   name: string
+  description?: string | null
 }
 
 export interface SessionMedia {

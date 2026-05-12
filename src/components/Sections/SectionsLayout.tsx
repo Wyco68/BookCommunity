@@ -11,6 +11,7 @@ interface SectionsLayoutProps {
 }
 
 export function SectionsLayout({
+  t,
   listProps,
 }: SectionsLayoutProps) {
   const hasJoinedSessions = listProps.filteredSessions.length > 0 || listProps.loadingSessions
@@ -18,8 +19,7 @@ export function SectionsLayout({
   return (
     <section className="stack">
       <article className="card stack">
-        <h2>Home</h2>
-        <p className="subtle">Your joined reading sessions.</p>
+        <h2>{t.sessions.home}</h2>
       </article>
 
       {hasJoinedSessions ? (
@@ -27,10 +27,7 @@ export function SectionsLayout({
       ) : (
         <article className="card">
           <div className="empty">
-            <p className="subtle" style={{ margin: 0 }}>You haven't joined any sessions yet.</p>
-            <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.875rem' }}>
-              Use the <strong>Search</strong> tab to discover and join reading sessions.
-            </p>
+            <p className="subtle" style={{ margin: 0 }}>{t.sessions.noSessions}</p>
           </div>
         </article>
       )}
