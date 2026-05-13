@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Comment, CommentLike, Profile, ProgressUpdate, SessionJoinRequest, SessionMembership } from '../types'
 import { resolveAvatarUrlMap, isRemoteUrl } from '../lib/avatar'
+import { checkRateLimit, recordAction, COMMENT_RATE_LIMIT } from '../lib/rateLimit'
 
 export interface UseSessionDetailReturn {
   comments: Comment[]
@@ -135,6 +136,12 @@ export function useSessionDetail(): UseSessionDetailReturn {
   const submitComment = useCallback(async (_sessionId: string, userId: string, body: string) => {
     if (!body.trim()) return
 
+    const rateCheck = checkRateLimit(`comment:${userId}`, COMMENT_RATE_LIMIT)
+    if (!rateCheck.allowed) {
+      setError(`Please wait ${Math.ceil(rateCheck.retryAfterMs / 1000)}s before commenting again`)
+      return
+    }
+
     const { error } = await supabase.from('comments').insert({
       session_id: _sessionId,
       user_id: userId,
@@ -143,6 +150,8 @@ export function useSessionDetail(): UseSessionDetailReturn {
 
     if (error) {
       setError(error.message)
+    } else {
+      recordAction(`comment:${userId}`, COMMENT_RATE_LIMIT.windowMs)
     }
   }, [])
 

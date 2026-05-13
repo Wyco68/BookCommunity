@@ -93,7 +93,7 @@ export function useSessions(): UseSessionsReturn {
     setError(null)
 
     const [sessionsResult, membershipsResult, progressResult, requestsResult] = await Promise.all([
-      supabase.from('reading_sessions').select('*').eq('status_type', 'ongoing').order('created_at', { ascending: false }),
+      supabase.from('reading_sessions').select('id,creator_id,book_title,book_author,total_chapters,description,visibility,join_policy,status_type,cover_image_path,category_id,created_at').eq('status_type', 'ongoing').order('created_at', { ascending: false }),
       supabase.from('session_members').select('session_id,user_id,role').eq('user_id', user.id),
       supabase
         .from('progress_updates')
