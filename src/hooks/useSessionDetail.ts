@@ -4,6 +4,7 @@ import type { Comment, CommentLike, Profile, ProgressUpdate, SessionJoinRequest,
 import { resolveAvatarUrlMap, isRemoteUrl } from '../lib/avatar'
 import { checkRateLimit, recordAction, COMMENT_RATE_LIMIT } from '../lib/rateLimit'
 
+
 export interface UseSessionDetailReturn {
   comments: Comment[]
   likes: CommentLike[]
@@ -33,6 +34,8 @@ export function useSessionDetail(): UseSessionDetailReturn {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const lastLoadRef = useRef<{ sessionId: string; time: number }>({ sessionId: '', time: 0 })
+  // Per-instance set prevents duplicate profile fetches within this hook instance
+  const fetchingProfileIds = useRef(new Set<string>())
 
   const loadDetail = useCallback(async (sessionId: string) => {
     const now = Date.now()
@@ -42,18 +45,20 @@ export function useSessionDetail(): UseSessionDetailReturn {
     setLoading(true)
 
     const [commentsResult, membersResult, progressResult, requestsResult] = await Promise.all([
-      supabase.from('comments').select('id,session_id,user_id,body,is_deleted,created_at').eq('session_id', sessionId).order('created_at'),
-      supabase.from('session_members').select('session_id,user_id,role').eq('session_id', sessionId),
+      supabase.from('comments').select('id,session_id,user_id,body,is_deleted,created_at').eq('session_id', sessionId).order('created_at').limit(500),
+      supabase.from('session_members').select('session_id,user_id,role').eq('session_id', sessionId).limit(500),
       supabase
         .from('progress_updates')
         .select('session_id,user_id,chapter_number,created_at')
         .eq('session_id', sessionId)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(1000),
       supabase
         .from('session_join_requests')
         .select('id,session_id,user_id,status,created_at')
         .eq('session_id', sessionId)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .limit(100),
     ])
 
     if (commentsResult.error || membersResult.error || progressResult.error || requestsResult.error) {
@@ -80,6 +85,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
         .from('comment_likes')
         .select('id,comment_id,user_id,created_at')
         .in('comment_id', commentIds)
+        .limit(commentIds.length * 10)
 
       if (likesResult.error) {
         setError(likesResult.error.message)
@@ -226,34 +232,37 @@ export function useSessionDetail(): UseSessionDetailReturn {
     })
   }, [])
 
-  // Fetch a profile into the cache if not already present (used for realtime new-commenter)
+  // Fetch a profile into the cache if not already present (used for realtime new-commenter).
+  // Uses a ref-based in-flight set to prevent concurrent duplicate requests for the same user.
   const ensureProfile = useCallback(async (userId: string) => {
-    setProfiles((prev) => {
-      if (prev[userId]) return prev
-      return prev
-    })
-    // Read current profiles outside setState to avoid stale closure
-    const result = await supabase
-      .from('profiles')
-      .select('id,display_name,avatar_url')
-      .eq('id', userId)
-      .maybeSingle()
+    if (fetchingProfileIds.current.has(userId)) return
+    fetchingProfileIds.current.add(userId)
 
-    if (!result.data) return
+    try {
+      const result = await supabase
+        .from('profiles')
+        .select('id,display_name,avatar_url')
+        .eq('id', userId)
+        .maybeSingle()
 
-    const p = result.data as Profile
-    const avatarPaths = p.avatar_url && !isRemoteUrl(p.avatar_url) ? [p.avatar_url] : []
-    const resolved = avatarPaths.length > 0 ? await resolveAvatarUrlMap(avatarPaths) : {}
+      if (!result.data) return
 
-    const resolvedProfile: Profile =
-      p.avatar_url && !isRemoteUrl(p.avatar_url) && resolved[p.avatar_url]
-        ? { ...p, avatar_url: resolved[p.avatar_url] }
-        : p
+      const p = result.data as Profile
+      const avatarPaths = p.avatar_url && !isRemoteUrl(p.avatar_url) ? [p.avatar_url] : []
+      const resolved = avatarPaths.length > 0 ? await resolveAvatarUrlMap(avatarPaths) : {}
 
-    setProfiles((prev) => {
-      if (prev[userId]) return prev
-      return { ...prev, [userId]: resolvedProfile }
-    })
+      const resolvedProfile: Profile =
+        p.avatar_url && !isRemoteUrl(p.avatar_url) && resolved[p.avatar_url]
+          ? { ...p, avatar_url: resolved[p.avatar_url] }
+          : p
+
+      setProfiles((prev) => {
+        if (prev[userId]) return prev
+        return { ...prev, [userId]: resolvedProfile }
+      })
+    } finally {
+      fetchingProfileIds.current.delete(userId)
+    }
   }, [])
 
   return {

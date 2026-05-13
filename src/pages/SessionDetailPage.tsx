@@ -68,7 +68,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
     let alive = true
     void supabase
       .from('session_members')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
       .then(({ count }) => {
         if (alive) setMyMembershipCount(count ?? 0)
