@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import { getSignedMediaUrl, SESSION_COVERS_BUCKET } from '../lib/storage'
+import { getSignedMediaUrlMap, SESSION_COVERS_BUCKET } from '../lib/storage'
 import type {
   Category,
   ReadingSession,
@@ -93,14 +93,15 @@ export function useSessions(): UseSessionsReturn {
     setError(null)
 
     const [sessionsResult, membershipsResult, progressResult, requestsResult] = await Promise.all([
-      supabase.from('reading_sessions').select('id,creator_id,book_title,book_author,total_chapters,description,visibility,join_policy,status_type,cover_image_path,category_id,created_at').eq('status_type', 'ongoing').order('created_at', { ascending: false }),
+      supabase.from('reading_sessions').select('id,creator_id,book_title,book_author,total_chapters,description,visibility,join_policy,status_type,cover_image_path,category_id,created_at').eq('status_type', 'ongoing').order('created_at', { ascending: false }).limit(200),
       supabase.from('session_members').select('session_id,user_id,role').eq('user_id', user.id),
       supabase
         .from('progress_updates')
         .select('session_id,user_id,chapter_number,created_at')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false }),
-      supabase.from('session_join_requests').select('id,session_id,user_id,status,created_at').eq('user_id', user.id),
+        .order('created_at', { ascending: false })
+        .limit(500),
+      supabase.from('session_join_requests').select('id,session_id,user_id,status,created_at').eq('user_id', user.id).limit(200),
     ])
 
     if (sessionsResult.error) {
@@ -133,13 +134,48 @@ export function useSessions(): UseSessionsReturn {
     const uploadedCountLookup: Record<string, number> = {}
     const readByUsersLookup: Record<string, number> = {}
     if (sessionIds.length > 0) {
+      // --- Batch: categories, progress-by-users, first-media, owner-counts ---
       const categoryIds = [...new Set(sessionsData.map((s) => s.category_id))]
-      const { data: catData } = await supabase
-        .from('categories')
-        .select('id, name')
-        .in('id', categoryIds)
+      const ownerSessionIds = sessionsData
+        .filter((s) => s.creator_id === user.id)
+        .map((s) => s.id)
+
+      // Sessions without a cover_image_path need a first-media fallback
+      const sessionsNeedingMedia = sessionsData.filter((s) => !s.cover_image_path).map((s) => s.id)
+
+      const [catResult, progressByUsersResult, firstMediaResult, ownerCountsResult] = await Promise.all([
+        // 1) Category names (single query, small table)
+        supabase.from('categories').select('id,name').in('id', categoryIds),
+        // 2) Progress across all sessions (single query, bounded)
+        supabase
+          .from('progress_updates')
+          .select('session_id,user_id,chapter_number,created_at')
+          .in('session_id', sessionIds)
+          .order('created_at', { ascending: false })
+          .limit(2000),
+        // 3) First image media for sessions without covers (single batched query)
+        sessionsNeedingMedia.length > 0
+          ? supabase
+              .from('session_media')
+              .select('session_id,file_path,file_name,mime_type,media_type,chapter_number')
+              .in('session_id', sessionsNeedingMedia)
+              .eq('media_type', 'image')
+              .order('chapter_number', { ascending: true })
+              .limit(sessionsNeedingMedia.length * 2)
+          : Promise.resolve({ data: [], error: null }),
+        // 4) Owner upload counts (single batched query)
+        ownerSessionIds.length > 0
+          ? supabase
+              .from('session_media')
+              .select('session_id')
+              .in('session_id', ownerSessionIds)
+              .limit(ownerSessionIds.length * 50)
+          : Promise.resolve({ data: [], error: null }),
+      ])
+
+      // Process categories
       const catNameMap: Record<number, string> = {}
-      for (const c of (catData ?? []) as Category[]) {
+      for (const c of (catResult.data ?? []) as Category[]) {
         catNameMap[c.id] = c.name
       }
       for (const session of sessionsData) {
@@ -147,12 +183,8 @@ export function useSessions(): UseSessionsReturn {
         if (name) catLookup[session.id] = [name]
       }
 
-      const { data: progressByUsers } = await supabase
-        .from('progress_updates')
-        .select('session_id,user_id,chapter_number,created_at')
-        .in('session_id', sessionIds)
-        .order('created_at', { ascending: false })
-
+      // Process progress by users
+      const progressByUsers = progressByUsersResult.data
       if (progressByUsers && progressByUsers.length > 0) {
         const latestBySessionAndUser = new Map<string, number>()
         for (const item of progressByUsers as ProgressUpdate[]) {
@@ -168,64 +200,76 @@ export function useSessions(): UseSessionsReturn {
         }
       }
 
-      const firstMediaRows = await Promise.all(
-        sessionIds.map(async (sessionId) => {
-          const session = sessionsData.find((s) => s.id === sessionId)
-          if (session?.cover_image_path) {
-            return {
-              session_id: sessionId,
-              file_path: session.cover_image_path,
-              file_name: 'cover',
-              mime_type: 'image/jpeg',
-              media_type: 'image',
-              is_cover: true,
-            }
-          }
-          const { data } = await supabase
-            .from('session_media')
-            .select('session_id,file_path,file_name,mime_type,media_type')
-            .eq('session_id', sessionId)
-            .eq('media_type', 'image')
-            .order('created_at', { ascending: true })
-            .limit(1)
-            .maybeSingle()
-          return data
-        }),
-      )
-
-      for (const item of firstMediaRows) {
-        if (!item) continue
-        const isImage = item.mime_type.startsWith('image/')
-        const isCover = 'is_cover' in item && item.is_cover === true
-        firstMediaLookup[item.session_id] = {
-          session_id: item.session_id,
-          file_path: item.file_path,
-          file_name: item.file_name,
-          mime_type: item.mime_type,
-          media_type: item.media_type,
-          is_image: isImage,
-          signed_url: isImage
-            ? await getSignedMediaUrl(item.file_path, isCover ? SESSION_COVERS_BUCKET : undefined)
-            : null,
+      // Process first media — pick first image per session from batched results
+      const firstMediaBySid = new Map<string, { session_id: string; file_path: string; file_name: string; mime_type: string; media_type: string }>()
+      for (const row of (firstMediaResult.data ?? []) as { session_id: string; file_path: string; file_name: string; mime_type: string; media_type: string }[]) {
+        if (!firstMediaBySid.has(row.session_id)) {
+          firstMediaBySid.set(row.session_id, row)
         }
       }
 
-      const ownerSessionIds = sessionsData
-        .filter((s) => s.creator_id === user.id)
-        .map((s) => s.id)
+      // Build combined cover/media items for batch signed URL resolution
+      const coverPaths: string[] = []
+      const mediaPaths: string[] = []
+      const coverSessionMap: Record<string, string> = {} // path -> session_id
+      const mediaSessionMap: Record<string, string> = {} // path -> session_id
 
-      if (ownerSessionIds.length > 0) {
-        const ownerCounts = await Promise.all(
-          ownerSessionIds.map(async (sessionId) => {
-            const result = await supabase
-              .from('session_media')
-              .select('id', { count: 'exact', head: true })
-              .eq('session_id', sessionId)
-            return { sessionId, count: result.count ?? 0 }
-          }),
-        )
-        for (const row of ownerCounts) {
-          uploadedCountLookup[row.sessionId] = row.count
+      for (const session of sessionsData) {
+        if (session.cover_image_path) {
+          coverPaths.push(session.cover_image_path)
+          coverSessionMap[session.cover_image_path] = session.id
+        } else {
+          const media = firstMediaBySid.get(session.id)
+          if (media && media.mime_type.startsWith('image/')) {
+            mediaPaths.push(media.file_path)
+            mediaSessionMap[media.file_path] = session.id
+          }
+        }
+      }
+
+      // Batch sign URLs (1 call per bucket instead of N calls)
+      const [coverSignedMap, mediaSignedMap] = await Promise.all([
+        coverPaths.length > 0 ? getSignedMediaUrlMap(coverPaths, SESSION_COVERS_BUCKET) : Promise.resolve({}),
+        mediaPaths.length > 0 ? getSignedMediaUrlMap(mediaPaths) : Promise.resolve({}),
+      ])
+
+      // Assemble firstMediaLookup from signed URL maps
+      for (const session of sessionsData) {
+        if (session.cover_image_path) {
+          firstMediaLookup[session.id] = {
+            session_id: session.id,
+            file_path: session.cover_image_path,
+            file_name: 'cover',
+            mime_type: 'image/jpeg',
+            media_type: 'image',
+            is_image: true,
+            signed_url: coverSignedMap[session.cover_image_path] ?? null,
+          }
+        } else {
+          const media = firstMediaBySid.get(session.id)
+          if (media) {
+            const isImage = media.mime_type.startsWith('image/')
+            firstMediaLookup[session.id] = {
+              session_id: session.id,
+              file_path: media.file_path,
+              file_name: media.file_name,
+              mime_type: media.mime_type,
+              media_type: media.media_type,
+              is_image: isImage,
+              signed_url: isImage ? (mediaSignedMap[media.file_path] ?? null) : null,
+            }
+          }
+        }
+      }
+
+      // Process owner upload counts from batched result
+      if (ownerCountsResult.data && ownerCountsResult.data.length > 0) {
+        const countMap = new Map<string, number>()
+        for (const row of ownerCountsResult.data as { session_id: string }[]) {
+          countMap.set(row.session_id, (countMap.get(row.session_id) ?? 0) + 1)
+        }
+        for (const [sid, count] of countMap.entries()) {
+          uploadedCountLookup[sid] = count
         }
       }
     }

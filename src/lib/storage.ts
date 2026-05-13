@@ -83,24 +83,32 @@ export async function getSignedMediaUrl(
   return data.signedUrl
 }
 
-export async function getSignedMediaUrlMap(filePaths: string[]): Promise<Record<string, string>> {
+/**
+ * Batch-resolve signed URLs in a single API call per bucket.
+ * Falls back gracefully — returns partial map if some paths fail.
+ */
+export async function getSignedMediaUrlMap(
+  filePaths: string[],
+  bucket: string = SESSION_MEDIA_BUCKET,
+): Promise<Record<string, string>> {
   const uniquePaths = Array.from(new Set(filePaths.filter(Boolean)))
 
   if (uniquePaths.length === 0) {
     return {}
   }
 
-  const results = await Promise.all(
-    uniquePaths.map(async (path) => {
-      const url = await getSignedMediaUrl(path)
-      return [path, url] as const
-    }),
-  )
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .createSignedUrls(uniquePaths, SIGNED_URL_EXPIRY_SECONDS)
+
+  if (error || !data) {
+    return {}
+  }
 
   const map: Record<string, string> = {}
-  for (const [path, url] of results) {
-    if (url) {
-      map[path] = url
+  for (const item of data) {
+    if (item.signedUrl && item.path) {
+      map[item.path] = item.signedUrl
     }
   }
   return map

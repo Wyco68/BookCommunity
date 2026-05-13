@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useCategories } from '../../hooks/useCategories'
-import { getSignedMediaUrl, SESSION_COVERS_BUCKET } from '../../lib/storage'
+import { getSignedMediaUrlMap, SESSION_COVERS_BUCKET } from '../../lib/storage'
 import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import type { ReadingSession } from '../../types'
@@ -59,6 +59,7 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
       .eq('visibility', 'public')
       .eq('status_type', 'ongoing')
       .order('created_at', { ascending: false })
+      .limit(50)
 
     if (sessionsRequestIdRef.current !== requestId) return
 
@@ -76,15 +77,23 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
 
     const sessionsData = data as ReadingSession[]
 
-    const sessionsWithCovers = await Promise.all(
-      sessionsData.map(async (session) => {
-        if (!session.cover_image_path) return { ...session, coverSignedUrl: null }
-        const signedUrl = await getSignedMediaUrl(session.cover_image_path, SESSION_COVERS_BUCKET)
-        return { ...session, coverSignedUrl: signedUrl }
-      }),
-    )
+    // Batch-sign all cover URLs in a single API call
+    const coverPaths = sessionsData
+      .map((s) => s.cover_image_path)
+      .filter((p): p is string => Boolean(p))
+    const signedMap = coverPaths.length > 0
+      ? await getSignedMediaUrlMap(coverPaths, SESSION_COVERS_BUCKET)
+      : {}
 
     if (sessionsRequestIdRef.current !== requestId) return
+
+    const sessionsWithCovers = sessionsData.map((session) => ({
+      ...session,
+      coverSignedUrl: session.cover_image_path
+        ? (signedMap[session.cover_image_path] ?? null)
+        : null,
+    }))
+
     setCategorySessions(sessionsWithCovers)
     setLoadingSessions(false)
   }, [])
