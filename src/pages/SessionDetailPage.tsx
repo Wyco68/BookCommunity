@@ -81,7 +81,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
     if (!sessionId) return
     setLoadingSession(true)
     Promise.all([
-      supabase.from('reading_sessions').select('*').eq('id', sessionId).single(),
+      supabase.from('reading_sessions').select('id,creator_id,book_title,book_author,total_chapters,description,visibility,join_policy,status_type,cover_image_path,category_id,created_at').eq('id', sessionId).single(),
       supabase
         .from('session_members')
         .select('session_id,user_id,role')

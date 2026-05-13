@@ -258,7 +258,9 @@ export const SessionDetailPanel = memo(function SessionDetailPanel({
                   value={myProgressChapterDraft}
                   onChange={(event) => {
                     const n = Number(event.target.value)
-                    onMyProgressChapterDraftChange(Number.isNaN(n) ? 1 : n)
+                    const max = maxProgressChapter ?? selectedSession.total_chapters
+                    const clamped = Number.isNaN(n) ? 1 : Math.max(1, Math.min(n, max))
+                    onMyProgressChapterDraftChange(clamped)
                   }}
                   aria-label={t.sessions.updateChapter}
                   style={{ flex: 1 }}

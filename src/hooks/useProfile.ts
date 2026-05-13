@@ -49,7 +49,7 @@ export function useProfile(): UseProfileReturn {
     // SELECT only — never upsert on load (upsert can overwrite avatar_url with null)
     const profileResult = await supabase
       .from('profiles')
-      .select('*')
+      .select('id,display_name,avatar_url,created_at')
       .eq('id', userId)
       .maybeSingle()
 
