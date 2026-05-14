@@ -514,13 +514,37 @@
   position: sticky;
   top: 56px;
   z-index: 10;
-  padding: var(--space-2) 0;
-  background: transparent;
-  pointer-events: none;
+  padding: var(--space-3) 0;
+  margin-bottom: var(--space-2);
+  background: var(--surface);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
 }
 
-.detail-back-bar .btn-back-compact {
-  pointer-events: all;
+.detail-back-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.detail-back-bar-inner .detail-tab-switch {
+  margin: 0;
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+/* Mobile: stack back button + tabs vertically */
+@media (max-width: 640px) {
+  .detail-back-bar-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  .detail-back-bar-inner .btn-back-compact {
+    align-self: flex-start;
+  }
 }
 
 /* ─── Reading Progress ──────────────────────────────────────────── */

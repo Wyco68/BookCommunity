@@ -1,6 +1,7 @@
 import type { FormEvent } from 'react'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
+import { Spinner } from './Spinner'
 
 type Copy = (typeof translations)[Language]
 
@@ -121,9 +122,9 @@ interface AuthLoadingViewProps {
 export function AuthLoadingView({ message }: AuthLoadingViewProps) {
   return (
     <main className="shell">
-      <section className="card centered">
-        <h1>BookCom</h1>
-        <p>{message}</p>
+      <section className="centered">
+        <h1 style={{ marginBottom: 'var(--space-4)' }}>BookCom</h1>
+        <Spinner size="md" showLabel label={message} />
       </section>
     </main>
   )

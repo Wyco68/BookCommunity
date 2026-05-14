@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { getSignedMediaUrlMap, SESSION_COVERS_BUCKET } from '../lib/storage'
 import type {
   Category,
+  MediaType,
   ReadingSession,
   SessionMembership,
   SessionJoinRequest,
@@ -47,10 +48,14 @@ export interface UseSessionsReturn {
   sessionUploadedChapterCount: Record<string, number>
   sessionReadChaptersByUsers: Record<string, number>
   loading: boolean
+  loadingMore: boolean
+  hasMore: boolean
   error: string | null
   creating: boolean
   busySessionId: string | null
   loadSessions: (user: User) => Promise<void>
+  loadMoreSessions: () => Promise<void>
+  refreshSessions: () => Promise<void>
   createSession: (user: User, form: SessionFormState) => Promise<void>
   joinSession: (sessionId: string, user: User) => Promise<void>
   leaveSession: (sessionId: string, user: User) => Promise<void>
@@ -68,6 +73,8 @@ export interface UseSessionsReturn {
   setError: (error: string | null) => void
 }
 
+export const SESSIONS_PAGE_SIZE = 20
+
 export function useSessions(): UseSessionsReturn {
   const [sessions, setSessions] = useState<ReadingSession[]>([])
   const [memberships, setMemberships] = useState<Record<string, SessionMembership>>({})
@@ -79,21 +86,196 @@ export function useSessions(): UseSessionsReturn {
   const [sessionUploadedChapterCount, setSessionUploadedChapterCount] = useState<Record<string, number>>({})
   const [sessionReadChaptersByUsers, setSessionReadChaptersByUsers] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [busySessionId, setBusySessionId] = useState<string | null>(null)
   const lastLoadedRef = useRef(0)
+  const lastUserRef = useRef<User | null>(null)
+  // Cursor for paginated discover query (created_at DESC, id DESC)
+  const discoverCursorRef = useRef<{ created_at: string; id: string } | null>(null)
+  const inFlightLoadRef = useRef(false)
+
+  // Hydrate category names, cover/media previews, owner upload counts, and
+  // progress-by-users for the given session set. Used by both the initial load
+  // and "load more" so the additional cards are decorated identically.
+  const hydrateSessionMeta = useCallback(async (
+    sessionsToHydrate: ReadingSession[],
+    user: User,
+    mode: 'replace' | 'append',
+  ) => {
+    if (sessionsToHydrate.length === 0) {
+      if (mode === 'replace') {
+        setSessionCategoryNames({})
+        setSessionFirstMedia({})
+        setSessionUploadedChapterCount({})
+        setSessionReadChaptersByUsers({})
+      }
+      return
+    }
+
+    const categoryIds = [...new Set(sessionsToHydrate.map((s) => s.category_id))]
+    const ownerSessionIds = sessionsToHydrate
+      .filter((s) => s.creator_id === user.id)
+      .map((s) => s.id)
+    const sessionIds = sessionsToHydrate.map((s) => s.id)
+    const sessionsNeedingMedia = sessionsToHydrate.filter((s) => !s.cover_image_path).map((s) => s.id)
+
+    const [catResult, progressByUsersResult, firstMediaResult, ownerCountsResult] = await Promise.all([
+      supabase.from('categories').select('id,name').in('id', categoryIds),
+      supabase
+        .from('progress_updates')
+        .select('session_id,user_id,chapter_number,created_at')
+        .in('session_id', sessionIds)
+        .order('created_at', { ascending: false })
+        .limit(2000),
+      sessionsNeedingMedia.length > 0
+        ? supabase
+            .from('session_media')
+            .select('session_id,file_path,file_name,mime_type,media_type,chapter_number')
+            .in('session_id', sessionsNeedingMedia)
+            .eq('media_type', 'image')
+            .order('chapter_number', { ascending: true })
+            .limit(sessionsNeedingMedia.length * 2)
+        : Promise.resolve({ data: [], error: null }),
+      ownerSessionIds.length > 0
+        ? supabase
+            .from('session_media')
+            .select('session_id')
+            .in('session_id', ownerSessionIds)
+            .limit(ownerSessionIds.length * 50)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+
+    const catLookup: Record<string, string[]> = {}
+    const firstMediaLookup: Record<string, SessionCardMediaPreview> = {}
+    const uploadedCountLookup: Record<string, number> = {}
+    const readByUsersLookup: Record<string, number> = {}
+
+    const catNameMap: Record<number, string> = {}
+    for (const c of (catResult.data ?? []) as Category[]) {
+      catNameMap[c.id] = c.name
+    }
+    for (const session of sessionsToHydrate) {
+      const name = catNameMap[session.category_id]
+      if (name) catLookup[session.id] = [name]
+    }
+
+    const progressByUsers = progressByUsersResult.data
+    if (progressByUsers && progressByUsers.length > 0) {
+      const latestBySessionAndUser = new Map<string, number>()
+      for (const item of progressByUsers as ProgressUpdate[]) {
+        const key = `${item.session_id}:${item.user_id}`
+        if (!latestBySessionAndUser.has(key)) {
+          latestBySessionAndUser.set(key, item.chapter_number)
+        }
+      }
+      for (const [key, chapter] of latestBySessionAndUser.entries()) {
+        const sessionId = key.split(':')[0]
+        readByUsersLookup[sessionId] = (readByUsersLookup[sessionId] ?? 0) + chapter
+      }
+    }
+
+    const firstMediaBySid = new Map<string, { session_id: string; file_path: string; file_name: string; mime_type: string; media_type: MediaType }>()
+    for (const row of (firstMediaResult.data ?? []) as { session_id: string; file_path: string; file_name: string; mime_type: string; media_type: MediaType }[]) {
+      if (!firstMediaBySid.has(row.session_id)) {
+        firstMediaBySid.set(row.session_id, row)
+      }
+    }
+
+    const coverPaths: string[] = []
+    const mediaPaths: string[] = []
+
+    for (const session of sessionsToHydrate) {
+      if (session.cover_image_path) {
+        coverPaths.push(session.cover_image_path)
+      } else {
+        const media = firstMediaBySid.get(session.id)
+        if (media && media.mime_type.startsWith('image/')) {
+          mediaPaths.push(media.file_path)
+        }
+      }
+    }
+
+    const [coverSignedMap, mediaSignedMap] = await Promise.all([
+      coverPaths.length > 0 ? getSignedMediaUrlMap(coverPaths, SESSION_COVERS_BUCKET) : Promise.resolve({} as Record<string, string>),
+      mediaPaths.length > 0 ? getSignedMediaUrlMap(mediaPaths) : Promise.resolve({} as Record<string, string>),
+    ])
+
+    for (const session of sessionsToHydrate) {
+      if (session.cover_image_path) {
+        firstMediaLookup[session.id] = {
+          session_id: session.id,
+          file_path: session.cover_image_path,
+          file_name: 'cover',
+          mime_type: 'image/jpeg',
+          media_type: 'image',
+          is_image: true,
+          signed_url: coverSignedMap[session.cover_image_path] ?? null,
+        }
+      } else {
+        const media = firstMediaBySid.get(session.id)
+        if (media) {
+          const isImage = media.mime_type.startsWith('image/')
+          firstMediaLookup[session.id] = {
+            session_id: session.id,
+            file_path: media.file_path,
+            file_name: media.file_name,
+            mime_type: media.mime_type,
+            media_type: media.media_type,
+            is_image: isImage,
+            signed_url: isImage ? (mediaSignedMap[media.file_path] ?? null) : null,
+          }
+        }
+      }
+    }
+
+    if (ownerCountsResult.data && ownerCountsResult.data.length > 0) {
+      const countMap = new Map<string, number>()
+      for (const row of ownerCountsResult.data as { session_id: string }[]) {
+        countMap.set(row.session_id, (countMap.get(row.session_id) ?? 0) + 1)
+      }
+      for (const [sid, count] of countMap.entries()) {
+        uploadedCountLookup[sid] = count
+      }
+    }
+
+    if (mode === 'replace') {
+      setSessionCategoryNames(catLookup)
+      setSessionFirstMedia(firstMediaLookup)
+      setSessionUploadedChapterCount(uploadedCountLookup)
+      setSessionReadChaptersByUsers(readByUsersLookup)
+    } else {
+      setSessionCategoryNames((prev) => ({ ...prev, ...catLookup }))
+      setSessionFirstMedia((prev) => ({ ...prev, ...firstMediaLookup }))
+      setSessionUploadedChapterCount((prev) => ({ ...prev, ...uploadedCountLookup }))
+      setSessionReadChaptersByUsers((prev) => ({ ...prev, ...readByUsersLookup }))
+    }
+  }, [])
 
   const loadSessions = useCallback(async (user: User) => {
     const now = Date.now()
     if (now - lastLoadedRef.current < 2000) return
+    if (inFlightLoadRef.current) return
+    inFlightLoadRef.current = true
     lastLoadedRef.current = now
+    lastUserRef.current = user
 
     setLoading(true)
     setError(null)
+    discoverCursorRef.current = null
 
-    const [sessionsResult, membershipsResult, progressResult, requestsResult] = await Promise.all([
-      supabase.from('reading_sessions').select('id,creator_id,book_title,book_author,total_chapters,description,visibility,join_policy,status_type,cover_image_path,category_id,created_at').eq('status_type', 'ongoing').order('created_at', { ascending: false }).limit(200),
+    // Initial discover page = SESSIONS_PAGE_SIZE most recent ongoing sessions.
+    // Joined sessions are loaded in full so the home view is always complete.
+    const [discoverResult, membershipsResult, progressResult, requestsResult] = await Promise.all([
+      supabase
+        .from('reading_sessions')
+        .select('id,creator_id,book_title,book_author,total_chapters,description,visibility,join_policy,status_type,cover_image_path,category_id,created_at')
+        .eq('status_type', 'ongoing')
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(SESSIONS_PAGE_SIZE),
       supabase.from('session_members').select('session_id,user_id,role').eq('user_id', user.id),
       supabase
         .from('progress_updates')
@@ -104,187 +286,123 @@ export function useSessions(): UseSessionsReturn {
       supabase.from('session_join_requests').select('id,session_id,user_id,status,created_at').eq('user_id', user.id).limit(200),
     ])
 
-    if (sessionsResult.error) {
-      setError(sessionsResult.error.message)
+    if (discoverResult.error) {
+      setError(discoverResult.error.message)
       setLoading(false)
+      inFlightLoadRef.current = false
       return
     }
 
     if (membershipsResult.error) {
       setError(membershipsResult.error.message)
       setLoading(false)
+      inFlightLoadRef.current = false
       return
     }
 
     if (progressResult.error || requestsResult.error) {
       setError(progressResult.error?.message || requestsResult.error?.message || 'Failed to load data')
       setLoading(false)
+      inFlightLoadRef.current = false
       return
     }
 
-    const sessionsData = (sessionsResult.data ?? []) as ReadingSession[]
-    const membershipLookup = buildMembershipLookup((membershipsResult.data ?? []) as SessionMembership[])
+    const discoverData = (discoverResult.data ?? []) as ReadingSession[]
+    const memberships = (membershipsResult.data ?? []) as SessionMembership[]
+    const membershipLookup = buildMembershipLookup(memberships)
     const progressLookup = buildLatestProgressBySession((progressResult.data ?? []) as ProgressUpdate[])
     const requestLookup = buildJoinRequestStatusLookup((requestsResult.data ?? []) as SessionJoinRequest[])
 
-    // Build category name lookup directly from session.category_id
-    const sessionIds = sessionsData.map((s) => s.id)
-    const catLookup: Record<string, string[]> = {}
-    const firstMediaLookup: Record<string, SessionCardMediaPreview> = {}
-    const uploadedCountLookup: Record<string, number> = {}
-    const readByUsersLookup: Record<string, number> = {}
-    if (sessionIds.length > 0) {
-      // --- Batch: categories, progress-by-users, first-media, owner-counts ---
-      const categoryIds = [...new Set(sessionsData.map((s) => s.category_id))]
-      const ownerSessionIds = sessionsData
-        .filter((s) => s.creator_id === user.id)
-        .map((s) => s.id)
+    // Pull joined sessions that aren't already on the first discover page so
+    // the home view shows every membership without forcing pagination.
+    const discoverIds = new Set(discoverData.map((s) => s.id))
+    const missingJoinedIds = memberships
+      .map((m) => m.session_id)
+      .filter((id) => !discoverIds.has(id))
 
-      // Sessions without a cover_image_path need a first-media fallback
-      const sessionsNeedingMedia = sessionsData.filter((s) => !s.cover_image_path).map((s) => s.id)
-
-      const [catResult, progressByUsersResult, firstMediaResult, ownerCountsResult] = await Promise.all([
-        // 1) Category names (single query, small table)
-        supabase.from('categories').select('id,name').in('id', categoryIds),
-        // 2) Progress across all sessions (single query, bounded)
-        supabase
-          .from('progress_updates')
-          .select('session_id,user_id,chapter_number,created_at')
-          .in('session_id', sessionIds)
-          .order('created_at', { ascending: false })
-          .limit(2000),
-        // 3) First image media for sessions without covers (single batched query)
-        sessionsNeedingMedia.length > 0
-          ? supabase
-              .from('session_media')
-              .select('session_id,file_path,file_name,mime_type,media_type,chapter_number')
-              .in('session_id', sessionsNeedingMedia)
-              .eq('media_type', 'image')
-              .order('chapter_number', { ascending: true })
-              .limit(sessionsNeedingMedia.length * 2)
-          : Promise.resolve({ data: [], error: null }),
-        // 4) Owner upload counts (single batched query)
-        ownerSessionIds.length > 0
-          ? supabase
-              .from('session_media')
-              .select('session_id')
-              .in('session_id', ownerSessionIds)
-              .limit(ownerSessionIds.length * 50)
-          : Promise.resolve({ data: [], error: null }),
-      ])
-
-      // Process categories
-      const catNameMap: Record<number, string> = {}
-      for (const c of (catResult.data ?? []) as Category[]) {
-        catNameMap[c.id] = c.name
+    let joinedExtra: ReadingSession[] = []
+    if (missingJoinedIds.length > 0) {
+      const extraResult = await supabase
+        .from('reading_sessions')
+        .select('id,creator_id,book_title,book_author,total_chapters,description,visibility,join_policy,status_type,cover_image_path,category_id,created_at')
+        .in('id', missingJoinedIds)
+      if (extraResult.error) {
+        setError(extraResult.error.message)
+        setLoading(false)
+        inFlightLoadRef.current = false
+        return
       }
-      for (const session of sessionsData) {
-        const name = catNameMap[session.category_id]
-        if (name) catLookup[session.id] = [name]
-      }
-
-      // Process progress by users
-      const progressByUsers = progressByUsersResult.data
-      if (progressByUsers && progressByUsers.length > 0) {
-        const latestBySessionAndUser = new Map<string, number>()
-        for (const item of progressByUsers as ProgressUpdate[]) {
-          const key = `${item.session_id}:${item.user_id}`
-          if (!latestBySessionAndUser.has(key)) {
-            latestBySessionAndUser.set(key, item.chapter_number)
-          }
-        }
-
-        for (const [key, chapter] of latestBySessionAndUser.entries()) {
-          const sessionId = key.split(':')[0]
-          readByUsersLookup[sessionId] = (readByUsersLookup[sessionId] ?? 0) + chapter
-        }
-      }
-
-      // Process first media — pick first image per session from batched results
-      const firstMediaBySid = new Map<string, { session_id: string; file_path: string; file_name: string; mime_type: string; media_type: string }>()
-      for (const row of (firstMediaResult.data ?? []) as { session_id: string; file_path: string; file_name: string; mime_type: string; media_type: string }[]) {
-        if (!firstMediaBySid.has(row.session_id)) {
-          firstMediaBySid.set(row.session_id, row)
-        }
-      }
-
-      // Build combined cover/media items for batch signed URL resolution
-      const coverPaths: string[] = []
-      const mediaPaths: string[] = []
-      const coverSessionMap: Record<string, string> = {} // path -> session_id
-      const mediaSessionMap: Record<string, string> = {} // path -> session_id
-
-      for (const session of sessionsData) {
-        if (session.cover_image_path) {
-          coverPaths.push(session.cover_image_path)
-          coverSessionMap[session.cover_image_path] = session.id
-        } else {
-          const media = firstMediaBySid.get(session.id)
-          if (media && media.mime_type.startsWith('image/')) {
-            mediaPaths.push(media.file_path)
-            mediaSessionMap[media.file_path] = session.id
-          }
-        }
-      }
-
-      // Batch sign URLs (1 call per bucket instead of N calls)
-      const [coverSignedMap, mediaSignedMap] = await Promise.all([
-        coverPaths.length > 0 ? getSignedMediaUrlMap(coverPaths, SESSION_COVERS_BUCKET) : Promise.resolve({}),
-        mediaPaths.length > 0 ? getSignedMediaUrlMap(mediaPaths) : Promise.resolve({}),
-      ])
-
-      // Assemble firstMediaLookup from signed URL maps
-      for (const session of sessionsData) {
-        if (session.cover_image_path) {
-          firstMediaLookup[session.id] = {
-            session_id: session.id,
-            file_path: session.cover_image_path,
-            file_name: 'cover',
-            mime_type: 'image/jpeg',
-            media_type: 'image',
-            is_image: true,
-            signed_url: coverSignedMap[session.cover_image_path] ?? null,
-          }
-        } else {
-          const media = firstMediaBySid.get(session.id)
-          if (media) {
-            const isImage = media.mime_type.startsWith('image/')
-            firstMediaLookup[session.id] = {
-              session_id: session.id,
-              file_path: media.file_path,
-              file_name: media.file_name,
-              mime_type: media.mime_type,
-              media_type: media.media_type,
-              is_image: isImage,
-              signed_url: isImage ? (mediaSignedMap[media.file_path] ?? null) : null,
-            }
-          }
-        }
-      }
-
-      // Process owner upload counts from batched result
-      if (ownerCountsResult.data && ownerCountsResult.data.length > 0) {
-        const countMap = new Map<string, number>()
-        for (const row of ownerCountsResult.data as { session_id: string }[]) {
-          countMap.set(row.session_id, (countMap.get(row.session_id) ?? 0) + 1)
-        }
-        for (const [sid, count] of countMap.entries()) {
-          uploadedCountLookup[sid] = count
-        }
-      }
+      joinedExtra = (extraResult.data ?? []) as ReadingSession[]
     }
+
+    const sessionsData = [...discoverData, ...joinedExtra]
+    const last = discoverData[discoverData.length - 1]
+    discoverCursorRef.current = last ? { created_at: last.created_at, id: last.id } : null
+    setHasMore(discoverData.length === SESSIONS_PAGE_SIZE)
 
     setSessions(sessionsData)
     setMemberships(membershipLookup)
     setLatestProgress(progressLookup)
     setProgressDrafts(progressLookup)
     setMyJoinRequestStatus(requestLookup)
-    setSessionCategoryNames(catLookup)
-    setSessionFirstMedia(firstMediaLookup)
-    setSessionUploadedChapterCount(uploadedCountLookup)
-    setSessionReadChaptersByUsers(readByUsersLookup)
+    await hydrateSessionMeta(sessionsData, user, 'replace')
     setLoading(false)
-  }, [])
+    inFlightLoadRef.current = false
+  }, [hydrateSessionMeta])
+
+  const loadMoreSessions = useCallback(async () => {
+    const user = lastUserRef.current
+    if (!user) return
+    if (loadingMore || loading) return
+    if (!hasMore) return
+    const cursor = discoverCursorRef.current
+    if (!cursor) return
+
+    setLoadingMore(true)
+
+    // Cursor pagination: rows with (created_at, id) lexicographically less than
+    // the cursor. PostgREST supports tuple comparison via `.or` with `lt` clauses.
+    const { data, error: pageError } = await supabase
+      .from('reading_sessions')
+      .select('id,creator_id,book_title,book_author,total_chapters,description,visibility,join_policy,status_type,cover_image_path,category_id,created_at')
+      .eq('status_type', 'ongoing')
+      .or(`created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(SESSIONS_PAGE_SIZE)
+
+    if (pageError) {
+      setError(pageError.message)
+      setLoadingMore(false)
+      return
+    }
+
+    const pageData = (data ?? []) as ReadingSession[]
+    setHasMore(pageData.length === SESSIONS_PAGE_SIZE)
+
+    if (pageData.length === 0) {
+      setLoadingMore(false)
+      return
+    }
+
+    const newLast = pageData[pageData.length - 1]
+    discoverCursorRef.current = { created_at: newLast.created_at, id: newLast.id }
+
+    setSessions((prev) => {
+      const seen = new Set(prev.map((s) => s.id))
+      const additions = pageData.filter((s) => !seen.has(s.id))
+      return additions.length === 0 ? prev : [...prev, ...additions]
+    })
+    await hydrateSessionMeta(pageData, user, 'append')
+    setLoadingMore(false)
+  }, [hasMore, loading, loadingMore, hydrateSessionMeta])
+
+  const refreshSessions = useCallback(async () => {
+    const user = lastUserRef.current
+    if (!user) return
+    lastLoadedRef.current = 0
+    await loadSessions(user)
+  }, [loadSessions])
 
   const createSession = useCallback(async (user: User, form: SessionFormState) => {
     if (!form.bookTitle.trim() || !form.bookAuthor.trim()) {
@@ -319,7 +437,9 @@ export function useSessions(): UseSessionsReturn {
     }
 
     setCreating(false)
-  }, [])
+    lastLoadedRef.current = 0
+    void loadSessions(user)
+  }, [loadSessions])
 
   const joinSession = useCallback(async (sessionId: string, user: User) => {
     const targetSession = sessions.find((session) => session.id === sessionId)
@@ -338,6 +458,9 @@ export function useSessions(): UseSessionsReturn {
 
       if (error) {
         setError(error.message)
+      } else {
+        lastLoadedRef.current = 0
+        void loadSessions(user)
       }
       setBusySessionId(null)
       return
@@ -359,7 +482,9 @@ export function useSessions(): UseSessionsReturn {
     }
 
     setBusySessionId(null)
-  }, [sessions])
+    lastLoadedRef.current = 0
+    void loadSessions(user)
+  }, [sessions, loadSessions])
 
   const leaveSession = useCallback(async (sessionId: string, user: User) => {
     setBusySessionId(sessionId)
@@ -378,7 +503,9 @@ export function useSessions(): UseSessionsReturn {
     }
 
     setBusySessionId(null)
-  }, [])
+    lastLoadedRef.current = 0
+    void loadSessions(user)
+  }, [loadSessions])
 
   const removeSession = useCallback((sessionId: string) => {
     setSessions((prev) => prev.filter((s) => s.id !== sessionId))
@@ -399,12 +526,25 @@ export function useSessions(): UseSessionsReturn {
         return
       }
 
+      // Sequential rule: only allow current (no-op) or current + 1.
+      // Block backward overwrite — keep DB monotonic.
+      const currentLatest = latestProgress[session.id] ?? 0
+      if (chapter !== currentLatest && chapter !== currentLatest + 1) {
+        setError(`Progress must advance one chapter at a time (current: ${currentLatest})`)
+        return
+      }
+      if (chapter <= currentLatest) return // already saved
+
       setBusySessionId(session.id)
       setError(null)
 
+      // Defensive: use auth user at insert time. RLS enforces user_id = auth.uid().
+      const { data: authData } = await supabase.auth.getUser()
+      const authUserId = authData.user?.id ?? user.id
+
       const { error } = await supabase.from('progress_updates').insert({
         session_id: session.id,
-        user_id: user.id,
+        user_id: authUserId,
         chapter_number: chapter,
       })
 
@@ -415,8 +555,10 @@ export function useSessions(): UseSessionsReturn {
       }
 
       setBusySessionId(null)
+      lastLoadedRef.current = 0
+      void loadSessions(user)
     },
-    [],
+    [loadSessions, latestProgress],
   )
 
   return {
@@ -430,10 +572,14 @@ export function useSessions(): UseSessionsReturn {
     sessionUploadedChapterCount,
     sessionReadChaptersByUsers,
     loading,
+    loadingMore,
+    hasMore,
     error,
     creating,
     busySessionId,
     loadSessions,
+    loadMoreSessions,
+    refreshSessions,
     createSession,
     joinSession,
     leaveSession,

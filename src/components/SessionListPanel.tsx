@@ -1,5 +1,8 @@
-import { memo } from 'react'
+import { memo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Spinner } from './Spinner'
+import { JoinSessionModal } from './JoinSessionModal'
+import { SessionCard } from './SessionCard'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import type { ReadingSession, SessionCardMediaPreview, SessionJoinRequest, SessionMembership } from '../types'
@@ -28,6 +31,9 @@ export interface SessionListPanelProps {
   onJoinSession: (sessionId: string) => Promise<void>
   showControls?: boolean
   embedded?: boolean
+  hasMore?: boolean
+  loadingMore?: boolean
+  onLoadMore?: () => void
 }
 
 export const SessionListPanel = memo(function SessionListPanel({
@@ -49,8 +55,18 @@ export const SessionListPanel = memo(function SessionListPanel({
   onJoinSession,
   showControls = true,
   embedded = false,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }: SessionListPanelProps) {
   const navigate = useNavigate()
+  const [joinTarget, setJoinTarget] = useState<ReadingSession | null>(null)
+
+  const handleConfirmJoin = useCallback(async () => {
+    if (!joinTarget) return
+    await onJoinSession(joinTarget.id)
+    setJoinTarget(null)
+  }, [joinTarget, onJoinSession])
 
   const rootClassName = embedded ? 'stack session-panel-embedded' : 'card stack'
   const RootTag = embedded ? 'div' : 'article'
@@ -80,10 +96,14 @@ export const SessionListPanel = memo(function SessionListPanel({
       ) : null}
 
       {screenError ? <p className="error">{screenError}</p> : null}
-      {loadingSessions ? <p className="subtle">{t.sessions.loading}</p> : null}
+      {loadingSessions ? (
+        <div style={{ minHeight: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Spinner size="sm" showLabel label={t.sessions.loading} />
+        </div>
+      ) : null}
       {!loadingSessions && filteredSessions.length === 0 ? <p className="subtle">{t.sessions.noResults}</p> : null}
 
-      <ul className="session-list">
+      <ul className="session-list session-grid">
         {filteredSessions.map((session) => {
           const membership = memberships[session.id]
           const requestStatus = myJoinRequestStatus[session.id]
@@ -91,92 +111,59 @@ export const SessionListPanel = memo(function SessionListPanel({
           const firstMedia = sessionFirstMedia[session.id]
           const myProgress = latestProgress[session.id] ?? 0
           const uploadedCount = sessionUploadedChapterCount[session.id] ?? 0
-          const isOwner = membership?.role === 'owner'
+          const coverUrl = firstMedia?.is_image ? firstMedia.signed_url : null
 
           return (
-            <li
+            <SessionCard
               key={session.id}
-              className="session-item session-card session-card-clickable"
-              onClick={(e) => {
-                if ((e.target as HTMLElement).closest('button, input, select, textarea')) return
-                navigate(`/session/${session.id}`)
+              t={t}
+              session={session}
+              membership={membership}
+              requestStatus={requestStatus}
+              categories={categories}
+              coverUrl={coverUrl}
+              myProgress={myProgress}
+              uploadedCount={uploadedCount}
+              busy={busySessionId === session.id}
+              onClick={() => {
+                if (membership) {
+                  navigate(`/session/${session.id}`)
+                } else if (requestStatus !== 'pending') {
+                  setJoinTarget(session)
+                }
               }}
-            >
-              <div className="session-card-cols">
-                <div className="session-card-col-cover" aria-hidden="true">
-                  {firstMedia?.is_image && firstMedia.signed_url ? (
-                    <img
-                      className="session-card-cover-image"
-                      src={firstMedia.signed_url}
-                      alt={`${session.book_title} cover`}
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="session-card-cover-empty">
-                      <span className="session-card-no-cover-icon">📖</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="session-card-col-info">
-                  <div className="session-heading">
-                    <h3 className="session-card-title">{session.book_title}</h3>
-                    <span className="pill">{t.enums.visibility[session.visibility]}</span>
-                  </div>
-
-                  <p className="subtle session-card-author">{t.sessions.byAuthor(session.book_author)}</p>
-
-                  {categories.length > 0 ? (
-                    <div className="session-categories">
-                      {categories.map((cat) => (
-                        <span key={cat} className="category-pill">{cat}</span>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  <div className="session-meta-grid">
-                    <div className="session-meta-item">
-                      <span className="session-meta-label">{t.sessions.chapters}</span>
-                      <span className="session-meta-value">
-                        {session.status_type === 'completed' ? t.sessions.completed : session.total_chapters}
-                      </span>
-                    </div>
-                    <div className="session-meta-item">
-                      <span className="session-meta-label">{isOwner ? t.sessions.uploaded : t.sessions.myProgress}</span>
-                      <span className="session-meta-value">
-                        {isOwner ? uploadedCount : myProgress}
-                      </span>
-                    </div>
-                  </div>
-
-                  {session.description ? (
-                    <p className="muted session-card-desc">{session.description}</p>
-                  ) : null}
-
-                  {!membership ? (
-                    <button
-                      type="button"
-                      className="secondary session-card-cta"
-                      disabled={busySessionId === session.id || requestStatus === 'pending'}
-                      onClick={() => { void onJoinSession(session.id) }}
-                    >
-                      {session.join_policy === 'request'
-                        ? requestStatus === 'pending'
-                          ? t.sessions.requestPending
-                          : t.sessions.requestToJoin
-                        : busySessionId === session.id
-                          ? t.sessions.joining
-                          : t.sessions.joinSession}
-                    </button>
-                  ) : (
-                    <p className="muted session-card-hint">{t.sessions.openDetails}</p>
-                  )}
-                </div>
-              </div>
-            </li>
+              onJoinClick={!membership ? () => setJoinTarget(session) : undefined}
+            />
           )
         })}
       </ul>
+
+      {onLoadMore && hasMore ? (
+        <div className="load-more-row">
+          <button
+            type="button"
+            className="secondary"
+            disabled={loadingMore}
+            onClick={onLoadMore}
+          >
+            {loadingMore ? t.sessions.loadingMore : t.sessions.loadMore}
+          </button>
+        </div>
+      ) : null}
+
+      {joinTarget ? (
+        <JoinSessionModal
+          session={joinTarget}
+          loading={busySessionId === joinTarget.id}
+          onConfirm={() => { void handleConfirmJoin() }}
+          onCancel={() => setJoinTarget(null)}
+          titleLabel={t.sessions.joinModalTitle}
+          descOpen={t.sessions.joinModalDescOpen}
+          descRequest={t.sessions.joinModalDescRequest}
+          confirmLabel={joinTarget.join_policy === 'request' ? t.sessions.requestToJoin : t.sessions.joinSession}
+          cancelLabel={t.common.cancel}
+        />
+      ) : null}
     </RootTag>
   )
 })

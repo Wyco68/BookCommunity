@@ -19,7 +19,7 @@ export function SectionsLayout({
   return (
     <section className="stack">
       <article className="card stack">
-        <h2>{t.sessions.home}</h2>
+        <h2 style={{ margin: 0 }}>{t.sessions.home}</h2>
       </article>
 
       {hasJoinedSessions ? (
