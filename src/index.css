@@ -435,6 +435,7 @@ select option { background: var(--surface); color: var(--text-primary); }
   grid-template-columns: 2fr 3fr;
   gap: 0;
   min-height: 164px;
+  height: 100%;
 }
 
 .session-card-col-cover {
@@ -445,6 +446,37 @@ select option { background: var(--surface); color: var(--text-primary); }
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* ─── Fixed-size session card grid (used on Home + Categories) ───── */
+.session-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.session-card-fixed {
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.session-card-fixed .session-card-cols {
+  height: 100%;
+  min-height: 0;
+}
+
+.session-card-fixed .session-card-col-info {
+  height: 100%;
+  overflow: hidden;
+}
+
+.session-card-footer {
+  margin-top: auto;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
 }
 
 .session-card-cover-image {
@@ -625,12 +657,211 @@ select option { background: var(--surface); color: var(--text-primary); }
   margin-top: var(--space-2);
 }
 
+/* ─── Spinner ───────────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: var(--border-strong);
+  border-top-color: var(--electric-blue);
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-xs  { width: 14px; height: 14px; border-width: 2px; }
+.spinner-sm  { width: 20px; height: 20px; border-width: 2px; }
+.spinner-md  { width: 28px; height: 28px; border-width: 3px; }
+.spinner-lg  { width: 40px; height: 40px; border-width: 3px; }
+
+/* Page-level loading shell */
+.spinner-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Inline row */
+.spinner-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Join Policy Toggle */
+.join-policy-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.join-policy-toggle button {
+  border-radius: var(--radius-xs);
+  font-size: 0.875rem;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+}
+
+/* ─── Session Card Badges ───────────────────────────────────────── */
+.session-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--electric-blue);
+  color: #fff;
+  border: 1px solid var(--electric-blue);
+  letter-spacing: 0.02em;
+}
+
+.join-policy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 500;
+  border: 1px solid var(--border-strong);
+}
+
+.join-policy-badge-open {
+  background: rgba(34, 197, 94, 0.1);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.join-policy-badge-request {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.join-policy-badge-joined {
+  background: var(--brand-soft);
+  color: var(--electric-blue);
+  border-color: rgba(62, 106, 225, 0.25);
+}
+
+.join-policy-badge-owner {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* ─── Join Session Modal ─────────────────────────────────────────── */
+.join-modal { max-width: 380px; }
+
+.join-modal-header { display: flex; flex-direction: column; gap: var(--space-1); }
+.join-modal-title { font-size: 1.1rem; font-weight: 500; margin: 0; }
+
+.join-modal-policy { display: flex; flex-direction: column; gap: var(--space-2); }
+.join-modal-policy-pill { align-self: flex-start; }
+
+.join-modal-policy-request {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.join-modal-desc { line-height: 1.5; }
+
+/* ─── Load More row (cursor pagination) ─────────────────────────── */
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0 var(--space-2);
+}
+
+.load-more-row button {
+  min-width: 160px;
+}
+
+/* ─── Detail tab switch (reuses auth-switch) ─────────────────────── */
+.detail-tab-switch {
+  margin: 0;
+}
+
+/* ─── Per-chapter Save Progress row ──────────────────────────────── */
+.chapter-save-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) 0;
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.chapter-save-status {
+  margin: 0;
+  font-size: 0.85rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.chapter-save-btn {
+  white-space: nowrap;
+}
+
+/* ─── Owner unified save row ─────────────────────────────────────── */
+.owner-panel-save-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+/* ─── Member own-progress bar (read-only) ────────────────────────── */
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--electric-blue), #6b8cff);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
 /* ─── Responsive: mobile ≤640 ────────────────────────────────────── */
 @media (max-width: 640px) {
+  .session-grid { grid-template-columns: 1fr; }
+  .session-card-fixed { height: auto; min-height: 260px; }
   .session-card-cols { grid-template-columns: 1fr; min-height: auto; }
   .session-card-col-cover { min-height: 140px; max-height: 180px; border-right: none; border-bottom: 1px solid var(--border); }
   .session-meta-grid, .session-user-cols { grid-template-columns: 1fr; }
   .session-heading, .detail-header, .member-head, .comment-head { flex-wrap: wrap; }
+  .chapter-save-row { flex-direction: column; align-items: stretch; }
 }
 
 @media (max-width: 500px) {

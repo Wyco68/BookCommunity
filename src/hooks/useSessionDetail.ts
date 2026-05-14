@@ -15,6 +15,7 @@ export interface UseSessionDetailReturn {
   loading: boolean
   error: string | null
   loadDetail: (sessionId: string) => Promise<void>
+  refreshDetail: () => Promise<void>
   submitComment: (sessionId: string, userId: string, body: string) => Promise<void>
   toggleLike: (sessionId: string, userId: string, commentId: string) => Promise<void>
   approveRequest: (sessionId: string, request: SessionJoinRequest) => Promise<void>
@@ -34,6 +35,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const lastLoadRef = useRef<{ sessionId: string; time: number }>({ sessionId: '', time: 0 })
+  const currentSessionIdRef = useRef<string>('')
   // Per-instance set prevents duplicate profile fetches within this hook instance
   const fetchingProfileIds = useRef(new Set<string>())
 
@@ -41,6 +43,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
     const now = Date.now()
     if (lastLoadRef.current.sessionId === sessionId && now - lastLoadRef.current.time < 1000) return
     lastLoadRef.current = { sessionId, time: now }
+    currentSessionIdRef.current = sessionId
 
     setLoading(true)
 
@@ -139,6 +142,13 @@ export function useSessionDetail(): UseSessionDetailReturn {
     setLoading(false)
   }, [])
 
+  const refreshDetail = useCallback(async () => {
+    const sessionId = currentSessionIdRef.current
+    if (!sessionId) return
+    lastLoadRef.current = { sessionId, time: 0 }
+    await loadDetail(sessionId)
+  }, [loadDetail])
+
   const submitComment = useCallback(async (_sessionId: string, userId: string, body: string) => {
     if (!body.trim()) return
 
@@ -158,8 +168,10 @@ export function useSessionDetail(): UseSessionDetailReturn {
       setError(error.message)
     } else {
       recordAction(`comment:${userId}`, COMMENT_RATE_LIMIT.windowMs)
+      lastLoadRef.current = { sessionId: _sessionId, time: 0 }
+      await loadDetail(_sessionId)
     }
-  }, [])
+  }, [loadDetail])
 
   const toggleLike = useCallback(async (_sessionId: string, userId: string, commentId: string) => {
     const existingLike = likes.find((like) => like.comment_id === commentId && like.user_id === userId)
@@ -168,18 +180,21 @@ export function useSessionDetail(): UseSessionDetailReturn {
       const { error } = await supabase.from('comment_likes').delete().eq('id', existingLike.id)
       if (error) {
         setError(error.message)
+        return
       }
     } else {
       const { error } = await supabase.from('comment_likes').insert({
         comment_id: commentId,
         user_id: userId,
       })
-
       if (error) {
         setError(error.message)
+        return
       }
     }
-  }, [likes])
+    lastLoadRef.current = { sessionId: _sessionId, time: 0 }
+    await loadDetail(_sessionId)
+  }, [likes, loadDetail])
 
   const approveRequest = useCallback(async (sessionId: string, request: SessionJoinRequest) => {
     const updateResult = await supabase
@@ -200,8 +215,11 @@ export function useSessionDetail(): UseSessionDetailReturn {
 
     if (membershipResult.error && !membershipResult.error.message.toLowerCase().includes('duplicate')) {
       setError(membershipResult.error.message)
+      return
     }
-  }, [])
+    lastLoadRef.current = { sessionId, time: 0 }
+    await loadDetail(sessionId)
+  }, [loadDetail])
 
   const rejectRequest = useCallback(async (_sessionId: string, request: SessionJoinRequest) => {
     const { error } = await supabase
@@ -211,8 +229,11 @@ export function useSessionDetail(): UseSessionDetailReturn {
 
     if (error) {
       setError(error.message)
+      return
     }
-  }, [])
+    lastLoadRef.current = { sessionId: _sessionId, time: 0 }
+    await loadDetail(_sessionId)
+  }, [loadDetail])
 
   const clearDetail = useCallback(() => {
     setComments([])
@@ -275,6 +296,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
     loading,
     error,
     loadDetail,
+    refreshDetail,
     submitComment,
     toggleLike,
     approveRequest,

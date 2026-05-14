@@ -11,14 +11,40 @@ import { AppRouter } from './router/AppRouter'
 import { AuthLoadingView, AuthView } from './components/AuthView'
 import './App.css'
 
-export type { SessionFormState } from './hooks/useSessions'
-export { defaultSessionForm } from './hooks/useSessions'
-
 function App() {
   const auth = useAuth()
   const sessions = useSessions()
   const profile = useProfile()
   const t = translations[auth.language]
+
+  // ── Stable-ref destructuring for exhaustive-deps compliance ──────────────
+  // useState setters are guaranteed stable by React.
+  // useCallback([]) / useCallback([stableRef]) functions are stable across renders.
+  const { setError: authSetError, setUser: authSetUser, setLoading: authSetLoading } = auth
+  const { mode: authMode, signIn: authSignIn, signUp: authSignUp } = auth
+  const {
+    loadSessions,
+    refreshSessions,
+    createSession,
+    setSessions,
+    setMemberships,
+    setLatestProgress,
+    setProgressDrafts,
+    setMyJoinRequestStatus,
+    setSessionCategoryNames,
+    setSessionFirstMedia,
+    setSessionUploadedChapterCount,
+    setSessionReadChaptersByUsers,
+  } = sessions
+  const {
+    loadProfile,
+    setProfile: profileSetData,
+    setNameDraft: profileSetNameDraft,
+    setNotice: profileSetNotice,
+    setAvatarInputKey: profileSetAvatarInputKey,
+    setAvatarPreviewUrl: profileSetAvatarPreviewUrl,
+  } = profile
+  // ─────────────────────────────────────────────────────────────────────────
 
   const [sessionSearch, setSessionSearch] = useState('')
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all')
@@ -74,7 +100,7 @@ function App() {
     async function bootstrap() {
       const { data, error } = await supabase.auth.getSession()
       if (error) {
-        auth.setError(error.message)
+        authSetError(error.message)
       }
 
       if (!alive) {
@@ -82,45 +108,45 @@ function App() {
       }
 
       const activeUser = data.session?.user ?? null
-      auth.setUser(activeUser)
-      auth.setLoading(false)
+      authSetUser(activeUser)
+      authSetLoading(false)
 
       if (activeUser) {
         await Promise.all([
-          sessions.loadSessions(activeUser),
-          profile.loadProfile(activeUser.id),
+          loadSessions(activeUser),
+          loadProfile(activeUser.id),
         ])
       }
     }
 
     bootstrap().catch((error: unknown) => {
-      auth.setError(error instanceof Error ? error.message : 'Unexpected authentication error')
-      auth.setLoading(false)
+      authSetError(error instanceof Error ? error.message : 'Unexpected authentication error')
+      authSetLoading(false)
     })
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       const activeUser = session?.user ?? null
-      auth.setUser(activeUser)
-      auth.setLoading(false)
+      authSetUser(activeUser)
+      authSetLoading(false)
       if (activeUser) {
-        Promise.all([sessions.loadSessions(activeUser), profile.loadProfile(activeUser.id)]).catch((error: unknown) => {
-          auth.setError(error instanceof Error ? error.message : 'Failed to load sessions')
+        Promise.all([loadSessions(activeUser), loadProfile(activeUser.id)]).catch((error: unknown) => {
+          authSetError(error instanceof Error ? error.message : 'Failed to load sessions')
         })
       } else {
-        sessions.setSessions([])
-        sessions.setMemberships({})
-        sessions.setLatestProgress({})
-        sessions.setProgressDrafts({})
-        sessions.setMyJoinRequestStatus({})
-        sessions.setSessionCategoryNames({})
-        sessions.setSessionFirstMedia({})
-        sessions.setSessionUploadedChapterCount({})
-        sessions.setSessionReadChaptersByUsers({})
-        profile.setProfile(null)
-        profile.setNameDraft('')
-        profile.setNotice(null)
-        profile.setAvatarInputKey(0)
-        profile.setAvatarPreviewUrl(null)
+        setSessions([])
+        setMemberships({})
+        setLatestProgress({})
+        setProgressDrafts({})
+        setMyJoinRequestStatus({})
+        setSessionCategoryNames({})
+        setSessionFirstMedia({})
+        setSessionUploadedChapterCount({})
+        setSessionReadChaptersByUsers({})
+        profileSetData(null)
+        profileSetNameDraft('')
+        profileSetNotice(null)
+        profileSetAvatarInputKey(0)
+        profileSetAvatarPreviewUrl(null)
       }
     })
 
@@ -128,26 +154,53 @@ function App() {
       alive = false
       authListener.subscription.unsubscribe()
     }
-  }, [])
+  }, [
+    authSetError, authSetUser, authSetLoading,
+    loadSessions, loadProfile,
+    setSessions, setMemberships, setLatestProgress, setProgressDrafts,
+    setMyJoinRequestStatus, setSessionCategoryNames, setSessionFirstMedia,
+    setSessionUploadedChapterCount, setSessionReadChaptersByUsers,
+    profileSetData, profileSetNameDraft, profileSetNotice,
+    profileSetAvatarInputKey, profileSetAvatarPreviewUrl,
+  ])
+
+  // Refetch sessions when user returns to the tab / window
+  useEffect(() => {
+    if (!auth.user) return
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        void refreshSessions()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [auth.user, refreshSessions])
 
   const handleAuthSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (auth.mode === 'sign-in') {
-      void auth.signIn()
+    if (authMode === 'sign-in') {
+      void authSignIn()
     } else {
-      void auth.signUp()
+      void authSignUp()
     }
-  }, [auth.mode, auth.signIn, auth.signUp])
+  }, [authMode, authSignIn, authSignUp])
 
   const handleCreateSession = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!auth.user) {
       return Promise.resolve()
     }
-    return sessions.createSession(auth.user, sessionForm).then(() => {
+    return createSession(auth.user, sessionForm).then(() => {
       setSessionForm(defaultSessionForm)
     })
-  }, [auth.user, sessionForm])
+  }, [auth.user, sessionForm, createSession])
 
   const handleJoinSession = useCallback(async (sessionId: string) => {
     if (!auth.user) {
@@ -209,6 +262,9 @@ function App() {
   const searchListProps = {
     ...listPanelProps,
     filteredSessions: combinedSearchSessions,
+    hasMore: sessions.hasMore,
+    loadingMore: sessions.loadingMore,
+    onLoadMore: sessions.loadMoreSessions,
   }
 
   const sectionsListProps = {

@@ -157,6 +157,53 @@ export async function deleteSessionMediaForSession(
   return null
 }
 
+/**
+ * Delete cover image(s) for a session from the session-covers bucket.
+ *
+ * Covers live at: `{user_id}/{session_id}/cover.{ext}`. We try the known
+ * stored path first (when available) and additionally list+remove any
+ * remaining objects under `{user_id}/{session_id}/` as a defensive sweep
+ * to avoid orphans (e.g. abandoned uploads with a different extension).
+ *
+ * Returns null on success, or the first error message encountered.
+ */
+export async function deleteSessionCover(
+  userId: string,
+  sessionId: string,
+  knownPath?: string | null,
+): Promise<string | null> {
+  if (!userId || !sessionId) {
+    return null
+  }
+
+  const folder = `${userId}/${sessionId}`
+  const toRemove = new Set<string>()
+
+  if (knownPath && pathContainsSessionId(knownPath, sessionId)) {
+    toRemove.add(knownPath)
+  }
+
+  const { data: listed, error: listError } = await supabase.storage
+    .from(SESSION_COVERS_BUCKET)
+    .list(folder, { limit: 100 })
+
+  if (listError && !knownPath) {
+    return listError.message
+  }
+
+  for (const obj of listed ?? []) {
+    if (obj?.name) toRemove.add(`${folder}/${obj.name}`)
+  }
+
+  if (toRemove.size === 0) return null
+
+  const { error: removeError } = await supabase.storage
+    .from(SESSION_COVERS_BUCKET)
+    .remove(Array.from(toRemove))
+
+  return removeError ? removeError.message : null
+}
+
 async function compressImage(file: File, quality: number, maxDimension: number): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image()
