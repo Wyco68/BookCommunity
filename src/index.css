@@ -30,6 +30,7 @@
   /* Semantic */
   --danger: #ef4444;
   --danger-soft: rgba(239, 68, 68, 0.1);
+  --success: #86efac;
 
   /* Radius — DESIGN.md: 4px interactive, 12px cards */
   --radius-xs: 4px;
@@ -834,6 +835,14 @@ select option { background: var(--surface); color: var(--text-primary); }
   gap: var(--space-3);
   padding-top: var(--space-2);
   border-top: 1px solid var(--border);
+}
+
+.manage-settings-notice--ok {
+  color: var(--success);
+}
+
+.manage-settings-notice--error {
+  color: var(--danger);
 }
 
 /* ─── Member own-progress bar (read-only) ────────────────────────── */

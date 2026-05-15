@@ -3,6 +3,7 @@ import type { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import type { Comment, Profile } from '../../types'
 import { Avatar } from '../Avatar'
+import { MAX_COMMENT_LENGTH } from '../../lib/validation'
 
 type Copy = (typeof translations)[Language]
 
@@ -53,6 +54,7 @@ export function DiscussionTab({
       <form className="stack" onSubmit={onSubmitComment}>
         <textarea
           value={commentDraft}
+          maxLength={MAX_COMMENT_LENGTH}
           onChange={(event) => onCommentDraftChange(event.target.value)}
           placeholder={t.sessions.commentPlaceholder}
           aria-label={t.sessions.yourComment}

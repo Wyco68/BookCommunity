@@ -12,11 +12,19 @@ const AVATAR_MIME_TO_EXT: Record<string, string> = {
   'image/webp': 'webp',
 }
 
+const SESSION_MEDIA_MIME_TO_EXT: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'application/pdf': 'pdf',
+  'application/epub+zip': 'epub',
+}
+
 export async function uploadAvatarFile(
   userId: string,
   file: File,
 ): Promise<{ path: string; error: string | null }> {
-  const ext = AVATAR_MIME_TO_EXT[file.type] ?? file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+  const ext = AVATAR_MIME_TO_EXT[file.type] ?? 'jpg'
   const path = `${userId}/avatar.${ext}`
 
   const { error } = await supabase.storage
@@ -36,7 +44,7 @@ export async function uploadSessionMedia(
   file: File,
   mediaType: MediaType,
 ): Promise<{ path: string; error: string | null }> {
-  const extension = file.name.split('.').pop()?.toLowerCase() || 'bin'
+  const extension = SESSION_MEDIA_MIME_TO_EXT[file.type] ?? 'bin'
   const path = `${sessionId}/${userId}/${crypto.randomUUID()}.${extension}`
 
   let uploadFile = file
@@ -160,10 +168,10 @@ export async function deleteSessionMediaForSession(
 /**
  * Delete cover image(s) for a session from the session-covers bucket.
  *
- * Covers live at: `{user_id}/{session_id}/cover.{ext}`. We try the known
- * stored path first (when available) and additionally list+remove any
- * remaining objects under `{user_id}/{session_id}/` as a defensive sweep
- * to avoid orphans (e.g. abandoned uploads with a different extension).
+ * Covers live at: `{user_id}/{session_id}/cover.{ext}`. When a trusted
+ * `knownPath` is present, we remove only that object (skip folder list —
+ * list can 400 under strict storage RLS). Otherwise we list the folder
+ * and remove all objects as a defensive sweep for orphan filenames.
  *
  * Returns null on success, or the first error message encountered.
  */
@@ -179,27 +187,32 @@ export async function deleteSessionCover(
   const folder = `${userId}/${sessionId}`
   const toRemove = new Set<string>()
 
-  if (knownPath && pathContainsSessionId(knownPath, sessionId)) {
-    toRemove.add(knownPath)
+  const trimmedKnown = knownPath?.trim() ?? ''
+  const hasTrustedKnownPath =
+    trimmedKnown.length > 0 && pathContainsSessionId(trimmedKnown, sessionId)
+
+  if (hasTrustedKnownPath) {
+    toRemove.add(trimmedKnown)
+  } else {
+    const { data: listed, error: listError } = await supabase.storage
+      .from(SESSION_COVERS_BUCKET)
+      .list(folder, { limit: 100 })
+
+    if (listError) {
+      return listError.message
+    }
+
+    for (const obj of listed ?? []) {
+      if (obj?.name) toRemove.add(`${folder}/${obj.name}`)
+    }
   }
 
-  const { data: listed, error: listError } = await supabase.storage
-    .from(SESSION_COVERS_BUCKET)
-    .list(folder, { limit: 100 })
-
-  if (listError && !knownPath) {
-    return listError.message
-  }
-
-  for (const obj of listed ?? []) {
-    if (obj?.name) toRemove.add(`${folder}/${obj.name}`)
-  }
-
-  if (toRemove.size === 0) return null
+  const paths = Array.from(toRemove).filter((p) => typeof p === 'string' && p.length > 0)
+  if (paths.length === 0) return null
 
   const { error: removeError } = await supabase.storage
     .from(SESSION_COVERS_BUCKET)
-    .remove(Array.from(toRemove))
+    .remove(paths)
 
   return removeError ? removeError.message : null
 }

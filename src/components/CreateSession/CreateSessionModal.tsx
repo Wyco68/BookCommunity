@@ -5,6 +5,13 @@ import { supabase } from '../../lib/supabase'
 import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import type { Category, ReadingSession } from '../../types'
+import { getAvatarExtension } from '../../lib/avatar'
+import {
+  validateBookAuthor,
+  validateBookTitle,
+  validateDescription,
+  validateTotalChapters,
+} from '../../lib/validation'
 
 const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
@@ -52,12 +59,29 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
     event.preventDefault()
     setError(null)
 
-    if (!title.trim()) { setError(t.sessionForm.titleRequired); return }
-    if (!author.trim()) { setError(t.sessionForm.authorRequired); return }
+    const titleCheck = validateBookTitle(title)
+    if (!titleCheck.valid) {
+      setError(titleCheck.error ?? t.sessionForm.titleRequired)
+      return
+    }
+
+    const authorCheck = validateBookAuthor(author)
+    if (!authorCheck.valid) {
+      setError(authorCheck.error ?? t.sessionForm.authorRequired)
+      return
+    }
 
     const totalChapters = chapters === '' ? null : Number(chapters)
-    if (totalChapters !== null && (totalChapters < 1 || !Number.isInteger(totalChapters))) {
-      setError(t.sessionForm.chaptersPositiveInt)
+    const chaptersToUse = totalChapters ?? 12
+    const chaptersCheck = validateTotalChapters(chaptersToUse)
+    if (!chaptersCheck.valid) {
+      setError(chaptersCheck.error ?? t.sessionForm.chaptersPositiveInt)
+      return
+    }
+
+    const descCheck = validateDescription(description)
+    if (!descCheck.valid) {
+      setError(descCheck.error ?? 'Invalid description')
       return
     }
     if (selectedCategoryId === null) { setError(t.sessionForm.selectCategory); return }
@@ -76,7 +100,7 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
       {
         p_book_title:     title.trim(),
         p_book_author:    author.trim(),
-        p_total_chapters: totalChapters ?? 12,
+        p_total_chapters: chaptersToUse,
         p_visibility:     visibility,
         p_join_policy:    joinPolicy,
         p_category_id:    selectedCategoryId,
@@ -97,7 +121,7 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
     if (!userId) { setError(t.sessionForm.mustBeSignedIn); setCreating(false); return }
 
     if (coverFile) {
-      const ext = coverFile.name.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const ext = getAvatarExtension(coverFile)
       const coverPath = `${userId}/${session.id}/cover.${ext}`
       const { error: uploadError } = await supabase.storage
         .from('session-covers')

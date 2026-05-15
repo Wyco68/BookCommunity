@@ -213,6 +213,8 @@ export const de = {
     removing: 'Wird entfernt...',
     deleteSession: 'Session löschen',
     deleteConfirm: 'Möchten Sie diese Session wirklich löschen? Dieser Vorgang ist endgültig und entfernt alle Mitglieder, Medien und Fortschrittsdaten.',
+    removeMemberConfirm:
+      'Dieses Mitglied aus der Session entfernen? Es kann später erneut beitreten, wenn die Session dies zulässt.',
   },
   media: {
     uploadChapter: (n: number) => `Kapitel ${n} hochladen`,

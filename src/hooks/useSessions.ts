@@ -16,6 +16,14 @@ import {
   buildLatestProgressBySession,
   buildMembershipLookup,
 } from '../lib/sessionData'
+import {
+  validateBookAuthor,
+  validateBookTitle,
+  validateDescription,
+  validateJoinPolicy,
+  validateTotalChapters,
+  validateVisibility,
+} from '../lib/validation'
 
 export interface SessionFormState {
   bookTitle: string
@@ -405,8 +413,34 @@ export function useSessions(): UseSessionsReturn {
   }, [loadSessions])
 
   const createSession = useCallback(async (user: User, form: SessionFormState) => {
-    if (!form.bookTitle.trim() || !form.bookAuthor.trim()) {
-      setError('Book title and author are required')
+    const titleCheck = validateBookTitle(form.bookTitle)
+    if (!titleCheck.valid) {
+      setError(titleCheck.error ?? 'Invalid book title')
+      return
+    }
+    const authorCheck = validateBookAuthor(form.bookAuthor)
+    if (!authorCheck.valid) {
+      setError(authorCheck.error ?? 'Invalid author')
+      return
+    }
+    const chaptersCheck = validateTotalChapters(form.totalChapters)
+    if (!chaptersCheck.valid) {
+      setError(chaptersCheck.error ?? 'Invalid chapter count')
+      return
+    }
+    const descCheck = validateDescription(form.description)
+    if (!descCheck.valid) {
+      setError(descCheck.error ?? 'Invalid description')
+      return
+    }
+    const visCheck = validateVisibility(form.visibility)
+    if (!visCheck.valid) {
+      setError(visCheck.error ?? 'Invalid visibility')
+      return
+    }
+    const joinCheck = validateJoinPolicy(form.joinPolicy)
+    if (!joinCheck.valid) {
+      setError(joinCheck.error ?? 'Invalid join policy')
       return
     }
 
