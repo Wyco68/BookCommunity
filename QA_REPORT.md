@@ -80,11 +80,7 @@ This single change is correct for both branches and makes the existing comment "
 
 ### 2.2 MEDIUM — Unexpected `Study` category in `public.categories`
 
-`public.categories` contains 6 rows: `Action, Adventure, Romance, Drama, Comedy, Study`. Per `projectSpec.md` §11 ("Categories"), the seed is the first five, and the table is meant to be read-only application data. The `Study` row was already there before this QA run.
-
-Either:
-- The spec needs to be updated to acknowledge `Study` as a valid sixth seed, or
-- The row should be removed (and any existing sessions in category 6 reassigned), and the `categories` SELECT-only RLS policy verified so no client can insert more rows.
+`public.categories` contains 6 rows: `Action, Adventure, Romance, Drama, Comedy, Study`. **Resolved:** `Study` is documented in `docs/projectspec.md` and seeded in `supabase/schema.sql`.
 
 Verify quickly with `select * from public.categories order by id;`.
 
@@ -195,18 +191,22 @@ The access-gate page (non-member viewing an open session by URL) renders a singl
 
 ## 4. Recommended fix order
 
-1. **§2.1 ManageTab filter** — one-line change, immediately unblocks the "members see other members' progress" requirement.
-2. **§2.7 storage list 400** — skip defensive list when `knownPath` is present.
-3. **§2.5 Save-settings toast** — wire the existing `settingsNotice` to a 2-second success message.
-4. **§2.6 Remove-member confirm** — reuse `ConfirmModal`.
-5. **§2.2 Stray `Study` category** — decide policy, update seed or remove row.
-6. **§2.3 / §2.4** — polish, schedule for the next iteration.
+**Status: recommended fixes completed (2026-05-15).**
+
+| Item | Status |
+|------|--------|
+| §2.1 ManageTab filter | Done — non-owners see other members including owner; owner excluded from progress list |
+| §2.7 storage list 400 | Done — skip `storage.list` when `knownPath` is set |
+| §2.5 Save-settings toast | Done — `settingsNotice` success message, 2s auto-hide |
+| §2.6 Remove-member confirm | Done — `ConfirmModal` before removal |
+| §2.2 `Study` category | Done — added to seed + `schema.sql` / spec |
+| §2.3 / §2.4 pagination & search state | Open — polish for a future iteration |
 
 ---
 
 ## 5. Backend / RLS audit notes (no changes required)
 
-Spot-checked the policies and helper functions referenced in `projectSpec.md`:
+Spot-checked the policies and helper functions referenced in `docs/projectspec.md`:
 
 - `is_session_member`, `can_access_session`, `max_uploaded_chapter` all present and `security definer` with `set_config('row_security', 'off', true)` to avoid recursion (per `fix_progress_rls_security_definer.sql`).
 - `reading_sessions.select` allows `visibility='public' or auth.uid() in session_members or auth.uid() = creator_id` — correct, lets us discover public sessions without breaking detail-page gating.
