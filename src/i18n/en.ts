@@ -213,6 +213,8 @@ export const en = {
     removing: 'Removing…',
     deleteSession: 'Delete Session',
     deleteConfirm: 'Delete this session? This cannot be undone and will remove all members, media, and progress.',
+    removeMemberConfirm:
+      'Remove this member from the session? They can re-join later if the session allows it.',
   },
   media: {
     uploadChapter: (n: number) => `Upload Chapter ${n}`,

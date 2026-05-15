@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import type { Comment, CommentLike, Profile, ProgressUpdate, SessionJoinRequest, SessionMembership } from '../types'
 import { resolveAvatarUrlMap, isRemoteUrl } from '../lib/avatar'
 import { checkRateLimit, recordAction, COMMENT_RATE_LIMIT } from '../lib/rateLimit'
+import { validateComment } from '../lib/validation'
 
 
 export interface UseSessionDetailReturn {
@@ -150,7 +151,14 @@ export function useSessionDetail(): UseSessionDetailReturn {
   }, [loadDetail])
 
   const submitComment = useCallback(async (_sessionId: string, userId: string, body: string) => {
-    if (!body.trim()) return
+    const trimmed = body.trim()
+    if (!trimmed) return
+
+    const commentCheck = validateComment(trimmed)
+    if (!commentCheck.valid) {
+      setError(commentCheck.error ?? 'Invalid comment')
+      return
+    }
 
     const rateCheck = checkRateLimit(`comment:${userId}`, COMMENT_RATE_LIMIT)
     if (!rateCheck.allowed) {
@@ -161,7 +169,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
     const { error } = await supabase.from('comments').insert({
       session_id: _sessionId,
       user_id: userId,
-      body: body.trim(),
+      body: trimmed,
     })
 
     if (error) {

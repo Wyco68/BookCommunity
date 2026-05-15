@@ -36,3 +36,7 @@ opencode.json
 
 /mobile-app
 project-analysis.json
+
+
+.playwright-mcp
+*.png

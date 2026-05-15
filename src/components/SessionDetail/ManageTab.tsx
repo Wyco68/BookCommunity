@@ -80,9 +80,11 @@ export function ManageTab({
     )
   }
 
-  // Members visible to *everyone* with access — owner sees all,
-  // non-owner members see all other members (excluding themselves for the action column).
-  const otherMembers = sessionMembers.filter((m) => m.user_id !== session.creator_id)
+  // Owner is excluded from progress tracking (DB + UI): never list the creator in the
+  // owner’s “Member Progress” table. Non-owners see everyone else in the session (including
+  // the owner’s row with 0/… progress since owners do not record updates).
+  const membersForOwnerProgress = sessionMembers.filter((m) => m.user_id !== session.creator_id)
+  const membersForMemberProgress = sessionMembers.filter((m) => m.user_id !== currentUserId)
 
   // Member (non-owner) view: own progress, read-only member list, leave action
   if (!isOwner) {
@@ -108,11 +110,11 @@ export function ManageTab({
         {/* Members + their progress (read-only for non-owner members). */}
         <section className="detail-pane stack">
           <h3 style={{ margin: 0 }}>{t.sessions.memberProgress}</h3>
-          {otherMembers.length === 0 ? (
+          {membersForMemberProgress.length === 0 ? (
             <p className="subtle">{t.manage.noOtherMembers}</p>
           ) : (
             <ul className="member-list">
-              {otherMembers.map((member) => {
+              {membersForMemberProgress.map((member) => {
                 const profile = sessionProfiles[member.user_id]
                 const chapter = memberLatestProgress[member.user_id] ?? 0
                 const displayName = profile?.display_name || member.user_id.slice(0, 8)
@@ -214,7 +216,17 @@ export function ManageTab({
           >
             {savingSettings ? t.common.saving : t.manage.saveSettings}
           </button>
-          {settingsNotice ? <span className="subtle">{settingsNotice}</span> : null}
+          {settingsNotice ? (
+            <span
+              className={
+                settingsNotice.startsWith('Failed:')
+                  ? 'subtle manage-settings-notice--error'
+                  : 'subtle manage-settings-notice--ok'
+              }
+            >
+              {settingsNotice}
+            </span>
+          ) : null}
         </div>
       </section>
 
@@ -265,14 +277,14 @@ export function ManageTab({
         )}
       </section>
 
-      {/* Members + their progress (OWNER ONLY view). Owner row excluded. */}
+      {/* Members + progress: everyone except the session creator (owners do not track reading). */}
       <section className="detail-pane stack">
         <h3 style={{ margin: 0 }}>{t.sessions.memberProgress}</h3>
-        {otherMembers.length === 0 ? (
+        {membersForOwnerProgress.length === 0 ? (
           <p className="subtle">{t.manage.noOtherMembers}</p>
         ) : (
           <ul className="member-list">
-            {otherMembers.map((member) => {
+            {membersForOwnerProgress.map((member) => {
               const profile = sessionProfiles[member.user_id]
               const chapter = memberLatestProgress[member.user_id] ?? 0
               const displayName = profile?.display_name || member.user_id.slice(0, 8)

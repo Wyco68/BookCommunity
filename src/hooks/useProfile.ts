@@ -7,6 +7,7 @@ import {
   MAX_AVATAR_BYTES,
   resolveAvatarUrl,
 } from '../lib/avatar'
+import { validateDisplayName } from '../lib/validation'
 
 export interface UseProfileReturn {
   profile: Profile | null
@@ -100,6 +101,13 @@ export function useProfile(): UseProfileReturn {
     setNotice(null)
 
     const trimmedName = nameDraft.trim()
+
+    const nameCheck = validateDisplayName(nameDraft)
+    if (!nameCheck.valid) {
+      setError(nameCheck.error ?? 'Invalid display name')
+      setSaving(false)
+      return
+    }
 
     const { error } = await supabase
       .from('profiles')

@@ -63,6 +63,7 @@ Seeded values:
 - Romance
 - Drama
 - Comedy
+- Study
 
 `public.session_categories`
 
@@ -226,6 +227,7 @@ Recommended join shape:
 UI must require user confirmation for:
 - uploading a new chapter
 - deleting a session
+- removing a member from a session (owner action)
 
 These are UI safeguards and do not replace DB authorization.
 
@@ -323,7 +325,8 @@ values
   ('Adventure'),
   ('Romance'),
   ('Drama'),
-  ('Comedy')
+  ('Comedy'),
+  ('Study')
 on conflict (name) do nothing;
 
 -- 5) Session-category mapping (at least 1 category per session)

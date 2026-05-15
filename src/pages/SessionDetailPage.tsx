@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
@@ -55,6 +55,8 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   const [deletingSession, setDeletingSession] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [removeMemberConfirmId, setRemoveMemberConfirmId] = useState<string | null>(null)
+  const settingsNoticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null)
   const [progressError, setProgressError] = useState<string | null>(null)
@@ -78,6 +80,15 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
 
   const isMember = Boolean(membership)
   const isOwner = Boolean(session && session.creator_id === userId)
+
+  useEffect(() => {
+    return () => {
+      if (settingsNoticeTimeoutRef.current) {
+        clearTimeout(settingsNoticeTimeoutRef.current)
+        settingsNoticeTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!userId) return
@@ -313,10 +324,18 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
           : prev,
       )
       setSettingsNotice(t.manage.settingsSaved)
-      setTimeout(() => setSettingsNotice(null), 2000)
+      if (settingsNoticeTimeoutRef.current) clearTimeout(settingsNoticeTimeoutRef.current)
+      settingsNoticeTimeoutRef.current = setTimeout(() => {
+        settingsNoticeTimeoutRef.current = null
+        setSettingsNotice(null)
+      }, 2000)
     },
     [sessionId, isOwner, session, t.manage.settingsSaved],
   )
+
+  const requestRemoveMember = useCallback(async (memberId: string) => {
+    setRemoveMemberConfirmId(memberId)
+  }, [])
 
   const handleRemoveMember = useCallback(async (memberId: string) => {
     if (!sessionId || !isOwner || memberId === userId) return
@@ -623,7 +642,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
         savingSettings={savingSettings}
         settingsNotice={settingsNotice}
         onSaveSettings={isOwner ? handleSaveSettings : undefined}
-        onRemoveMember={isOwner ? handleRemoveMember : undefined}
+        onRemoveMember={isOwner ? requestRemoveMember : undefined}
         removingMemberId={removingMemberId}
         onDeleteSession={isOwner ? () => setShowDeleteConfirm(true) : undefined}
         onLeaveSession={handleLeaveSession}
@@ -651,6 +670,21 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
             void handleDeleteSession()
           }}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      ) : null}
+
+      {removeMemberConfirmId ? (
+        <ConfirmModal
+          message={t.manage.removeMemberConfirm}
+          confirmLabel={removingMemberId ? t.common.working : t.manage.remove}
+          cancelLabel={t.common.cancel}
+          dangerous
+          onConfirm={() => {
+            const id = removeMemberConfirmId
+            setRemoveMemberConfirmId(null)
+            void handleRemoveMember(id)
+          }}
+          onCancel={() => setRemoveMemberConfirmId(null)}
         />
       ) : null}
     </section>
