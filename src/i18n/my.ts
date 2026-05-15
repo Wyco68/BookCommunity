@@ -49,6 +49,10 @@ export const my = {
     signedInAs: 'လက်ရှိဝင်ထားသူ -',
     welcomeBack: 'ပြန်လည်ကြိုဆိုပါတယ်',
     joinedSessionsSummary: (count: number) => `သင်ပါဝင်ထားသော အဖွဲ့ ${count} ခု ရှိသည်။ ဆက်လက်ဖတ်ရှုပါ။`,
+    continueWithGoogle: 'Google ဖြင့် ဆက်လက်ပါ',
+    orDivider: 'သို့မဟုတ်',
+    redirectingGoogle: 'Google သို့ ပြန်ညွှန်းနေသည်…',
+    completingOAuth: 'ဝင်ရောက်မှု ပြီးစီးနေသည်…',
   },
   profile: {
     title: 'ပရိုဖိုင်',

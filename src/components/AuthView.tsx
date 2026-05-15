@@ -15,11 +15,13 @@ interface AuthViewProps {
   authPassword: string
   authError: string | null
   authBusy: boolean
+  googleBusy: boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onAuthModeChange: (mode: AuthMode) => void
   onAuthEmailChange: (value: string) => void
   onAuthPasswordChange: (value: string) => void
   onLanguageChange: (language: Language) => void
+  onGoogleSignIn: () => void
 }
 
 export function AuthView({
@@ -30,12 +32,16 @@ export function AuthView({
   authPassword,
   authError,
   authBusy,
+  googleBusy,
   onSubmit,
   onAuthModeChange,
   onAuthEmailChange,
   onAuthPasswordChange,
   onLanguageChange,
+  onGoogleSignIn,
 }: AuthViewProps) {
+  const disableEmailAuth = authBusy || googleBusy
+
   return (
     <main className="shell">
       <section className="card auth-card">
@@ -50,6 +56,7 @@ export function AuthView({
               type="button"
               className={`auth-switch-option ${authMode === 'sign-in' ? 'auth-switch-option-active' : ''}`}
               onClick={() => onAuthModeChange('sign-in')}
+              disabled={disableEmailAuth}
             >
               {t.auth.signIn}
             </button>
@@ -57,6 +64,7 @@ export function AuthView({
               type="button"
               className={`auth-switch-option ${authMode === 'sign-up' ? 'auth-switch-option-active' : ''}`}
               onClick={() => onAuthModeChange('sign-up')}
+              disabled={disableEmailAuth}
             >
               {t.auth.signUp}
             </button>
@@ -69,6 +77,7 @@ export function AuthView({
             placeholder={t.auth.emailPlaceholder}
             autoComplete="email"
             aria-label={t.auth.email}
+            disabled={disableEmailAuth}
           />
 
           <input
@@ -78,14 +87,31 @@ export function AuthView({
             placeholder={t.auth.passwordPlaceholder}
             autoComplete={authMode === 'sign-in' ? 'current-password' : 'new-password'}
             aria-label={t.auth.password}
+            disabled={disableEmailAuth}
           />
 
           {authError ? <p className="error">{authError}</p> : null}
 
-          <button type="submit" className="primary" disabled={authBusy}>
+          <button type="submit" className="primary" disabled={disableEmailAuth}>
             {authBusy ? t.common.pleaseWait : authMode === 'sign-in' ? t.auth.signIn : t.auth.createAccount}
           </button>
         </form>
+
+        <div className="stack">
+          <p className="auth-oauth-divider" role="presentation">
+            <span>{t.auth.orDivider}</span>
+          </p>
+          <button
+            type="button"
+            className="secondary auth-google-btn"
+            onClick={() => {
+              void onGoogleSignIn()
+            }}
+            disabled={disableEmailAuth}
+          >
+            {googleBusy ? t.auth.redirectingGoogle : t.auth.continueWithGoogle}
+          </button>
+        </div>
 
         <div className="auth-switch auth-switch-corner" role="tablist" aria-label={t.language.switchLabel}>
           <button

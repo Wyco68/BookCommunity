@@ -49,6 +49,10 @@ export const en = {
     signedInAs: 'Signed in as',
     welcomeBack: 'Welcome back',
     joinedSessionsSummary: (count: number) => `${count} joined sessions. Keep your chapter streak alive.`,
+    continueWithGoogle: 'Continue with Google',
+    orDivider: 'or',
+    redirectingGoogle: 'Redirecting to Google…',
+    completingOAuth: 'Completing sign-in…',
   },
   profile: {
     title: 'Profile',
