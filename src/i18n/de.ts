@@ -49,6 +49,10 @@ export const de = {
     signedInAs: 'Angemeldet als',
     welcomeBack: 'Willkommen zurück',
     joinedSessionsSummary: (count: number) => `${count} Sessions beigetreten. Lesen Sie weiter.`,
+    continueWithGoogle: 'Mit Google fortfahren',
+    orDivider: 'oder',
+    redirectingGoogle: 'Weiterleitung zu Google…',
+    completingOAuth: 'Anmeldung wird abgeschlossen…',
   },
   profile: {
     title: 'Profil',

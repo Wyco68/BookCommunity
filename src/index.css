@@ -278,6 +278,31 @@ select option { background: var(--surface); color: var(--text-primary); }
   color: #fff;
 }
 
+.auth-google-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.auth-oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.auth-oauth-divider::before,
+.auth-oauth-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
+.auth-oauth-divider span { flex-shrink: 0; }
+
 /* ─── 10. Avatars ───────────────────────────────────────────────── */
 .avatar {
   border-radius: 50%;

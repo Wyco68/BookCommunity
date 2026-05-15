@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Language } from '../i18n'
+import { APP_PATHS } from '../router/paths'
 
 const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
@@ -24,6 +25,8 @@ export interface UseAuthReturn {
   signIn: () => Promise<void>
   signUp: () => Promise<void>
   signOut: () => Promise<void>
+  signInWithGoogle: () => Promise<void>
+  googleBusy: boolean
 }
 
 export function useAuth(): UseAuthReturn {
@@ -41,6 +44,7 @@ export function useAuth(): UseAuthReturn {
   }, [])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [googleBusy, setGoogleBusy] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in')
@@ -88,6 +92,20 @@ export function useAuth(): UseAuthReturn {
     await supabase.auth.signOut()
   }, [])
 
+  const signInWithGoogle = useCallback(async () => {
+    setGoogleBusy(true)
+    setError(null)
+    const redirectTo = `${window.location.origin}${APP_PATHS.authCallback}`
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    })
+    if (oauthError) {
+      setError(oauthError.message)
+      setGoogleBusy(false)
+    }
+  }, [])
+
   return {
     user,
     loading,
@@ -107,5 +125,7 @@ export function useAuth(): UseAuthReturn {
     signIn,
     signUp,
     signOut,
+    signInWithGoogle,
+    googleBusy,
   }
 }
