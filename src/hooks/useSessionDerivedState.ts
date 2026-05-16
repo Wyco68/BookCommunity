@@ -32,7 +32,7 @@ export function useSessionDerivedState({
   sessionSearch,
 }: UseSessionDerivedStateInput) {
   const joinedSessionCount = useMemo(
-    () => sessions.filter((session) => memberships[session.id] && session.status === 'active').length,
+    () => sessions.filter((session) => memberships[session.id] && session.status_type === 'ongoing').length,
     [sessions, memberships],
   )
 

@@ -7,14 +7,12 @@ interface SearchInputProps {
 
 export function SearchInput({ value, label, placeholder, onChange }: SearchInputProps) {
   return (
-    <label className="field">
-      <span>{label}</span>
-      <input
-        type="text"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-      />
-    </label>
+    <input
+      type="text"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      placeholder={placeholder}
+      aria-label={label}
+    />
   )
 }

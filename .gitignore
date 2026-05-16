@@ -16,6 +16,8 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+skills-lock.json
+.agents
 .idea
 .DS_Store
 *.suo
@@ -25,7 +27,16 @@ dist-ssr
 *.sw?
 
 
-/supabase/schema.sql   
+/supabase
 
+AGENTS.md
 DESIGN.md 
+opencode.json
+
+
 /mobile-app
+project-analysis.json
+
+
+.playwright-mcp
+*.png

@@ -1,34 +1,36 @@
 import { JoinedSectionsList } from './JoinedSectionsList'
-import { SectionDetails } from './SectionDetails'
 import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import type { SessionListPanelProps } from '../SessionListPanel'
-import type { SessionDetailPanelProps } from '../SessionDetailPanel'
 
 type Copy = (typeof translations)[Language]
 
 interface SectionsLayoutProps {
   t: Copy
   listProps: SessionListPanelProps
-  detailProps: SessionDetailPanelProps
 }
 
 export function SectionsLayout({
   t,
   listProps,
-  detailProps,
 }: SectionsLayoutProps) {
+  const hasJoinedSessions = listProps.filteredSessions.length > 0 || listProps.loadingSessions
+
   return (
     <section className="stack">
       <article className="card stack">
-        <h2>Sections</h2>
-        <p className="subtle">Select a joined section to review {t.sessions.memberProgress.toLowerCase()} and discussion.</p>
+        <h2 style={{ margin: 0 }}>{t.sessions.home}</h2>
       </article>
 
-      <section className="sections-grid">
+      {hasJoinedSessions ? (
         <JoinedSectionsList listProps={listProps} />
-        <SectionDetails detailProps={detailProps} />
-      </section>
+      ) : (
+        <article className="card">
+          <div className="empty">
+            <p className="subtle" style={{ margin: 0 }}>{t.sessions.noSessions}</p>
+          </div>
+        </article>
+      )}
     </section>
   )
 }

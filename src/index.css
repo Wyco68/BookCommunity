@@ -1,66 +1,903 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Geist+Mono:wght@500;600&display=swap');
+/* ═══════════════════════════════════════════════════════════════════
+   BookCom Design System — Tesla-inspired, dark mode
+   DESIGN.md color palette + typography rules
+   ═══════════════════════════════════════════════════════════════════ */
 
+/* ─── 1. Design Tokens ──────────────────────────────────────────── */
 :root {
-  --font-base: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
-  --font-heading: 'Inter', 'Inter Fallback', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback', ui-monospace, 'SFMono-Regular', monospace;
+  /* Brand */
+  --electric-blue: #3E6AE1;
+  --brand-deep: #2d4a9e;
+  --brand-soft: rgba(62, 106, 225, 0.12);
 
-  --color-brand: #3b82f6;
-  --color-brand-soft: #dbeafe;
-  --color-brand-deep: #1d4ed8;
+  /* Surfaces (dark mode) */
+  --bg: #0e0e10;
+  --surface: #18181b;
+  --surface-raised: #1e1f23;
+  --surface-overlay: #27272a;
 
-  --black: #0d0d0d;
-  --white: #ffffff;
-  --glass-dark: rgba(0, 0, 0, 0.04);
-  --glass-light: rgba(255, 255, 255, 0.4);
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --border-interactive: rgba(255, 255, 255, 0.18);
 
-  --bg-base: var(--white);
-  --text-strong: #0d0d0d;
-  --text-soft: #333333;
-  --text-muted: #666666;
-  --line: rgba(0, 0, 0, 0.05);
-  --line-strong: rgba(0, 0, 0, 0.08);
-  --card-bg: #ffffff;
+  /* Text — DESIGN.md hierarchy */
+  --text-primary: #f4f4f5;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --text-placeholder: #52525b;
 
-  --hero-gradient: radial-gradient(circle at 10% 12%, rgba(59, 130, 246, 0.22) 0%, rgba(59, 130, 246, 0.1) 34%, transparent 70%);
-  --bg-overlay:
-    radial-gradient(circle at 12% 0%, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.08) 28%, transparent 58%),
-    radial-gradient(circle at 88% 8%, rgba(59, 130, 246, 0.12) 0%, rgba(59, 130, 246, 0.04) 24%, transparent 56%),
-    linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
+  /* Semantic */
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.1);
+  --success: #86efac;
 
-  --shadow-soft: 0 2px 4px rgba(0, 0, 0, 0.03);
-  --shadow-medium: 0 8px 18px rgba(0, 0, 0, 0.04);
+  /* Radius — DESIGN.md: 4px interactive, 12px cards */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
 
-  font-family: var(--font-base);
-  line-height: 1.5;
+  /* Spacing — 8px base unit */
+  --space-1: 0.25rem;   /* 4px */
+  --space-2: 0.5rem;    /* 8px */
+  --space-3: 0.75rem;   /* 12px */
+  --space-4: 1rem;      /* 16px */
+  --space-5: 1.25rem;   /* 20px */
+  --space-6: 1.5rem;    /* 24px */
+  --space-8: 2rem;      /* 32px */
+  --space-10: 2.5rem;   /* 40px */
+
+  /* Typography — DESIGN.md: only 400 + 500 */
+  font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+  line-height: 1.43;
   font-weight: 400;
-  font-synthesis: none;
-  font-feature-settings: 'kern' 1;
-  letter-spacing: normal;
+  font-size: 14px;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Motion — DESIGN.md: 0.33s for all interactive states */
+  --transition: 0.33s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-* {
-  box-sizing: border-box;
-}
+/* ─── 2. Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
 
 *::selection {
-  color: var(--white);
-  background: var(--color-brand-deep);
+  color: #fff;
+  background: var(--electric-blue);
 }
 
-html,
-body,
-#root {
+html, body, #root {
   min-height: 100%;
 }
 
 body {
   margin: 0;
-  color: var(--text-strong);
-  background: var(--bg-base);
-  background-image: var(--bg-overlay);
-  background-attachment: fixed;
+  color: var(--text-primary);
+  background: var(--bg);
+}
+
+/* ─── 3. Typography ─────────────────────────────────────────────── */
+h1, h2, h3 {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: normal;
+}
+
+h1 { font-size: 2rem; line-height: 1.15; }
+h2 { font-size: 1.25rem; line-height: 1.2; }
+h3 { font-size: 1.06rem; line-height: 1.25; }
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--electric-blue);
+}
+
+.subtle { margin: 0; color: var(--text-secondary); font-weight: 400; font-size: 0.875rem; }
+.muted  { margin: 0; color: var(--text-muted); font-weight: 400; font-size: 0.82rem; }
+.error  { margin: 0; color: var(--danger); font-size: 0.875rem; padding: var(--space-3); border: 1px solid rgba(239,68,68,0.25); border-radius: var(--radius-xs); background: var(--danger-soft); }
+
+/* ─── 4. Layout Primitives ──────────────────────────────────────── */
+.shell {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0;
+  min-height: 100vh;
+}
+
+.stack    { display: grid; gap: var(--space-4); }
+.gap-sm   { gap: var(--space-2); }
+.grid     { display: grid; gap: var(--space-4); }
+.span-full { grid-column: 1 / -1; }
+
+/* ─── 5. Links ──────────────────────────────────────────────────── */
+a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition);
+}
+a:hover { color: var(--electric-blue); }
+
+/* ─── 6. Buttons — DESIGN.md: 4px radius, weight 500, 0.33s ──── */
+button {
+  font: inherit;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-xs);
+  padding: var(--space-2) var(--space-4);
+  min-height: 36px;
+  transition: background-color var(--transition), border-color var(--transition), color var(--transition);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Primary CTA — Electric Blue */
+.primary, .btn-primary {
+  background: var(--electric-blue);
+  color: #fff;
+}
+.primary:hover:not(:disabled),
+.btn-primary:hover:not(:disabled) {
+  background: var(--brand-deep);
+}
+
+/* Secondary */
+.secondary, .btn-secondary {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+}
+.secondary:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled) {
+  background: var(--brand-soft);
+  border-color: var(--electric-blue);
+  color: var(--electric-blue);
+}
+
+/* Ghost */
+.ghost, .btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: var(--space-2) var(--space-3);
+}
+.ghost:hover:not(:disabled),
+.btn-ghost:hover:not(:disabled) {
+  color: var(--electric-blue);
+  background: var(--brand-soft);
+}
+
+/* Danger */
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+/* ─── 7. Inputs & Forms ─────────────────────────────────────────── */
+input, textarea {
+  font: inherit;
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-weight: 400;
+  transition: border-color var(--transition);
+}
+
+input:focus, textarea:focus {
+  outline: none;
+  border-color: var(--electric-blue);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-placeholder);
+}
+
+select {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+select:focus { outline: none; border-color: var(--electric-blue); }
+select option { background: var(--surface); color: var(--text-primary); }
+
+.field { display: flex; flex-direction: column; gap: var(--space-2); }
+.field-label { font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+.field-hint { font-size: 0.75rem; color: var(--text-muted); }
+
+/* ─── 8. Cards — DESIGN.md: 12px radius, no shadow, no border ── */
+.card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+/* ─── 9. Auth Card ──────────────────────────────────────────────── */
+.auth-card {
+  max-width: 400px;
+  margin: 6vh auto;
+  padding: var(--space-8);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+.auth-card h1 { font-size: 1.75rem; line-height: 1.15; }
+
+/* Auth mode switcher */
+.auth-switch {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.auth-switch-option {
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.875rem;
+  min-height: 32px;
+}
+
+.auth-switch-option-active {
+  background: var(--electric-blue);
+  color: #fff;
+}
+
+.auth-google-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.auth-oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.auth-oauth-divider::before,
+.auth-oauth-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
+.auth-oauth-divider span { flex-shrink: 0; }
+
+/* ─── 10. Avatars ───────────────────────────────────────────────── */
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.avatar-xs { width: 24px; height: 24px; }
+.avatar-sm { width: 32px; height: 32px; }
+.avatar-md { width: 40px; height: 40px; }
+.avatar-lg { width: 56px; height: 56px; }
+
+.avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--brand-soft);
+  color: var(--text-muted);
+  font-weight: 500;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── 11. Identity Row ──────────────────────────────────────────── */
+.identity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.header-identity-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* ─── 12. Pills & Badges ───────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.category-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-xs);
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--brand-soft);
+  color: var(--electric-blue);
+  border: 1px solid rgba(62, 106, 225, 0.2);
+}
+
+/* ─── 13. Empty / Centered ──────────────────────────────────────── */
+.empty {
+  text-align: center;
+  padding: var(--space-10) var(--space-4);
+  color: var(--text-muted);
+}
+
+.centered {
+  text-align: center;
+  padding: var(--space-10) var(--space-4);
+}
+
+/* ─── 14. Progress Track ────────────────────────────────────────── */
+.progress-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--electric-blue);
+  border-radius: var(--radius-full);
+  transition: width var(--transition);
+}
+
+/* ─── 15. Like Button ───────────────────────────────────────────── */
+.like-button {
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  padding: var(--space-1) var(--space-3);
+  min-height: 28px;
+}
+
+.like-button-active {
+  background: var(--brand-soft);
+  color: var(--electric-blue);
+  border-color: rgba(62, 106, 225, 0.3);
+}
+
+/* ─── 16. Feed (Profile page) ───────────────────────────────────── */
+.feed { min-height: 100vh; }
+.feed-header {
+  position: sticky;
+  top: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 5;
+}
+.feed-title { font-size: 1.06rem; font-weight: 500; margin: 0; }
+.feed-content { padding: var(--space-4); background: var(--bg); }
+
+/* ─── 17. Session List ──────────────────────────────────────────── */
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.session-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+  padding: var(--space-3);
+}
+
+.session-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* ─── 18. Session Cards ─────────────────────────────────────────── */
+.session-item.session-card {
+  border-radius: var(--radius-lg);
+  padding: 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.session-card-cols {
+  display: grid;
+  grid-template-columns: 2fr 3fr;
+  gap: 0;
+  min-height: 164px;
+  height: 100%;
+}
+
+.session-card-col-cover {
+  min-height: 164px;
+  overflow: hidden;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ─── Fixed-size session card grid (used on Home + Categories) ───── */
+.session-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: var(--space-3);
+  align-items: stretch;
+}
+
+.session-card-fixed {
+  height: 240px;
+  display: flex;
+  flex-direction: column;
+}
+
+.session-card-fixed .session-card-cols {
+  height: 100%;
+  min-height: 0;
+}
+
+.session-card-fixed .session-card-col-info {
+  height: 100%;
+  overflow: hidden;
+}
+
+.session-card-footer {
+  margin-top: auto;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+
+.session-card-cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.session-card-cover-empty {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-content: center;
+}
+
+.session-card-no-cover-icon {
+  font-size: 2.5rem;
+  opacity: 0.2;
+}
+
+.session-card-col-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.session-card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.session-card-author { margin: 0; font-size: 0.82rem; color: var(--text-secondary); }
+.session-card-desc { font-size: 0.82rem; line-height: 1.4; color: var(--text-muted); margin: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.session-card-hint { margin: 0; font-size: 0.75rem; color: var(--text-muted); }
+
+.session-card-cta {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  padding: var(--space-1) var(--space-3);
+  min-height: 28px;
+}
+
+.session-card-clickable {
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+.session-card-clickable:hover {
+  border-color: var(--electric-blue);
+}
+
+.session-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.session-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1) var(--space-3);
+}
+
+.session-meta-item { display: grid; gap: 2px; }
+.session-meta-label { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
+.session-meta-value { font-size: 0.875rem; color: var(--text-primary); font-weight: 500; }
+
+/* ─── 19. Session Detail ────────────────────────────────────────── */
+.detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.detail-stat-pill {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.detail-grid { display: grid; gap: var(--space-4); }
+.detail-two-col { display: grid; gap: var(--space-4); }
+
+.detail-pane {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-4);
+}
+
+/* ─── 20. Member / Comment Lists ────────────────────────────────── */
+.member-list, .comment-list {
+  margin: 0; padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.member-item, .comment-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  background: var(--surface-raised);
+}
+
+.member-head, .comment-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.comment-body {
+  margin: var(--space-2) 0;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Member progress */
+.session-user-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.session-user-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.session-col-label { font-size: 0.65rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.session-col-value { font-size: 0.875rem; font-weight: 500; color: var(--text-primary); line-height: 1.25; }
+.session-col-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.member-item.member-progress-row { padding: 0; overflow: hidden; }
+.member-item.member-progress-row .member-progress-cols.session-user-cols { margin: 0; border: none; border-radius: 0; }
+
+/* ─── 21. Profile ───────────────────────────────────────────────── */
+.profile-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-4);
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.profile-upload-stack { flex: 1; min-width: 0; }
+
+/* ─── 22. Search Toolbar ────────────────────────────────────────── */
+.search-toolbar {
+  display: grid;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+/* ─── 23. Danger Zone ───────────────────────────────────────────── */
+.danger-zone {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+/* ─── Spinner ───────────────────────────────────────────────────── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: var(--border-strong);
+  border-top-color: var(--electric-blue);
+  animation: spin 0.75s linear infinite;
+  flex-shrink: 0;
+}
+
+.spinner-xs  { width: 14px; height: 14px; border-width: 2px; }
+.spinner-sm  { width: 20px; height: 20px; border-width: 2px; }
+.spinner-md  { width: 28px; height: 28px; border-width: 3px; }
+.spinner-lg  { width: 40px; height: 40px; border-width: 3px; }
+
+/* Page-level loading shell */
+.spinner-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Inline row */
+.spinner-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+/* Join Policy Toggle */
+.join-policy-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.join-policy-toggle button {
+  border-radius: var(--radius-xs);
+  font-size: 0.875rem;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+}
+
+/* ─── Session Card Badges ───────────────────────────────────────── */
+.session-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 500;
+  background: var(--electric-blue);
+  color: #fff;
+  border: 1px solid var(--electric-blue);
+  letter-spacing: 0.02em;
+}
+
+.join-policy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 500;
+  border: 1px solid var(--border-strong);
+}
+
+.join-policy-badge-open {
+  background: rgba(34, 197, 94, 0.1);
+  color: #4ade80;
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.join-policy-badge-request {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.join-policy-badge-joined {
+  background: var(--brand-soft);
+  color: var(--electric-blue);
+  border-color: rgba(62, 106, 225, 0.25);
+}
+
+.join-policy-badge-owner {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* ─── Join Session Modal ─────────────────────────────────────────── */
+.join-modal { max-width: 380px; }
+
+.join-modal-header { display: flex; flex-direction: column; gap: var(--space-1); }
+.join-modal-title { font-size: 1.1rem; font-weight: 500; margin: 0; }
+
+.join-modal-policy { display: flex; flex-direction: column; gap: var(--space-2); }
+.join-modal-policy-pill { align-self: flex-start; }
+
+.join-modal-policy-request {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.join-modal-desc { line-height: 1.5; }
+
+/* ─── Load More row (cursor pagination) ─────────────────────────── */
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0 var(--space-2);
+}
+
+.load-more-row button {
+  min-width: 160px;
+}
+
+/* ─── Detail tab switch (reuses auth-switch) ─────────────────────── */
+.detail-tab-switch {
+  margin: 0;
+}
+
+/* ─── Per-chapter Save Progress row ──────────────────────────────── */
+.chapter-save-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-2) 0;
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.chapter-save-status {
+  margin: 0;
+  font-size: 0.85rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.chapter-save-btn {
+  white-space: nowrap;
+}
+
+/* ─── Owner unified save row ─────────────────────────────────────── */
+.owner-panel-save-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.manage-settings-notice--ok {
+  color: var(--success);
+}
+
+.manage-settings-notice--error {
+  color: var(--danger);
+}
+
+/* ─── Member own-progress bar (read-only) ────────────────────────── */
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--electric-blue), #6b8cff);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+/* ─── Responsive: mobile ≤640 ────────────────────────────────────── */
+@media (max-width: 640px) {
+  .session-grid { grid-template-columns: 1fr; }
+  .session-card-fixed { height: auto; min-height: 260px; }
+  .session-card-cols { grid-template-columns: 1fr; min-height: auto; }
+  .session-card-col-cover { min-height: 140px; max-height: 180px; border-right: none; border-bottom: 1px solid var(--border); }
+  .session-meta-grid, .session-user-cols { grid-template-columns: 1fr; }
+  .session-heading, .detail-header, .member-head, .comment-head { flex-wrap: wrap; }
+  .chapter-save-row { flex-direction: column; align-items: stretch; }
+}
+
+@media (max-width: 500px) {
+  .feed-header { padding-left: var(--space-4); }
 }
