@@ -1,6 +1,6 @@
-import { supabase } from './supabase'
+import { PROFILE_AVATARS_BUCKET, getSignedMediaUrl } from './storage'
 
-export const AVATAR_BUCKET = 'avatars'
+export const AVATAR_BUCKET = PROFILE_AVATARS_BUCKET
 export const MAX_AVATAR_BYTES = 2 * 1024 * 1024
 export const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
@@ -38,41 +38,26 @@ export function getAvatarExtension(file: File): string {
 }
 
 export async function resolveAvatarUrl(pathOrUrl: string | null): Promise<string | null> {
-  if (!pathOrUrl) {
-    return null
-  }
-
-  if (isRemoteUrl(pathOrUrl)) {
-    return pathOrUrl
-  }
-
-  const signedResult = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(pathOrUrl, 60 * 60)
-  if (!signedResult.error && signedResult.data?.signedUrl) {
-    return signedResult.data.signedUrl
-  }
-
-  const publicResult = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(pathOrUrl)
-  return publicResult.data.publicUrl
+  if (!pathOrUrl) return null
+  if (isRemoteUrl(pathOrUrl)) return pathOrUrl
+  return getSignedMediaUrl(pathOrUrl, PROFILE_AVATARS_BUCKET)
 }
 
 export async function resolveAvatarUrlMap(paths: string[]): Promise<Record<string, string>> {
   const uniquePaths = Array.from(new Set(paths.filter((path) => path && !isRemoteUrl(path))))
 
-  if (uniquePaths.length === 0) {
-    return {}
-  }
+  if (uniquePaths.length === 0) return {}
 
-  const signedResults = await Promise.all(
+  const entries = await Promise.all(
     uniquePaths.map(async (path) => {
-      const signedResult = await supabase.storage.from(AVATAR_BUCKET).createSignedUrl(path, 60 * 60)
-      if (!signedResult.error && signedResult.data?.signedUrl) {
-        return [path, signedResult.data.signedUrl] as const
-      }
-
-      const publicResult = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(path)
-      return [path, publicResult.data.publicUrl] as const
+      const url = await getSignedMediaUrl(path, PROFILE_AVATARS_BUCKET)
+      return [path, url] as const
     }),
   )
 
-  return Object.fromEntries(signedResults)
+  const result: Record<string, string> = {}
+  for (const [path, url] of entries) {
+    if (url !== null) result[path] = url
+  }
+  return result
 }

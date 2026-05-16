@@ -1,5 +1,6 @@
 export type SessionVisibility = 'public' | 'private'
 export type SessionStatus = 'active' | 'archived'
+export type SessionStatusType = 'ongoing' | 'completed'
 
 export interface ReadingSession {
   id: string
@@ -11,6 +12,9 @@ export interface ReadingSession {
   visibility: SessionVisibility
   join_policy: 'open' | 'request'
   status: SessionStatus
+  status_type: SessionStatusType
+  cover_image_path: string | null
+  category_id: number
   created_at: string
 }
 
@@ -31,6 +35,28 @@ export interface Profile {
   id: string
   display_name: string | null
   avatar_url: string | null
+  bio: string | null
+  cover_url: string | null
+  location: string | null
+  website: string | null
+  is_private: boolean
+  created_at: string
+}
+
+export interface Post {
+  id: string
+  user_id: string
+  body: string
+  reply_to_id: string | null
+  is_deleted: boolean
+  created_at: string
+}
+
+export interface PostLike {
+  id: string
+  post_id: string
+  user_id: string
+  created_at: string
 }
 
 export interface Comment {
@@ -55,4 +81,48 @@ export interface SessionJoinRequest {
   user_id: string
   status: 'pending' | 'approved' | 'rejected'
   created_at: string
+}
+
+
+export type MediaType = 'image' | 'book_file'
+
+export interface Category {
+  id: number
+  name: string
+  description?: string | null
+}
+
+export interface SessionMedia {
+  id: string
+  session_id: string
+  uploader_id: string
+  chapter_number: number
+  media_type: MediaType
+  file_path: string
+  file_name: string
+  file_size_bytes: number
+  mime_type: string
+  description: string | null
+  created_at: string
+}
+
+export interface SessionCardMediaPreview {
+  session_id: string
+  file_path: string
+  file_name: string
+  mime_type: string
+  media_type: MediaType
+  is_image: boolean
+  signed_url: string | null
+}
+
+export interface PaginationCursor {
+  created_at: string
+  id: string
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  nextCursor: PaginationCursor | null
+  hasMore: boolean
 }

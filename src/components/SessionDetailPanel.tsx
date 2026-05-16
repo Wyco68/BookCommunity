@@ -1,28 +1,76 @@
+import { memo } from 'react'
 import type { FormEvent } from 'react'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import type {
   Comment,
+  MediaType,
   Profile,
   ReadingSession,
   SessionJoinRequest,
   SessionMembership,
 } from '../types'
-import { Avatar } from './Avatar'
+import { Spinner } from './Spinner'
+import { MediaTab } from './SessionDetail/MediaTab'
+import { ManageTab } from './SessionDetail/ManageTab'
+import { DiscussionTab } from './SessionDetail/DiscussionTab'
 
 type Copy = (typeof translations)[Language]
 
+export type SessionDetailPanelTranslations = Copy
+
+export type SessionDetailTab = 'media' | 'manage' | 'discussion'
+
 export interface SessionDetailPanelProps {
   t: Copy
+  activeTab: SessionDetailTab
   selectedSession: ReadingSession | null
   selectedIsOwner: boolean
   selectedIsMember: boolean
   loadingSessionDetail: boolean
+
   sessionMembers: SessionMembership[]
   sessionProfiles: Record<string, Profile>
   memberLatestProgress: Record<string, number>
+
   pendingRequests: SessionJoinRequest[]
   requestBusyId: string | null
+  onApproveJoinRequest: (request: SessionJoinRequest) => Promise<void>
+  onRejectJoinRequest: (request: SessionJoinRequest) => Promise<void>
+
+  // Media tab
+  activeChapter: number
+  maxChapter: number
+  activeChapterMedia: { file_name: string; mime_type: string; media_type: 'image' | 'book_file' } | null
+  activeChapterUrl: string | null
+  loadingChapter: boolean
+  onPrevChapter?: () => Promise<void> | void
+  onNextChapter?: () => Promise<void> | void
+
+  myLatestChapter: number
+  savingChapterProgress: boolean
+  onSaveCurrentChapter?: () => Promise<void> | void
+
+  canUploadMedia: boolean
+  mediaUploading: boolean
+  mediaError: string | null
+  mediaLimit: number
+  nextChapter: number
+  onUploadMedia?: (file: File, mediaType: MediaType, description?: string) => Promise<boolean>
+
+  // Manage tab
+  currentUserId: string
+  savingSettings: boolean
+  settingsNotice: string | null
+  onSaveSettings?: (visibility: 'public' | 'private', joinPolicy: 'open' | 'request') => Promise<void> | void
+  onRemoveMember?: (userId: string) => Promise<void>
+  removingMemberId: string | null
+  onDeleteSession?: () => void
+  onLeaveSession?: () => Promise<void>
+  leavingSession: boolean
+  leaveSessionDisabled: boolean
+
+  // Discussion tab
   commentDraft: string
   postingComment: boolean
   sessionComments: Comment[]
@@ -31,184 +79,108 @@ export interface SessionDetailPanelProps {
     likedByMe: Record<string, boolean>
   }
   likingCommentId: string | null
-  onApproveJoinRequest: (request: SessionJoinRequest) => Promise<void>
-  onRejectJoinRequest: (request: SessionJoinRequest) => Promise<void>
   onSubmitComment: (event: FormEvent<HTMLFormElement>) => Promise<void>
   onCommentDraftChange: (value: string) => void
   onToggleLike: (commentId: string) => Promise<void>
+
   fullWidth?: boolean
 }
 
-export function SessionDetailPanel({
-  t,
-  selectedSession,
-  selectedIsOwner,
-  selectedIsMember,
-  loadingSessionDetail,
-  sessionMembers,
-  sessionProfiles,
-  memberLatestProgress,
-  pendingRequests,
-  requestBusyId,
-  commentDraft,
-  postingComment,
-  sessionComments,
-  commentMeta,
-  likingCommentId,
-  onApproveJoinRequest,
-  onRejectJoinRequest,
-  onSubmitComment,
-  onCommentDraftChange,
-  onToggleLike,
-  fullWidth = true,
-}: SessionDetailPanelProps) {
+export const SessionDetailPanel = memo(function SessionDetailPanel(props: SessionDetailPanelProps) {
+  const { t, activeTab, selectedSession, fullWidth = true } = props
+
+  if (!selectedSession) {
+    return (
+      <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
+        <p className="subtle">{t.sessions.selectSessionPrompt}</p>
+      </article>
+    )
+  }
+
   return (
     <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
-      {!selectedSession ? (
-        <p className="subtle">{t.sessions.selectSessionPrompt}</p>
-      ) : (
-        <>
-          <div className="detail-header">
-            <div>
-              <h2>{selectedSession.book_title}</h2>
-              <p className="subtle">{t.sessions.singleThread}</p>
-            </div>
-          </div>
+      {/* Header */}
+      <div className="detail-header">
+        <div>
+          <h2>{selectedSession.book_title}</h2>
+          <p className="subtle">{selectedSession.book_author}</p>
+        </div>
+      </div>
 
-          <div className="detail-grid">
-            <section className="detail-pane stack">
-              <h3>{t.sessions.memberProgress}</h3>
-              {loadingSessionDetail ? <p className="subtle">{t.sessions.loadingDetail}</p> : null}
-              <ul className="member-list">
-                {sessionMembers.map((member) => {
-                  const profile = sessionProfiles[member.user_id]
-                  const chapter = memberLatestProgress[member.user_id] ?? 0
-                  const ratio = Math.min(100, Math.round((chapter / Math.max(1, selectedSession.total_chapters)) * 100))
+      {props.loadingSessionDetail ? (
+        <div style={{ minHeight: 48, display: 'flex', alignItems: 'center' }}>
+          <Spinner size="xs" showLabel label={t.sessions.loadingDetail} />
+        </div>
+      ) : null}
 
-                  return (
-                    <li key={member.user_id} className="member-item">
-                      <div className="member-head">
-                        <div className="identity-row">
-                          <Avatar imageUrl={profile?.avatar_url ?? null} label={profile?.display_name || member.user_id.slice(0, 8)} size="sm" />
-                          <strong>{profile?.display_name || member.user_id.slice(0, 8)}</strong>
-                        </div>
-                        <span className="pill">{t.enums.role[member.role]}</span>
-                      </div>
-                      <div className="progress-track">
-                        <span className="progress-fill" style={{ width: `${ratio}%` }} />
-                      </div>
-                      <span className="progress-label">{t.sessions.chapterProgress(chapter, selectedSession.total_chapters)}</span>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
+      {/* Tab content (local state switch — no remount of page) */}
+      {activeTab === 'media' ? (
+        <MediaTab
+          t={t}
+          session={selectedSession}
+          isOwner={props.selectedIsOwner}
+          isMember={props.selectedIsMember}
+          activeChapter={props.activeChapter}
+          maxChapter={props.maxChapter}
+          activeChapterMedia={props.activeChapterMedia}
+          activeChapterUrl={props.activeChapterUrl}
+          loadingChapter={props.loadingChapter}
+          onPrevChapter={props.onPrevChapter}
+          onNextChapter={props.onNextChapter}
+          myLatestChapter={props.myLatestChapter}
+          savingChapterProgress={props.savingChapterProgress}
+          onSaveCurrentChapter={props.onSaveCurrentChapter}
+          canUploadMedia={props.canUploadMedia}
+          mediaUploading={props.mediaUploading}
+          mediaError={props.mediaError}
+          mediaLimit={props.mediaLimit}
+          nextChapter={props.nextChapter}
+          onUploadMedia={props.onUploadMedia}
+        />
+      ) : null}
 
-            <section className="detail-pane stack">
-              {selectedIsOwner ? (
-                <>
-                  <h3>{t.sessions.joinRequests}</h3>
-                  {pendingRequests.length === 0 ? <p className="subtle">{t.sessions.noPendingRequests}</p> : null}
-                  <ul className="member-list">
-                    {pendingRequests.map((request) => {
-                      const profile = sessionProfiles[request.user_id]
-                      return (
-                        <li key={request.id} className="member-item stack gap-sm">
-                          <div className="member-head">
-                            <div className="identity-row">
-                              <Avatar imageUrl={profile?.avatar_url ?? null} label={profile?.display_name || request.user_id.slice(0, 8)} size="sm" />
-                              <strong>{profile?.display_name || request.user_id.slice(0, 8)}</strong>
-                            </div>
-                            <span className="subtle">{new Date(request.created_at).toLocaleString()}</span>
-                          </div>
-                          <div className="split compact">
-                            <button
-                              type="button"
-                              className="secondary"
-                              disabled={requestBusyId === request.id}
-                              onClick={() => {
-                                void onApproveJoinRequest(request)
-                              }}
-                            >
-                              {requestBusyId === request.id ? t.common.processing : t.sessions.approve}
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost"
-                              disabled={requestBusyId === request.id}
-                              onClick={() => {
-                                void onRejectJoinRequest(request)
-                              }}
-                            >
-                              {t.sessions.reject}
-                            </button>
-                          </div>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </>
-              ) : null}
+      {activeTab === 'manage' ? (
+        <ManageTab
+          t={t}
+          session={selectedSession}
+          currentUserId={props.currentUserId}
+          isOwner={props.selectedIsOwner}
+          isMember={props.selectedIsMember}
+          myLatestChapter={props.myLatestChapter}
+          sessionMembers={props.sessionMembers}
+          sessionProfiles={props.sessionProfiles}
+          memberLatestProgress={props.memberLatestProgress}
+          pendingRequests={props.pendingRequests}
+          requestBusyId={props.requestBusyId}
+          savingSettings={props.savingSettings}
+          settingsNotice={props.settingsNotice}
+          onSaveSettings={props.onSaveSettings}
+          onApproveJoinRequest={props.onApproveJoinRequest}
+          onRejectJoinRequest={props.onRejectJoinRequest}
+          onRemoveMember={props.onRemoveMember}
+          removingMemberId={props.removingMemberId}
+          onDeleteSession={props.onDeleteSession}
+          onLeaveSession={props.onLeaveSession}
+          leavingSession={props.leavingSession}
+          leaveSessionDisabled={props.leaveSessionDisabled}
+        />
+      ) : null}
 
-              <h3>{t.sessions.discussion}</h3>
-              {!selectedIsMember ? (
-                <p className="subtle">{t.sessions.joinToDiscuss}</p>
-              ) : (
-                <>
-                  <form className="stack" onSubmit={onSubmitComment}>
-                    <label className="field">
-                      <span>{t.sessions.yourComment}</span>
-                      <textarea
-                        value={commentDraft}
-                        onChange={(event) => onCommentDraftChange(event.target.value)}
-                        placeholder={t.sessions.commentPlaceholder}
-                      />
-                    </label>
-                    <button type="submit" className="primary" disabled={postingComment}>
-                      {postingComment ? t.common.posting : t.sessions.postComment}
-                    </button>
-                  </form>
-
-                  <ul className="comment-list">
-                    {sessionComments.map((comment) => {
-                      const profile = sessionProfiles[comment.user_id]
-                      const likes = commentMeta.likeCounts[comment.id] ?? 0
-                      const likedByMe = Boolean(commentMeta.likedByMe[comment.id])
-
-                      return (
-                        <li key={comment.id} className="comment-item">
-                          <div className="comment-head">
-                            <div className="identity-row">
-                              <Avatar imageUrl={profile?.avatar_url ?? null} label={profile?.display_name || comment.user_id.slice(0, 8)} size="sm" />
-                              <strong>{profile?.display_name || comment.user_id.slice(0, 8)}</strong>
-                            </div>
-                            <span className="subtle">{new Date(comment.created_at).toLocaleString()}</span>
-                          </div>
-                          <p className="comment-body">{comment.is_deleted ? t.sessions.deleted : comment.body}</p>
-                          <button
-                            type="button"
-                            className={`like-button ${likedByMe ? 'like-button-active' : ''}`}
-                            disabled={likingCommentId === comment.id}
-                            onClick={() => {
-                              void onToggleLike(comment.id)
-                            }}
-                          >
-                            {likingCommentId === comment.id
-                              ? t.common.updating
-                              : likedByMe
-                                ? t.sessions.liked(likes)
-                                : t.sessions.like(likes)}
-                          </button>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </>
-              )}
-            </section>
-          </div>
-        </>
-      )}
+      {activeTab === 'discussion' ? (
+        <DiscussionTab
+          t={t}
+          isMember={props.selectedIsMember}
+          commentDraft={props.commentDraft}
+          postingComment={props.postingComment}
+          sessionComments={props.sessionComments}
+          sessionProfiles={props.sessionProfiles}
+          commentMeta={props.commentMeta}
+          likingCommentId={props.likingCommentId}
+          onSubmitComment={props.onSubmitComment}
+          onCommentDraftChange={props.onCommentDraftChange}
+          onToggleLike={props.onToggleLike}
+        />
+      ) : null}
     </article>
   )
-}
+})

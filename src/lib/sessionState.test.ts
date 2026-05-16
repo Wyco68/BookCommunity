@@ -24,6 +24,9 @@ function makeSession(
     visibility,
     join_policy: 'open',
     status,
+    status_type: status === 'active' ? 'ongoing' : 'completed',
+    cover_image_path: null,
+    category_id: 1,
     created_at: '2026-01-01T00:00:00.000Z',
   }
 }

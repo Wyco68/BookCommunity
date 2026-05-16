@@ -7,14 +7,13 @@
     "main_use_cases": [
       "Sign up/sign in with email and password",
       "Create a reading session with title, author, chapter count, description, visibility, and join policy",
-      "Discover sessions via search, visibility filter, and active/archived views",
+      "Discover sessions via search and visibility filter",
       "Join open sessions or request access to request-based sessions",
       "Approve/reject join requests as session owner",
       "Leave sessions",
       "Submit chapter progress and view progress bars",
       "Post comments in a single session thread",
       "Like/unlike comments",
-      "Archive/restore sessions as owner",
       "Update profile display name (web and mobile) and avatar (web upload)"
     ]
   },
@@ -32,8 +31,7 @@
     "Session creation via secure RPC (create_reading_session) with validation",
     "Session visibility modes: public/private",
     "Join policies: open join or request-based join",
-    "Session status lifecycle: active/archived with owner restore",
-    "Session discovery: title/author search + visibility filtering + active/archived tab",
+    "Session discovery: title/author search + visibility filtering",
     "Membership tracking with owner/member roles",
     "Join-request lifecycle: pending/approved/rejected",
     "Progress updates by chapter number and session/member progress visualization",
@@ -73,7 +71,7 @@
         "description text nullable",
         "visibility text check in (public, private)",
         "join_policy text check in (open, request)",
-        "status text check in (active, archived)",
+        "status text check in (active)",
         "created_at timestamptz default now()",
         "updated_at timestamptz default now()"
       ],

@@ -1,0 +1,246 @@
+import { useCallback, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import type { Profile } from '../types'
+import { uploadAvatarFile } from '../lib/storage'
+import {
+  ALLOWED_AVATAR_TYPES,
+  MAX_AVATAR_BYTES,
+  resolveAvatarUrl,
+} from '../lib/avatar'
+import { validateDisplayName } from '../lib/validation'
+
+export interface UseProfileReturn {
+  profile: Profile | null
+  loading: boolean
+  error: string | null
+  avatarFile: File | null
+  avatarPreviewUrl: string | null
+  avatarInputKey: number
+  nameDraft: string
+  saving: boolean
+  uploading: boolean
+  notice: string | null
+  loadProfile: (userId: string) => Promise<void>
+  saveProfile: (userId: string) => Promise<void>
+  setNameDraft: (name: string) => void
+  handleAvatarFile: (file: File | null) => void
+  uploadAvatar: (userId: string) => Promise<void>
+  setNotice: (notice: string | null) => void
+  setProfile: React.Dispatch<React.SetStateAction<Profile | null>>
+  setAvatarInputKey: React.Dispatch<React.SetStateAction<number>>
+  setAvatarPreviewUrl: React.Dispatch<React.SetStateAction<string | null>>
+}
+
+export function useProfile(): UseProfileReturn {
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
+  const [avatarInputKey, setAvatarInputKey] = useState(0)
+  const [nameDraft, setNameDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const loadProfile = useCallback(async (userId: string) => {
+    setLoading(true)
+    setError(null)
+
+    // SELECT only — never upsert on load (upsert can overwrite avatar_url with null)
+    const profileResult = await supabase
+      .from('profiles')
+      .select('id,display_name,avatar_url,created_at')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (profileResult.error) {
+      setError(profileResult.error.message)
+      setLoading(false)
+      return
+    }
+
+    // If the profile row is missing (shouldn't happen — handle_new_user trigger creates it),
+    // insert a minimal row so the rest of the app has something to work with.
+    if (!profileResult.data) {
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({ id: userId })
+      if (insertError && !insertError.message.toLowerCase().includes('duplicate')) {
+        setError(insertError.message)
+        setLoading(false)
+        return
+      }
+    }
+
+    const loadedProfile = (profileResult.data ?? {
+      id: userId,
+      display_name: null,
+      avatar_url: null,
+      bio: null,
+      cover_url: null,
+      location: null,
+      website: null,
+      is_private: false,
+      created_at: '',
+    }) as Profile
+
+    // avatar_url is stored as a storage path; generate a fresh signed URL on every load
+    const avatarUrl = await resolveAvatarUrl(loadedProfile.avatar_url)
+
+    setProfile(loadedProfile)
+    setNameDraft(loadedProfile.display_name ?? '')
+    setAvatarPreviewUrl(avatarUrl)
+    setLoading(false)
+  }, [])
+
+  const saveProfile = useCallback(async (userId: string) => {
+    if (saving) return
+
+    setSaving(true)
+    setNotice(null)
+
+    const trimmedName = nameDraft.trim()
+
+    const nameCheck = validateDisplayName(nameDraft)
+    if (!nameCheck.valid) {
+      setError(nameCheck.error ?? 'Invalid display name')
+      setSaving(false)
+      return
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ display_name: trimmedName.length > 0 ? trimmedName : null })
+      .eq('id', userId)
+
+    if (error) {
+      setError(error.message)
+      setSaving(false)
+      return
+    }
+
+    const nextProfile: Profile = {
+      id: userId,
+      display_name: trimmedName.length > 0 ? trimmedName : null,
+      avatar_url: profile?.avatar_url ?? null,
+      bio: profile?.bio ?? null,
+      cover_url: profile?.cover_url ?? null,
+      location: profile?.location ?? null,
+      website: profile?.website ?? null,
+      is_private: profile?.is_private ?? false,
+      created_at: profile?.created_at ?? '',
+    }
+
+    setProfile(nextProfile)
+    setNotice('Profile saved')
+    setSaving(false)
+  }, [nameDraft, profile, saving])
+
+  const handleAvatarFile = useCallback((file: File | null) => {
+    if (!file) return
+
+    if (!ALLOWED_AVATAR_TYPES.includes(file.type)) {
+      setError('Invalid file type. Use PNG, JPEG, or WebP.')
+      return
+    }
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      setError('File too large. Maximum 2MB.')
+      return
+    }
+
+    if (avatarPreviewUrl) {
+      URL.revokeObjectURL(avatarPreviewUrl)
+    }
+
+    setError(null)
+    setAvatarFile(file)
+    setAvatarPreviewUrl(URL.createObjectURL(file))
+  }, [avatarPreviewUrl])
+
+  const uploadAvatar = useCallback(async (userId: string) => {
+    if (!avatarFile || uploading) return
+
+    setUploading(true)
+    setNotice(null)
+    setError(null)
+
+    if (!ALLOWED_AVATAR_TYPES.includes(avatarFile.type)) {
+      setError('Invalid file type. Use PNG, JPEG, or WebP.')
+      setUploading(false)
+      return
+    }
+
+    if (avatarFile.size > MAX_AVATAR_BYTES) {
+      setError('File too large. Maximum 2MB.')
+      setUploading(false)
+      return
+    }
+
+    const { path: nextPath, error: uploadError } = await uploadAvatarFile(userId, avatarFile)
+
+    if (uploadError) {
+      setError(`Storage upload failed: ${uploadError}`)
+      setUploading(false)
+      return
+    }
+
+    const updateResult = await supabase
+      .from('profiles')
+      .update({ avatar_url: nextPath })
+      .eq('id', userId)
+
+    if (updateResult.error) {
+      setError(`Profile update failed: ${updateResult.error.message}`)
+      setUploading(false)
+      return
+    }
+
+    const updatedProfile: Profile = {
+      id: userId,
+      display_name: profile?.display_name ?? null,
+      avatar_url: nextPath,
+      bio: profile?.bio ?? null,
+      cover_url: profile?.cover_url ?? null,
+      location: profile?.location ?? null,
+      website: profile?.website ?? null,
+      is_private: profile?.is_private ?? false,
+      created_at: profile?.created_at ?? '',
+    }
+
+    setProfile(updatedProfile)
+    setAvatarFile(null)
+
+    const resolvedUrl = await resolveAvatarUrl(nextPath)
+    if (avatarPreviewUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(avatarPreviewUrl)
+    }
+    setAvatarPreviewUrl(resolvedUrl)
+    setAvatarInputKey((current) => current + 1)
+    setNotice('Avatar updated')
+    setUploading(false)
+  }, [avatarFile, avatarPreviewUrl, profile, uploading])
+
+  return {
+    profile,
+    loading,
+    error,
+    avatarFile,
+    avatarPreviewUrl,
+    avatarInputKey,
+    nameDraft,
+    saving,
+    uploading,
+    notice,
+    loadProfile,
+    saveProfile,
+    setNameDraft,
+    handleAvatarFile,
+    uploadAvatar,
+    setNotice,
+    setProfile,
+    setAvatarInputKey,
+    setAvatarPreviewUrl,
+  }
+}

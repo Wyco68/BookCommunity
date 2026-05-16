@@ -1,8 +1,10 @@
 import { en } from './en'
+import { de } from './de'
 import { my } from './my'
 
 export const translations = {
   en,
+  de,
   my,
 }
 

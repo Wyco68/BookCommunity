@@ -1,0 +1,316 @@
+import { useCallback, useRef, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import type { Comment, CommentLike, Profile, ProgressUpdate, SessionJoinRequest, SessionMembership } from '../types'
+import { resolveAvatarUrlMap, isRemoteUrl } from '../lib/avatar'
+import { checkRateLimit, recordAction, COMMENT_RATE_LIMIT } from '../lib/rateLimit'
+import { validateComment } from '../lib/validation'
+
+
+export interface UseSessionDetailReturn {
+  comments: Comment[]
+  likes: CommentLike[]
+  members: SessionMembership[]
+  progress: ProgressUpdate[]
+  profiles: Record<string, Profile>
+  joinRequests: SessionJoinRequest[]
+  loading: boolean
+  error: string | null
+  loadDetail: (sessionId: string) => Promise<void>
+  refreshDetail: () => Promise<void>
+  submitComment: (sessionId: string, userId: string, body: string) => Promise<void>
+  toggleLike: (sessionId: string, userId: string, commentId: string) => Promise<void>
+  approveRequest: (sessionId: string, request: SessionJoinRequest) => Promise<void>
+  rejectRequest: (sessionId: string, request: SessionJoinRequest) => Promise<void>
+  clearDetail: () => void
+  appendComment: (comment: Comment) => void
+  ensureProfile: (userId: string) => Promise<void>
+}
+
+export function useSessionDetail(): UseSessionDetailReturn {
+  const [comments, setComments] = useState<Comment[]>([])
+  const [likes, setLikes] = useState<CommentLike[]>([])
+  const [members, setMembers] = useState<SessionMembership[]>([])
+  const [progress, setProgress] = useState<ProgressUpdate[]>([])
+  const [profiles, setProfiles] = useState<Record<string, Profile>>({})
+  const [joinRequests, setJoinRequests] = useState<SessionJoinRequest[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const lastLoadRef = useRef<{ sessionId: string; time: number }>({ sessionId: '', time: 0 })
+  const currentSessionIdRef = useRef<string>('')
+  // Per-instance set prevents duplicate profile fetches within this hook instance
+  const fetchingProfileIds = useRef(new Set<string>())
+
+  const loadDetail = useCallback(async (sessionId: string) => {
+    const now = Date.now()
+    if (lastLoadRef.current.sessionId === sessionId && now - lastLoadRef.current.time < 1000) return
+    lastLoadRef.current = { sessionId, time: now }
+    currentSessionIdRef.current = sessionId
+
+    setLoading(true)
+
+    const [commentsResult, membersResult, progressResult, requestsResult] = await Promise.all([
+      supabase.from('comments').select('id,session_id,user_id,body,is_deleted,created_at').eq('session_id', sessionId).order('created_at').limit(500),
+      supabase.from('session_members').select('session_id,user_id,role').eq('session_id', sessionId).limit(500),
+      supabase
+        .from('progress_updates')
+        .select('session_id,user_id,chapter_number,created_at')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      supabase
+        .from('session_join_requests')
+        .select('id,session_id,user_id,status,created_at')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: false })
+        .limit(100),
+    ])
+
+    if (commentsResult.error || membersResult.error || progressResult.error || requestsResult.error) {
+      setError(
+        commentsResult.error?.message ||
+          membersResult.error?.message ||
+          progressResult.error?.message ||
+          requestsResult.error?.message ||
+          'Failed to load session details',
+      )
+      setLoading(false)
+      return
+    }
+
+    const commentsData = (commentsResult.data ?? []) as Comment[]
+    const membersData = (membersResult.data ?? []) as SessionMembership[]
+    const progressData = (progressResult.data ?? []) as ProgressUpdate[]
+    const requestsData = (requestsResult.data ?? []) as SessionJoinRequest[]
+
+    let likesData: CommentLike[] = []
+    if (commentsData.length > 0) {
+      const commentIds = commentsData.map((comment) => comment.id)
+      const likesResult = await supabase
+        .from('comment_likes')
+        .select('id,comment_id,user_id,created_at')
+        .in('comment_id', commentIds)
+        .limit(commentIds.length * 10)
+
+      if (likesResult.error) {
+        setError(likesResult.error.message)
+        setLoading(false)
+        return
+      }
+
+      likesData = (likesResult.data ?? []) as CommentLike[]
+    }
+
+    const profileUserIds = Array.from(
+      new Set([
+        ...membersData.map((member) => member.user_id),
+        ...commentsData.map((comment) => comment.user_id),
+        ...requestsData.map((request) => request.user_id),
+      ]),
+    )
+
+    const profileLookup: Record<string, Profile> = {}
+    if (profileUserIds.length > 0) {
+      const profilesResult = await supabase
+        .from('profiles')
+        .select('id,display_name,avatar_url')
+        .in('id', profileUserIds)
+
+      if (profilesResult.error) {
+        setError(profilesResult.error.message)
+        setLoading(false)
+        return
+      }
+
+      const profilesArr = (profilesResult.data ?? []) as Profile[]
+      const resolvedAvatars = await resolveAvatarUrlMap(
+        profilesArr.map((profile) => profile.avatar_url).filter((avatarUrl): avatarUrl is string => Boolean(avatarUrl)),
+      )
+
+      for (const profile of profilesArr) {
+        profileLookup[profile.id] = profile
+        if (profile.avatar_url && !isRemoteUrl(profile.avatar_url) && resolvedAvatars[profile.avatar_url]) {
+          profileLookup[profile.id] = { ...profile, avatar_url: resolvedAvatars[profile.avatar_url] }
+        }
+      }
+    }
+
+    setComments(commentsData)
+    setMembers(membersData)
+    setProgress(progressData)
+    setLikes(likesData)
+    setJoinRequests(requestsData)
+    setProfiles(profileLookup)
+    setLoading(false)
+  }, [])
+
+  const refreshDetail = useCallback(async () => {
+    const sessionId = currentSessionIdRef.current
+    if (!sessionId) return
+    lastLoadRef.current = { sessionId, time: 0 }
+    await loadDetail(sessionId)
+  }, [loadDetail])
+
+  const submitComment = useCallback(async (_sessionId: string, userId: string, body: string) => {
+    const trimmed = body.trim()
+    if (!trimmed) return
+
+    const commentCheck = validateComment(trimmed)
+    if (!commentCheck.valid) {
+      setError(commentCheck.error ?? 'Invalid comment')
+      return
+    }
+
+    const rateCheck = checkRateLimit(`comment:${userId}`, COMMENT_RATE_LIMIT)
+    if (!rateCheck.allowed) {
+      setError(`Please wait ${Math.ceil(rateCheck.retryAfterMs / 1000)}s before commenting again`)
+      return
+    }
+
+    const { error } = await supabase.from('comments').insert({
+      session_id: _sessionId,
+      user_id: userId,
+      body: trimmed,
+    })
+
+    if (error) {
+      setError(error.message)
+    } else {
+      recordAction(`comment:${userId}`, COMMENT_RATE_LIMIT.windowMs)
+      lastLoadRef.current = { sessionId: _sessionId, time: 0 }
+      await loadDetail(_sessionId)
+    }
+  }, [loadDetail])
+
+  const toggleLike = useCallback(async (_sessionId: string, userId: string, commentId: string) => {
+    const existingLike = likes.find((like) => like.comment_id === commentId && like.user_id === userId)
+
+    if (existingLike) {
+      const { error } = await supabase.from('comment_likes').delete().eq('id', existingLike.id)
+      if (error) {
+        setError(error.message)
+        return
+      }
+    } else {
+      const { error } = await supabase.from('comment_likes').insert({
+        comment_id: commentId,
+        user_id: userId,
+      })
+      if (error) {
+        setError(error.message)
+        return
+      }
+    }
+    lastLoadRef.current = { sessionId: _sessionId, time: 0 }
+    await loadDetail(_sessionId)
+  }, [likes, loadDetail])
+
+  const approveRequest = useCallback(async (sessionId: string, request: SessionJoinRequest) => {
+    const updateResult = await supabase
+      .from('session_join_requests')
+      .update({ status: 'approved' })
+      .eq('id', request.id)
+
+    if (updateResult.error) {
+      setError(updateResult.error.message)
+      return
+    }
+
+    const membershipResult = await supabase.from('session_members').insert({
+      session_id: sessionId,
+      user_id: request.user_id,
+      role: 'member',
+    })
+
+    if (membershipResult.error && !membershipResult.error.message.toLowerCase().includes('duplicate')) {
+      setError(membershipResult.error.message)
+      return
+    }
+    lastLoadRef.current = { sessionId, time: 0 }
+    await loadDetail(sessionId)
+  }, [loadDetail])
+
+  const rejectRequest = useCallback(async (_sessionId: string, request: SessionJoinRequest) => {
+    const { error } = await supabase
+      .from('session_join_requests')
+      .update({ status: 'rejected' })
+      .eq('id', request.id)
+
+    if (error) {
+      setError(error.message)
+      return
+    }
+    lastLoadRef.current = { sessionId: _sessionId, time: 0 }
+    await loadDetail(_sessionId)
+  }, [loadDetail])
+
+  const clearDetail = useCallback(() => {
+    setComments([])
+    setLikes([])
+    setMembers([])
+    setProgress([])
+    setProfiles({})
+    setJoinRequests([])
+    setError(null)
+  }, [])
+
+  // Append a single comment directly (used by realtime INSERT to avoid full reload)
+  const appendComment = useCallback((comment: Comment) => {
+    setComments((prev) => {
+      if (prev.some((c) => c.id === comment.id)) return prev
+      return [...prev, comment]
+    })
+  }, [])
+
+  // Fetch a profile into the cache if not already present (used for realtime new-commenter).
+  // Uses a ref-based in-flight set to prevent concurrent duplicate requests for the same user.
+  const ensureProfile = useCallback(async (userId: string) => {
+    if (fetchingProfileIds.current.has(userId)) return
+    fetchingProfileIds.current.add(userId)
+
+    try {
+      const result = await supabase
+        .from('profiles')
+        .select('id,display_name,avatar_url')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (!result.data) return
+
+      const p = result.data as Profile
+      const avatarPaths = p.avatar_url && !isRemoteUrl(p.avatar_url) ? [p.avatar_url] : []
+      const resolved = avatarPaths.length > 0 ? await resolveAvatarUrlMap(avatarPaths) : {}
+
+      const resolvedProfile: Profile =
+        p.avatar_url && !isRemoteUrl(p.avatar_url) && resolved[p.avatar_url]
+          ? { ...p, avatar_url: resolved[p.avatar_url] }
+          : p
+
+      setProfiles((prev) => {
+        if (prev[userId]) return prev
+        return { ...prev, [userId]: resolvedProfile }
+      })
+    } finally {
+      fetchingProfileIds.current.delete(userId)
+    }
+  }, [])
+
+  return {
+    comments,
+    likes,
+    members,
+    progress,
+    profiles,
+    joinRequests,
+    loading,
+    error,
+    loadDetail,
+    refreshDetail,
+    submitComment,
+    toggleLike,
+    approveRequest,
+    rejectRequest,
+    clearDetail,
+    appendComment,
+    ensureProfile,
+  }
+}
