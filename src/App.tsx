@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useCallback } from 'react'
 import type { FormEvent } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import type { User } from '@supabase/supabase-js'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { translations } from './i18n'
 import { useAuth } from './hooks/useAuth'
@@ -15,6 +16,7 @@ const AuthenticatedApp = lazy(() => import('./AuthenticatedApp'))
 
 function App() {
   const auth = useAuth()
+  const location = useLocation()
   const t = translations[auth.language]
 
   const { setError: authSetError, setUser: authSetUser, setLoading: authSetLoading } = auth
@@ -29,23 +31,37 @@ function App() {
     setPassword: authSetPassword,
   } = auth
 
+  const handleOAuthResolved = useCallback(
+    (user: User | null) => {
+      authSetUser(user)
+      authSetLoading(false)
+    },
+    [authSetUser, authSetLoading],
+  )
+
   useEffect(() => {
     let alive = true
+    const isOAuthCallback = location.pathname === APP_PATHS.authCallback
 
-    async function bootstrap() {
-      const { data, error } = await supabase.auth.getSession()
-      if (!alive) return
-      if (error) authSetError(error.message)
-      authSetUser(data.session?.user ?? null)
-      authSetLoading(false)
+    if (isOAuthCallback) {
+      authSetLoading(true)
+    } else {
+      async function bootstrap() {
+        const { data, error } = await supabase.auth.getSession()
+        if (!alive) return
+        if (error) authSetError(error.message)
+        authSetUser(data.session?.user ?? null)
+        authSetLoading(false)
+      }
+
+      bootstrap().catch((error: unknown) => {
+        authSetError(error instanceof Error ? error.message : 'Unexpected authentication error')
+        authSetLoading(false)
+      })
     }
 
-    bootstrap().catch((error: unknown) => {
-      authSetError(error instanceof Error ? error.message : 'Unexpected authentication error')
-      authSetLoading(false)
-    })
-
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (location.pathname === APP_PATHS.authCallback) return
       authSetUser(session?.user ?? null)
       authSetLoading(false)
     })
@@ -54,7 +70,7 @@ function App() {
       alive = false
       authListener.subscription.unsubscribe()
     }
-  }, [authSetError, authSetUser, authSetLoading])
+  }, [location.pathname, authSetError, authSetUser, authSetLoading])
 
   const handleAuthSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -80,7 +96,12 @@ function App() {
 
   return (
     <Routes>
-      <Route path={APP_PATHS.authCallback} element={<AuthCallbackPage language={auth.language} />} />
+      <Route
+        path={APP_PATHS.authCallback}
+        element={
+          <AuthCallbackPage language={auth.language} onAuthResolved={handleOAuthResolved} />
+        }
+      />
       <Route
         path={APP_PATHS.login}
         element={
