@@ -53,9 +53,13 @@ export function SessionCard({
               loading="lazy"
             />
           ) : (
-            <div className="session-card-cover-empty">
-              <span className="session-card-no-cover-icon">📖</span>
-            </div>
+            <img
+              className="session-card-cover-image"
+              src="/default-cover.png"
+              alt="Default cover"
+              loading="lazy"
+              style={{ objectFit: 'contain', background: '#222' }}
+            />
           )}
         </div>
 

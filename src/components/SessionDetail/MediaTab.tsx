@@ -2,6 +2,7 @@ import type { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import type { MediaType, ReadingSession } from '../../types'
 import { MediaUpload } from '../Media/MediaComponents'
+import { ArrowLeft, ArrowRight } from 'lucide-react'
 
 type Copy = (typeof translations)[Language]
 
@@ -88,8 +89,9 @@ export function MediaTab({
               className="secondary"
               disabled={!onPrevChapter || activeChapter <= 1 || loadingChapter}
               onClick={() => { void onPrevChapter?.() }}
+              style={{ display: 'flex', alignItems: 'center' }}
             >
-              {t.media.prev}
+              <ArrowLeft size={16} style={{ marginRight: '0.25rem' }} /> {t.media.prev}
             </button>
             <span className="chapter-viewer-label">
               {t.media.chapter(activeChapter)} <span className="subtle">/ {maxChapter}</span>
@@ -99,8 +101,9 @@ export function MediaTab({
               className="secondary"
               disabled={!onNextChapter || activeChapter >= maxChapter || loadingChapter}
               onClick={() => { void onNextChapter?.() }}
+              style={{ display: 'flex', alignItems: 'center' }}
             >
-              {t.media.next}
+              {t.media.next} <ArrowRight size={16} style={{ marginLeft: '0.25rem' }} />
             </button>
           </div>
 

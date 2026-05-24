@@ -144,7 +144,7 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
 
   return (
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal-content modal-create-session">
+      <div className="modal-content modal-create-session" style={{ maxWidth: '800px', width: '90vw' }}>
         <div className="modal-header">
           <h2>{t.sessionForm.title}</h2>
           <button type="button" className="modal-close" onClick={onClose} aria-label={t.nav.closeMenu}>✕</button>
@@ -152,92 +152,123 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
 
         {error ? <p className="error">{error}</p> : null}
 
-        <form className="create-session-form" onSubmit={(e) => { void handleSubmit(e) }}>
-          <div className="create-session-row">
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={t.sessionForm.bookTitlePlaceholder}
-              aria-label={t.sessionForm.bookTitle}
-              required
-            />
+        <form className="create-session-form" onSubmit={(e) => { void handleSubmit(e) }} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+            {/* Left Column: Core Info */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label className="field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>{t.sessionForm.bookTitle}</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder={t.sessionForm.bookTitlePlaceholder}
+                  aria-label={t.sessionForm.bookTitle}
+                  required
+                />
+              </div>
 
-            <input
-              type="text"
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              placeholder={t.sessionForm.authorPlaceholder}
-              aria-label={t.sessionForm.author}
-              required
-            />
-          </div>
+              <div>
+                <label className="field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>{t.sessionForm.author}</label>
+                <input
+                  type="text"
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  placeholder={t.sessionForm.authorPlaceholder}
+                  aria-label={t.sessionForm.author}
+                  required
+                />
+              </div>
 
-          <div className="create-session-row">
-            <input
-              type="number"
-              min={1}
-              value={chapters}
-              onChange={(e) => setChapters(e.target.value === '' ? '' : Number(e.target.value))}
-              placeholder={t.sessionForm.totalChaptersPlaceholder}
-              aria-label={t.sessionForm.totalChapters}
-            />
+              <div>
+                <label className="field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>{t.sessionForm.description}</label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={t.sessionForm.descriptionPlaceholder}
+                  aria-label={t.sessionForm.description}
+                  rows={4}
+                />
+              </div>
 
-            <select
-              value={visibility}
-              onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
-              aria-label={t.sessionForm.visibility}
-            >
-              <option value="public">{t.enums.visibility.public}</option>
-              <option value="private">{t.enums.visibility.private}</option>
-            </select>
-
-            <select
-              value={joinPolicy}
-              onChange={(e) => setJoinPolicy(e.target.value as 'open' | 'request')}
-              aria-label={t.sessionForm.joinPolicy}
-            >
-              <option value="open">{t.sessionForm.openJoin}</option>
-              <option value="request">{t.sessionForm.requestToJoin}</option>
-            </select>
-          </div>
-
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t.sessionForm.descriptionPlaceholder}
-            aria-label={t.sessionForm.description}
-            rows={3}
-          />
-
-          {categories.length > 0 ? (
-            <div className="field">
-              <div className="category-tab-bar">
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    className={`category-tab ${selectedCategoryId === cat.id ? 'category-tab-active' : ''}`}
-                    onClick={() => setSelectedCategoryId(cat.id)}
-                  >
-                    {cat.name}
-                  </button>
-                ))}
+              <div>
+                <label className="field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>{t.sessionForm.coverImage}</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
+                  aria-label={t.sessionForm.coverImage}
+                />
+                <span className="field-hint" style={{ display: 'block', marginTop: '0.25rem' }}>{t.sessionForm.coverImageHint}</span>
               </div>
             </div>
-          ) : null}
 
-          <div className="field">
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setCoverFile(e.target.files?.[0] ?? null)}
-              aria-label={t.sessionForm.coverImage}
-            />
-            <span className="field-hint">{t.sessionForm.coverImageHint}</span>
+            {/* Right Column: Settings & Categories */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>{t.sessionForm.totalChapters}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={chapters}
+                    onChange={(e) => setChapters(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder={t.sessionForm.totalChaptersPlaceholder}
+                    aria-label={t.sessionForm.totalChapters}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1 }}>
+                  <label className="field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>{t.sessionForm.visibility}</label>
+                  <select
+                    value={visibility}
+                    onChange={(e) => setVisibility(e.target.value as 'public' | 'private')}
+                    aria-label={t.sessionForm.visibility}
+                  >
+                    <option value="public">{t.enums.visibility.public}</option>
+                    <option value="private">{t.enums.visibility.private}</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label className="field-label" style={{ display: 'block', marginBottom: '0.25rem' }}>{t.sessionForm.joinPolicy}</label>
+                  <select
+                    value={joinPolicy}
+                    onChange={(e) => setJoinPolicy(e.target.value as 'open' | 'request')}
+                    aria-label={t.sessionForm.joinPolicy}
+                  >
+                    <option value="open">{t.sessionForm.openJoin}</option>
+                    <option value="request">{t.sessionForm.requestToJoin}</option>
+                  </select>
+                </div>
+              </div>
+
+              {categories.length > 0 ? (
+                <div>
+                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>Category</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    {categories.map((cat) => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        className={`pill ${selectedCategoryId === cat.id ? 'pill-active' : ''}`}
+                        onClick={() => setSelectedCategoryId(cat.id)}
+                        style={{
+                          background: selectedCategoryId === cat.id ? 'var(--electric-blue)' : 'var(--surface-raised)',
+                          color: selectedCategoryId === cat.id ? '#fff' : 'var(--text-primary)'
+                        }}
+                      >
+                        {cat.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
 
-          <div className="create-session-footer">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
             <button type="button" className="secondary" onClick={onClose} disabled={creating}>
               {t.common.cancel}
             </button>

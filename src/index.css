@@ -62,6 +62,24 @@
   --transition: 0.33s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+[data-theme='light'] {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-overlay: #f1f5f9;
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --border-interactive: rgba(0, 0, 0, 0.16);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-placeholder: #94a3b8;
+  
+  --brand-soft: rgba(62, 106, 225, 0.08);
+}
+
 /* ─── 2. Reset ──────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -72,12 +90,25 @@
 
 html, body, #root {
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   color: var(--text-primary);
   background: var(--bg);
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+img, video, canvas, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+svg {
+  flex-shrink: 0;
 }
 
 /* ─── 3. Typography ─────────────────────────────────────────────── */
@@ -114,6 +145,98 @@ h3 { font-size: 1.06rem; line-height: 1.25; }
   grid-template-columns: 1fr;
   gap: 0;
   min-height: 100vh;
+}
+
+/* SaaS Layout Primitives */
+.saas-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.saas-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  z-index: 10;
+  transition: transform var(--transition);
+}
+
+.saas-main-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100vh;
+}
+
+.saas-topbar {
+  height: 60px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-4);
+  z-index: 5;
+}
+
+.saas-content-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--bg);
+}
+
+.saas-workspace-3col {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr) 300px;
+  height: 100%;
+}
+
+.saas-workspace-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.saas-workspace-center {
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+@media (max-width: 1024px) {
+  .saas-workspace-3col {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+  .saas-workspace-right {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .saas-sidebar {
+    position: absolute;
+    transform: translateX(-100%);
+  }
+  .saas-sidebar.open {
+    transform: translateX(0);
+  }
+  .saas-workspace-3col {
+    grid-template-columns: 1fr;
+  }
+  .saas-workspace-left {
+    display: none;
+  }
 }
 
 .stack    { display: grid; gap: var(--space-4); }
@@ -238,10 +361,12 @@ select option { background: var(--surface); color: var(--text-primary); }
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
+  min-width: 0;
 }
 
 /* ─── 9. Auth Card ──────────────────────────────────────────────── */
 .auth-card {
+  width: calc(100% - 2rem);
   max-width: 400px;
   margin: 6vh auto;
   padding: var(--space-8);
@@ -549,6 +674,36 @@ select option { background: var(--surface); color: var(--text-primary); }
 .session-card-desc { font-size: 0.82rem; line-height: 1.4; color: var(--text-muted); margin: 0; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .session-card-hint { margin: 0; font-size: 0.75rem; color: var(--text-muted); }
 
+.featured-carousel {
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  cursor: grab;
+  /* Custom scrollbar for WebKit */
+  padding-bottom: 0.5rem;
+}
+
+.featured-carousel::-webkit-scrollbar {
+  height: 6px;
+}
+
+.featured-carousel::-webkit-scrollbar-track {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.featured-carousel::-webkit-scrollbar-thumb {
+  background: var(--text-tertiary);
+  border-radius: 4px;
+}
+
+.featured-carousel::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+.featured-carousel:active {
+  cursor: grabbing;
+}
+
 .session-card-cta {
   align-self: flex-start;
   font-size: 0.8rem;
@@ -558,10 +713,12 @@ select option { background: var(--surface); color: var(--text-primary); }
 
 .session-card-clickable {
   cursor: pointer;
-  transition: border-color var(--transition);
+  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
 .session-card-clickable:hover {
   border-color: var(--electric-blue);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .session-categories {

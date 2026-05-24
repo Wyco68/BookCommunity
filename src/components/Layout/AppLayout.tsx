@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import { DashboardHeader } from '../DashboardHeader'
 import type { DashboardHeaderProps } from '../DashboardHeader'
+import { DashboardHeader } from '../DashboardHeader'
 import { CreateSessionModal } from '../CreateSession/CreateSessionModal'
 
 interface AppLayoutProps {
@@ -12,14 +12,15 @@ export function AppLayout({ headerProps }: AppLayoutProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
 
   return (
-    <main className="shell dashboard-shell">
-      <div className="app-container">
-        <DashboardHeader {...headerProps} onCreateClick={() => setShowCreateModal(true)} />
-        <section className="layout-content">
-          <Outlet />
-        </section>
-      </div>
+    <>
+      <DashboardHeader 
+        {...headerProps} 
+        onCreateClick={() => setShowCreateModal(true)} 
+      />
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem', width: '100%', minWidth: 0 }}>
+        <Outlet />
+      </main>
       {showCreateModal ? <CreateSessionModal onClose={() => setShowCreateModal(false)} /> : null}
-    </main>
+    </>
   )
-}
+}

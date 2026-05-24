@@ -215,6 +215,7 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
   const sectionsAndDetailsProps = {
     t,
     listProps: sectionsListProps as never,
+    allSessions: sessions.sessions,
   }
 
   return (

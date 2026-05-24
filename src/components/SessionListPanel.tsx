@@ -65,8 +65,9 @@ export const SessionListPanel = memo(function SessionListPanel({
   const handleConfirmJoin = useCallback(async () => {
     if (!joinTarget) return
     await onJoinSession(joinTarget.id)
+    navigate(`/session/${joinTarget.id}`)
     setJoinTarget(null)
-  }, [joinTarget, onJoinSession])
+  }, [joinTarget, onJoinSession, navigate])
 
   const rootClassName = embedded ? 'stack session-panel-embedded' : 'card stack'
   const RootTag = embedded ? 'div' : 'article'
