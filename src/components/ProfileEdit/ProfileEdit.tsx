@@ -104,146 +104,161 @@ export function ProfileEdit({
   }
 
   return (
-    <section className="feed">
-      <div className="feed-header">
-        <h1 className="feed-title">{t.profile.title}</h1>
-      </div>
-      <div className="feed-content">
-        <article className="card" style={{ maxWidth: '100%', width: '100%' }}>
-          <div className="profile-card stack" style={{ border: 'none', padding: 0, background: 'transparent' }}>
-            {/* Avatar section */}
-            <div className="profile-row">
-              <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="lg" />
-              <div className="stack gap-sm profile-upload-stack">
-                <input
-                  key={avatarInputKey}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={onAvatarFileChange}
-                  aria-label={t.profile.avatarImage}
-                />
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+      <header style={{ marginBottom: '2rem' }}>
+        <h1 style={{ margin: 0, fontSize: '1.75rem' }}>{t.profile.title}</h1>
+      </header>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        {/* Profile Card */}
+        <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <div style={{ flexShrink: 0, textAlign: 'center', margin: '0 auto', maxWidth: '100%' }}>
+              <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="xl" />
+              <div style={{ marginTop: '1rem', width: '100%' }}>
+                <label className="secondary" style={{ cursor: 'pointer', padding: '0.4rem 0.75rem', fontSize: '0.875rem', display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
+                  {t.profile.avatarImage}
+                  <input
+                    key={avatarInputKey}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={onAvatarFileChange}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
+              {avatarFile && (
                 <button
                   type="button"
-                  className="btn-secondary"
-                  disabled={!avatarFile || avatarUploadBusy}
-                  onClick={() => {
-                    void onUploadAvatar()
-                  }}
+                  className="primary"
+                  style={{ marginTop: '0.5rem', width: '100%', maxWidth: '200px' }}
+                  disabled={avatarUploadBusy}
+                  onClick={() => { void onUploadAvatar() }}
                 >
                   {avatarUploadBusy ? t.common.uploading : t.profile.uploadAvatar}
                 </button>
-              </div>
+              )}
             </div>
 
-            {/* Display name */}
-            <form
-              className="stack"
-              onSubmit={(event) => {
-                event.preventDefault()
-                void onSaveProfile()
-              }}
-            >
-              <input
-                type="text"
-                value={profileNameDraft}
-                onChange={(event) => onProfileNameDraftChange(event.target.value)}
-                placeholder={t.profile.displayNamePlaceholder}
-                aria-label={t.profile.displayName}
-                maxLength={80}
-              />
-              <button type="submit" className="btn-primary" disabled={profileSaving}>
-                {profileSaving ? t.common.saving : t.profile.saveProfile}
-              </button>
-            </form>
-
-            {profileNotice ? <p className="subtle">{profileNotice}</p> : null}
-          </div>
-        </article>
-
-        {/* Change password */}
-        <article className="card stack" style={{ maxWidth: '100%', width: '100%', marginTop: '1rem' }}>
-          <h3>{t.profile.changePassword}</h3>
-          <input
-            type="password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            placeholder={t.profile.oldPasswordPlaceholder}
-            autoComplete="current-password"
-            aria-label={t.profile.oldPassword}
-          />
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder={t.profile.newPasswordPlaceholder}
-            minLength={6}
-            autoComplete="new-password"
-            aria-label={t.profile.newPassword}
-          />
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={passwordBusy || !oldPassword.trim() || !newPassword.trim()}
-            onClick={() => { void handleChangePassword() }}
-          >
-            {passwordBusy ? t.common.saving : t.profile.updatePassword}
-          </button>
-          {passwordNotice ? <p className="subtle">{passwordNotice}</p> : null}
-        </article>
-
-        {/* Account actions */}
-        <article className="card stack" style={{ maxWidth: '100%', width: '100%', marginTop: '1rem' }}>
-          <h3>{t.profile.account}</h3>
-
-          <button
-            type="button"
-            className="btn-primary"
-            onClick={onSignOut}
-            style={{ width: '100%' }}
-          >
-            {t.auth.signOut}
-          </button>
-
-          <div style={{ borderTop: '1px solid var(--dark-border)', paddingTop: '1rem', marginTop: '0.5rem' }}>
-            {!deleteConfirm ? (
-              <button
-                type="button"
-                className="btn-danger"
-                onClick={() => setDeleteConfirm(true)}
-                style={{ width: '100%' }}
+            <div style={{ flex: 1, minWidth: '0', flexBasis: '250px' }}>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void onSaveProfile()
+                }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
               >
-                {t.profile.deleteAccount}
-              </button>
-            ) : (
-              <div className="stack gap-sm">
-                <p className="subtle" style={{ margin: 0, color: '#ef4444' }}>
-                  {t.profile.deleteConfirm}
-                </p>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn-danger"
-                    disabled={deleteBusy}
-                    onClick={() => { void handleDeleteAccount() }}
-                    style={{ flex: 1 }}
-                  >
-                    {deleteBusy ? t.profile.deleting : t.profile.yesDelete}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setDeleteConfirm(false)}
-                    style={{ flex: 1 }}
-                  >
-                    {t.common.cancel}
-                  </button>
+                <div>
+                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.displayName}</label>
+                  <input
+                    type="text"
+                    value={profileNameDraft}
+                    onChange={(event) => onProfileNameDraftChange(event.target.value)}
+                    placeholder={t.profile.displayNamePlaceholder}
+                    maxLength={80}
+                  />
                 </div>
-              </div>
-            )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <button type="submit" className="primary" disabled={profileSaving}>
+                    {profileSaving ? t.common.saving : t.profile.saveProfile}
+                  </button>
+                  {profileNotice ? <span className="subtle" style={{ fontSize: '0.875rem' }}>{profileNotice}</span> : null}
+                </div>
+              </form>
+            </div>
           </div>
-        </article>
+        </section>
+
+        {/* Security Card */}
+        <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
+          <h3 style={{ margin: '0 0 1rem 0' }}>{t.profile.changePassword}</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
+            <div>
+              <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.oldPassword}</label>
+              <input
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+                placeholder={t.profile.oldPasswordPlaceholder}
+                autoComplete="current-password"
+              />
+            </div>
+            <div>
+              <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.newPassword}</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder={t.profile.newPasswordPlaceholder}
+                minLength={6}
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <button
+              type="button"
+              className="primary"
+              disabled={passwordBusy || !oldPassword.trim() || !newPassword.trim()}
+              onClick={() => { void handleChangePassword() }}
+            >
+              {passwordBusy ? t.common.saving : t.profile.updatePassword}
+            </button>
+            {passwordNotice ? <span className="subtle" style={{ fontSize: '0.875rem' }}>{passwordNotice}</span> : null}
+          </div>
+        </section>
+
+        {/* Danger Zone */}
+        <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <h3 style={{ margin: '0 0 1rem 0', color: '#ef4444' }}>Danger Zone</h3>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div>
+              <button type="button" className="secondary" onClick={onSignOut}>
+                {t.auth.signOut}
+              </button>
+            </div>
+
+            <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+              {!deleteConfirm ? (
+                <button
+                  type="button"
+                  className="secondary"
+                  style={{ color: '#ef4444', borderColor: '#ef4444' }}
+                  onClick={() => setDeleteConfirm(true)}
+                >
+                  {t.profile.deleteAccount}
+                </button>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <p className="subtle" style={{ margin: 0, color: '#ef4444' }}>
+                    {t.profile.deleteConfirm}
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="primary"
+                      style={{ background: '#ef4444' }}
+                      disabled={deleteBusy}
+                      onClick={() => { void handleDeleteAccount() }}
+                    >
+                      {deleteBusy ? t.profile.deleting : t.profile.yesDelete}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => setDeleteConfirm(false)}
+                    >
+                      {t.common.cancel}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
   )
 }
 

@@ -17,6 +17,7 @@ import { PageSpinner } from '../components/Spinner'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import type { Comment, ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
+import { ArrowLeft } from 'lucide-react'
 
 const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
@@ -501,10 +502,10 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
           <button
             type="button"
             className="secondary"
-            style={{ alignSelf: 'center' }}
+            style={{ alignSelf: 'center', display: 'flex', alignItems: 'center' }}
             onClick={() => navigate(-1)}
           >
-            ← {t.common.back}
+            <ArrowLeft size={16} style={{ marginRight: '0.25rem' }} /> {t.common.back}
           </button>
         </article>
       </section>
@@ -520,8 +521,8 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
       <section className="stack">
         <div className="detail-back-bar">
           <div className="detail-back-bar-inner">
-            <button type="button" className="btn-back-compact" onClick={() => navigate(-1)}>
-              ⬅ {t.common.back}
+            <button type="button" className="btn-back-compact" onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center' }}>
+              <ArrowLeft size={16} style={{ marginRight: '0.25rem' }} /> {t.common.back}
             </button>
           </div>
         </div>
@@ -576,8 +577,8 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
     <section className="stack">
       <div className="detail-back-bar">
         <div className="detail-back-bar-inner">
-          <button type="button" className="btn-back-compact" onClick={() => navigate(-1)}>
-            ⬅ {t.common.back}
+          <button type="button" className="btn-back-compact" onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center' }}>
+            <ArrowLeft size={16} style={{ marginRight: '0.25rem' }} /> {t.common.back}
           </button>
           <div className="auth-switch detail-tab-switch" role="tablist" aria-label="Session tabs">
             {tabs.map((tab) => (

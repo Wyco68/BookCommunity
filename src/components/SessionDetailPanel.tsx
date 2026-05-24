@@ -87,20 +87,20 @@ export interface SessionDetailPanelProps {
 }
 
 export const SessionDetailPanel = memo(function SessionDetailPanel(props: SessionDetailPanelProps) {
-  const { t, activeTab, selectedSession, fullWidth = true } = props
+  const { t, activeTab, selectedSession } = props
 
   if (!selectedSession) {
     return (
-      <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
         <p className="subtle">{t.sessions.selectSessionPrompt}</p>
-      </article>
+      </div>
     )
   }
 
   return (
-    <article className={fullWidth ? 'card stack span-full' : 'card stack'}>
+    <article className={props.fullWidth ? 'card stack span-full' : 'card stack'}>
       {/* Header */}
-      <div className="detail-header">
+      <div className="detail-header" style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
         <div>
           <h2>{selectedSession.book_title}</h2>
           <p className="subtle">{selectedSession.book_author}</p>
@@ -139,6 +139,22 @@ export const SessionDetailPanel = memo(function SessionDetailPanel(props: Sessio
         />
       ) : null}
 
+      {activeTab === 'discussion' ? (
+        <DiscussionTab
+          t={t}
+          isMember={props.selectedIsMember}
+          commentDraft={props.commentDraft}
+          postingComment={props.postingComment}
+          sessionComments={props.sessionComments}
+          sessionProfiles={props.sessionProfiles}
+          commentMeta={props.commentMeta}
+          likingCommentId={props.likingCommentId}
+          onSubmitComment={props.onSubmitComment}
+          onCommentDraftChange={props.onCommentDraftChange}
+          onToggleLike={props.onToggleLike}
+        />
+      ) : null}
+
       {activeTab === 'manage' ? (
         <ManageTab
           t={t}
@@ -163,22 +179,6 @@ export const SessionDetailPanel = memo(function SessionDetailPanel(props: Sessio
           onLeaveSession={props.onLeaveSession}
           leavingSession={props.leavingSession}
           leaveSessionDisabled={props.leaveSessionDisabled}
-        />
-      ) : null}
-
-      {activeTab === 'discussion' ? (
-        <DiscussionTab
-          t={t}
-          isMember={props.selectedIsMember}
-          commentDraft={props.commentDraft}
-          postingComment={props.postingComment}
-          sessionComments={props.sessionComments}
-          sessionProfiles={props.sessionProfiles}
-          commentMeta={props.commentMeta}
-          likingCommentId={props.likingCommentId}
-          onSubmitComment={props.onSubmitComment}
-          onCommentDraftChange={props.onCommentDraftChange}
-          onToggleLike={props.onToggleLike}
         />
       ) : null}
     </article>

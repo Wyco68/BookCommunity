@@ -46,7 +46,7 @@ export function buildAuthenticatedBranch({
 
   return (
     <Route element={<AppLayout headerProps={headerProps} />}>
-      <Route index element={<Navigate to={APP_PATHS.dashboard} replace />} />
+      <Route index element={<Navigate to={APP_PATHS.home} replace />} />
       <Route path={nestPath(APP_PATHS.dashboard)} element={homeScreen} />
       <Route path={nestPath(APP_PATHS.home)} element={homeScreen} />
       <Route

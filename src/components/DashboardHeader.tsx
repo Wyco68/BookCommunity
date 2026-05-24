@@ -4,6 +4,7 @@ import type { Language } from '../i18n'
 import { Avatar } from './Avatar'
 import { APP_PATHS } from '../router/paths'
 import { useState } from 'react'
+import { Menu, X } from 'lucide-react'
 
 type Copy = (typeof translations)[Language]
 
@@ -93,9 +94,7 @@ export function DashboardHeader({
             aria-label={mobileMenuOpen ? t.nav.closeMenu : t.nav.openMenu}
             aria-expanded={mobileMenuOpen}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d={mobileMenuOpen ? 'M18.3 5.71 12 12.01l-6.3-6.3-1.41 1.42 6.29 6.29-6.29 6.29 1.41 1.42 6.3-6.3 6.3 6.3 1.41-1.42-6.29-6.29 6.29-6.29z' : 'M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z'} />
-            </svg>
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </header>
@@ -108,7 +107,7 @@ export function DashboardHeader({
             onClick={closeMobileMenu}
             aria-label={t.nav.closeMenu}
           >
-            ✕
+            <X size={20} />
           </button>
         </div>
         <div className="sidebar-nav">
