@@ -39,4 +39,7 @@ project-analysis.json
 
 
 .playwright-mcp
+# Ignore PNG screenshots at repo root; keep app static assets
 *.png
+!public/*.png
+!src/assets/*.png

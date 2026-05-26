@@ -1,6 +1,7 @@
 import type { ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
 import type { translations } from '../i18n'
 import type { Language } from '../i18n'
+import defaultCoverUrl from '../assets/default-cover.png'
 
 type Copy = (typeof translations)[Language]
 
@@ -55,7 +56,7 @@ export function SessionCard({
           ) : (
             <img
               className="session-card-cover-image w-full h-full object-cover aspect-[4/3]"
-              src="/default-cover.png"
+              src={defaultCoverUrl}
               alt="Default cover"
               loading="lazy"
               style={{ background: '#222' }}
