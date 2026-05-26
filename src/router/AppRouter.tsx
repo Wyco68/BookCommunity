@@ -50,8 +50,12 @@ export function buildAuthenticatedBranch({
       <Route path={nestPath(APP_PATHS.dashboard)} element={homeScreen} />
       <Route path={nestPath(APP_PATHS.home)} element={homeScreen} />
       <Route
-        path={nestPath(APP_PATHS.profileEdit)}
+        path={nestPath(APP_PATHS.account)}
         element={<ErrorBoundary><ProfileEditPage {...profileEditProps} /></ErrorBoundary>}
+      />
+      <Route
+        path={nestPath(APP_PATHS.profileEdit)}
+        element={<Navigate to={APP_PATHS.account} replace />}
       />
       <Route
         path={nestPath(APP_PATHS.search)}

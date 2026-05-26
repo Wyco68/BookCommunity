@@ -21,6 +21,42 @@ drop function if exists public.create_reading_session(text, text, integer[], tex
 drop type if exists public.session_status_type cascade;
 create type public.session_status_type as enum ('ongoing', 'completed');
 
+-- ── Username helpers (before profiles table CHECK) ────────────────────────────
+create or replace function public.is_valid_username(p_username text)
+returns boolean
+language sql
+immutable
+strict
+as $$
+  select p_username is not null
+    and char_length(p_username) >= 3
+    and char_length(p_username) <= 32
+    and p_username = lower(p_username)
+    and position(' ' in p_username) = 0
+    and p_username ~ '^[a-z0-9][a-z0-9_-]{2,}$';
+$$;
+
+create or replace function public.username_base_from_email(p_email text)
+returns text
+language plpgsql
+immutable
+as $$
+declare
+  v_local text;
+  v_base text;
+begin
+  v_local := split_part(coalesce(p_email, ''), '@', 1);
+  v_base := lower(regexp_replace(v_local, '[^a-z0-9]', '', 'g'));
+  if v_base is null or char_length(v_base) < 3 then
+    v_base := 'user';
+  end if;
+  if char_length(v_base) > 28 then
+    v_base := left(v_base, 28);
+  end if;
+  return v_base;
+end;
+$$;
+
 -- ── Tables (dependency order) ───────────────────────────────────────────────
 drop table if exists public.comment_likes cascade;
 drop table if exists public.comments cascade;
@@ -34,11 +70,66 @@ drop table if exists public.profiles cascade;
 
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  display_name text check (display_name is null or char_length(display_name) <= 100),
+  username text not null,
+  username_updated_at timestamptz,
   avatar_url text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint profiles_username_format_check check (public.is_valid_username(username))
 );
+
+create unique index profiles_username_lower_unique on public.profiles (lower(username));
+
+create or replace function public.allocate_username(
+  p_base text,
+  p_exclude_id uuid default null
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_base text;
+  v_candidate text;
+  v_suffix int;
+begin
+  perform set_config('row_security', 'off', true);
+
+  v_base := lower(regexp_replace(coalesce(p_base, ''), '[^a-z0-9]', '', 'g'));
+  if v_base is null or char_length(v_base) < 3 then
+    v_base := 'user';
+  end if;
+  if char_length(v_base) > 28 then
+    v_base := left(v_base, 28);
+  end if;
+
+  perform pg_advisory_xact_lock(hashtext('username_alloc:' || v_base));
+
+  for v_suffix in 0..9999 loop
+    if v_suffix = 0 then
+      v_candidate := v_base;
+    else
+      v_candidate := v_base || v_suffix::text;
+    end if;
+
+    if char_length(v_candidate) > 32 then
+      continue;
+    end if;
+
+    if not exists (
+      select 1
+      from public.profiles p
+      where lower(p.username) = lower(v_candidate)
+        and (p_exclude_id is null or p.id <> p_exclude_id)
+    ) then
+      return v_candidate;
+    end if;
+  end loop;
+
+  raise exception 'Could not allocate unique username for base %', v_base;
+end;
+$$;
 
 create table public.categories (
   id integer generated always as identity primary key,
@@ -130,16 +221,97 @@ insert into public.categories (name)
 values ('Action'), ('Adventure'), ('Romance'), ('Drama'), ('Comedy'), ('Study')
 on conflict (name) do nothing;
 
+create or replace function public.enforce_profiles_username()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_cooldown interval := interval '30 days';
+begin
+  if new.username is null or btrim(new.username) = '' then
+    raise exception 'username is required';
+  end if;
+
+  new.username := lower(btrim(new.username));
+
+  if not public.is_valid_username(new.username) then
+    raise exception 'invalid username: at least 3 characters, lowercase letters, numbers, underscore or hyphen only, no spaces';
+  end if;
+
+  if tg_op = 'UPDATE' then
+    if old.username is distinct from new.username then
+      if old.username_updated_at is not null
+         and old.username_updated_at + v_cooldown > now() then
+        raise exception 'username can only be changed once every 30 days';
+      end if;
+      new.username_updated_at := now();
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  v_base text;
+  v_username text;
+  v_attempt int := 0;
 begin
-  insert into public.profiles (id)
-  values (new.id)
-  on conflict (id) do nothing;
+  perform set_config('row_security', 'off', true);
+
+  if exists (select 1 from public.profiles p where p.id = new.id) then
+    return new;
+  end if;
+
+  v_base := public.username_base_from_email(new.email);
+
+  loop
+    v_attempt := v_attempt + 1;
+    if v_attempt > 50 then
+      raise exception 'Could not create profile with unique username for user %', new.id;
+    end if;
+
+    v_username := public.allocate_username(v_base);
+
+    begin
+      insert into public.profiles (id, username)
+      values (new.id, v_username);
+      exit;
+    exception
+      when unique_violation then
+        continue;
+    end;
+  end loop;
+
+  return new;
+end;
+$$;
+
+create or replace function public.enforce_profiles_avatar_url()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.avatar_url is null then
+    return new;
+  end if;
+
+  if new.avatar_url ~* '^https?://' then
+    return new;
+  end if;
+
+  if new.avatar_url !~ ('^' || new.id::text || '/avatar\.(jpg|jpeg|png|webp)$') then
+    raise exception 'invalid avatar path: must be {user_id}/avatar.{jpg|jpeg|png|webp}';
+  end if;
+
   return new;
 end;
 $$;
@@ -277,9 +449,9 @@ begin
     raise exception 'Invalid category';
   end if;
 
-  insert into public.profiles (id)
-  values (v_user_id)
-  on conflict (id) do nothing;
+  if not exists (select 1 from public.profiles where id = v_user_id) then
+    raise exception 'Profile not found for authenticated user';
+  end if;
 
   insert into public.reading_sessions (
     creator_id, book_title, book_author, description,
@@ -377,6 +549,18 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
+
+drop trigger if exists trg_enforce_profiles_username on public.profiles;
+create trigger trg_enforce_profiles_username
+before insert or update of username on public.profiles
+for each row
+execute function public.enforce_profiles_username();
+
+drop trigger if exists trg_enforce_profiles_avatar_url on public.profiles;
+create trigger trg_enforce_profiles_avatar_url
+before insert or update of avatar_url on public.profiles
+for each row
+execute function public.enforce_profiles_avatar_url();
 
 drop trigger if exists trg_enforce_sequential_session_media on public.session_media;
 create trigger trg_enforce_sequential_session_media
@@ -478,11 +662,38 @@ before update on public.reading_sessions
 for each row
 execute function public.enforce_reading_sessions_total_chapters_floor();
 
-insert into public.profiles (id)
-select u.id
-from auth.users u
-left join public.profiles p on p.id = u.id
-where p.id is null;
+-- Backfill profiles for auth users without a row (same allocator as handle_new_user)
+do $$
+declare
+  r record;
+  v_username text;
+  v_attempt int;
+begin
+  for r in
+    select u.id, u.email
+    from auth.users u
+    left join public.profiles p on p.id = u.id
+    where p.id is null
+  loop
+    v_attempt := 0;
+    loop
+      v_attempt := v_attempt + 1;
+      if v_attempt > 50 then
+        raise exception 'Could not backfill profile for user %', r.id;
+      end if;
+      v_username := public.allocate_username(public.username_base_from_email(r.email));
+      begin
+        insert into public.profiles (id, username)
+        values (r.id, v_username);
+        exit;
+      exception
+        when unique_violation then
+          continue;
+      end;
+    end loop;
+  end loop;
+end;
+$$;
 
 revoke all on function public.create_reading_session(text, text, int, text, text, integer, text) from public;
 grant execute on function public.create_reading_session(text, text, int, text, text, integer, text) to authenticated;
@@ -495,6 +706,15 @@ grant execute on function public.can_access_session(uuid, uuid) to authenticated
 
 revoke all on function public.max_uploaded_chapter(uuid) from public;
 grant execute on function public.max_uploaded_chapter(uuid) to authenticated;
+
+revoke all on function public.is_valid_username(text) from public;
+grant execute on function public.is_valid_username(text) to authenticated;
+
+revoke all on function public.username_base_from_email(text) from public;
+grant execute on function public.username_base_from_email(text) to authenticated;
+
+revoke all on function public.allocate_username(text, uuid) from public;
+grant execute on function public.allocate_username(text, uuid) to authenticated;
 
 -- reading_sessions: individual filter columns
 create index if not exists idx_reading_sessions_visibility
@@ -553,11 +773,16 @@ to authenticated
 using (true);
 
 drop policy if exists profiles_insert on public.profiles;
-create policy profiles_insert
+
+revoke insert on public.profiles from authenticated;
+revoke insert on public.profiles from anon;
+
+drop policy if exists profiles_delete on public.profiles;
+create policy profiles_delete
 on public.profiles
-for insert
+for delete
 to authenticated
-with check (auth.uid() = id);
+using (false);
 
 drop policy if exists profiles_update on public.profiles;
 create policy profiles_update

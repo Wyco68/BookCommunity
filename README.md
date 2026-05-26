@@ -58,6 +58,18 @@ For Google sign-in, add your site URL and `http://localhost:5173/auth/callback` 
 
 For an existing database that still has `session_categories` / `category_members`, run **`supabase/migrations/one_category_per_session.sql`** first, then reconcile with `schema.sql` as needed.
 
+On an existing project with profiles already in place, also run **`supabase/migrations/20260526_identity_and_account_delete.sql`** once (deduplicates usernames, avatar path trigger, revokes profile INSERT).
+
+### 3b. Account deletion (Edge Function)
+
+Deploy the `delete-account` function (requires [Supabase CLI](https://supabase.com/docs/guides/cli)):
+
+```bash
+supabase functions deploy delete-account
+```
+
+The function uses `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` from the project environment (set automatically when deployed). Account deletion in the app calls this function only — never delete auth users or profile rows from the client.
+
 ### 4. Run locally
 
 ```bash
@@ -83,6 +95,7 @@ src/                 React app (pages, components, hooks, i18n)
 supabase/
   schema.sql         Database source of truth (full recreate)
   migrations/        Incremental upgrades for existing DBs
+  functions/         Edge Functions (e.g. delete-account)
 docs/
   projectspec.md     Product + schema contract
   DESIGN.md          Visual design system
@@ -91,8 +104,3 @@ docs/
 ## Documentation
 
 - [Project specification](docs/projectspec.md) — domain model, RLS, triggers, API patterns
-- [Design system](docs/DESIGN.md) — colors, typography, layout rules
-
-## License
-
-See repository license file if present.

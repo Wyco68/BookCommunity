@@ -60,7 +60,7 @@ export function CommentThread({
                 t={t}
                 language={language}
                 comment={comment}
-                authorName={author?.display_name || 'User'}
+                authorName={author?.username || 'User'}
                 authorAvatarUrl={author?.avatar_url || null}
                 isLikedByMe={meta.isLikedByMe}
                 likeCount={meta.likeCount}

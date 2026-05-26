@@ -33,6 +33,7 @@ export function validateText(
     return fail(`${fieldName} must be ${maxLength} characters or fewer`)
   }
 
+  // eslint-disable-next-line no-control-regex
   if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(trimmed)) {
     return fail(`${fieldName} contains invalid characters`)
   }
@@ -62,6 +63,38 @@ export function validateCategoryName(value: string): ValidationResult {
 
 export function validateDisplayName(value: string): ValidationResult {
   return validateText(value, 'Display name', MAX_DISPLAY_NAME_LENGTH, false)
+}
+
+export const MIN_PASSWORD_LENGTH = 8
+
+export function validatePassword(value: string): ValidationResult {
+  if (value.length < MIN_PASSWORD_LENGTH) {
+    return fail(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`)
+  }
+  if (!/[A-Z]/.test(value)) {
+    return fail('Password must include at least one uppercase letter.')
+  }
+  if (!/[a-z]/.test(value)) {
+    return fail('Password must include at least one lowercase letter.')
+  }
+  if (!/[0-9]/.test(value)) {
+    return fail('Password must include at least one number.')
+  }
+  if (!/[^A-Za-z0-9]/.test(value)) {
+    return fail('Password must include at least one symbol.')
+  }
+  return ok()
+}
+
+export function validateEmail(value: string): ValidationResult {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return fail('Email is required.')
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+    return fail('Enter a valid email address.')
+  }
+  return ok()
 }
 
 const VALID_VISIBILITIES = ['public', 'private'] as const

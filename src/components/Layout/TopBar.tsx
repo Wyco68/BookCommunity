@@ -33,7 +33,7 @@ export function TopBar({
       </div>
 
       <div className="top-nav-actions" style={{ display: 'flex', marginLeft: 'auto' }}>
-        <Link to={APP_PATHS.profileEdit} className="header-identity-link">
+        <Link to={APP_PATHS.account} className="header-identity-link">
           <div className="identity-row">
             <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="sm" />
             <p style={{ margin: 0, fontWeight: 540, fontSize: '0.9rem' }}>{myDisplayName}</p>

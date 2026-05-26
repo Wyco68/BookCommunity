@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useCallback } from 'react'
 import type { FormEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import { translations } from './i18n'
 import { useAuth } from './hooks/useAuth'
@@ -17,6 +17,7 @@ const AuthenticatedApp = lazy(() => import('./AuthenticatedApp'))
 function App() {
   const auth = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const t = translations[auth.language]
 
   const { setError: authSetError, setUser: authSetUser, setLoading: authSetLoading } = auth
@@ -76,10 +77,14 @@ function App() {
     event.preventDefault()
     if (authMode === 'sign-in') {
       void authSignIn()
-    } else {
-      void authSignUp()
+      return
     }
-  }, [authMode, authSignIn, authSignUp])
+    void authSignUp().then((result) => {
+      if (result === 'ok') {
+        navigate(APP_PATHS.account, { replace: true })
+      }
+    })
+  }, [authMode, authSignIn, authSignUp, navigate])
 
   const handleAuthModeChange = useCallback(
     (mode: 'sign-in' | 'sign-up') => {
@@ -114,6 +119,7 @@ function App() {
             authPassword={auth.password}
             authError={auth.error}
             authBusy={auth.busy}
+            submitBlockedUntil={auth.submitBlockedUntil}
             googleBusy={googleBusy}
             onSubmit={handleAuthSubmit}
             onAuthModeChange={handleAuthModeChange}
