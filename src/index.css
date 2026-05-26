@@ -39,15 +39,15 @@
   --radius-lg: 12px;
   --radius-full: 9999px;
 
-  /* Spacing — 8px base unit */
+  /* Spacing — 4px/8px scale */
   --space-1: 0.25rem;   /* 4px */
   --space-2: 0.5rem;    /* 8px */
   --space-3: 0.75rem;   /* 12px */
   --space-4: 1rem;      /* 16px */
-  --space-5: 1.25rem;   /* 20px */
-  --space-6: 1.5rem;    /* 24px */
-  --space-8: 2rem;      /* 32px */
-  --space-10: 2.5rem;   /* 40px */
+  --space-5: 1.5rem;    /* 24px */
+  --space-6: 2rem;      /* 32px */
+  --space-8: 2.5rem;    /* 40px (legacy fallback) */
+  --space-10: 3rem;     /* 48px (legacy fallback) */
 
   /* Typography — DESIGN.md: only 400 + 500 */
   font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
@@ -137,6 +137,46 @@ h3 { font-size: 1.06rem; line-height: 1.25; }
 .error  { margin: 0; color: var(--danger); font-size: 0.875rem; padding: var(--space-3); border: 1px solid rgba(239,68,68,0.25); border-radius: var(--radius-xs); background: var(--danger-soft); }
 
 /* ─── 4. Layout Primitives ──────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 calc(-1 * var(--space-2));
+}
+
+.col {
+  flex: 1 0 0%;
+  padding: 0 var(--space-2);
+}
+
+.col-12 { flex: 0 0 100%; max-width: 100%; padding: 0 var(--space-2); }
+.col-6 { flex: 0 0 50%; max-width: 50%; padding: 0 var(--space-2); }
+.col-4 { flex: 0 0 33.333333%; max-width: 33.333333%; padding: 0 var(--space-2); }
+.col-3 { flex: 0 0 25%; max-width: 25%; padding: 0 var(--space-2); }
+
+/* Tables */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: var(--space-4);
+}
+.table th, .table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
 .shell {
   max-width: 1440px;
   margin: 0 auto;
@@ -223,7 +263,7 @@ h3 { font-size: 1.06rem; line-height: 1.25; }
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 640px) {
   .saas-sidebar {
     position: absolute;
     transform: translateX(-100%);
@@ -253,7 +293,7 @@ a {
 a:hover { color: var(--electric-blue); }
 
 /* ─── 6. Buttons — DESIGN.md: 4px radius, weight 500, 0.33s ──── */
-button {
+button, .btn {
   font: inherit;
   font-weight: 500;
   font-size: 0.875rem;
@@ -265,7 +305,7 @@ button {
   transition: background-color var(--transition), border-color var(--transition), color var(--transition);
 }
 
-button:disabled {
+button:disabled, .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
@@ -316,7 +356,7 @@ button:disabled {
 }
 
 /* ─── 7. Inputs & Forms ─────────────────────────────────────────── */
-input, textarea {
+input, textarea, .input {
   font: inherit;
   width: 100%;
   padding: var(--space-3);
@@ -328,12 +368,12 @@ input, textarea {
   transition: border-color var(--transition);
 }
 
-input:focus, textarea:focus {
+input:focus, textarea:focus, .input:focus {
   outline: none;
   border-color: var(--electric-blue);
 }
 
-input::placeholder, textarea::placeholder {
+input::placeholder, textarea::placeholder, .input::placeholder {
   color: var(--text-placeholder);
 }
 
@@ -355,13 +395,14 @@ select option { background: var(--surface); color: var(--text-primary); }
 .field-label { font-size: 0.75rem; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
 .field-hint { font-size: 0.75rem; color: var(--text-muted); }
 
-/* ─── 8. Cards — DESIGN.md: 12px radius, no shadow, no border ── */
+/* ─── 8. Cards — DESIGN.md: 12px radius, shadow, border ──────── */
 .card {
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
   min-width: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* ─── 9. Auth Card ──────────────────────────────────────────────── */
