@@ -171,6 +171,14 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     onVisibilityFilterChange: () => {},
   }
 
+  const createdListProps = {
+    ...listPanelProps,
+    filteredSessions: sessions.sessions.filter(s => s.creator_id === activeUserId),
+    sessionSearch: '',
+    onSessionSearchChange: () => {},
+    onVisibilityFilterChange: () => {},
+  }
+
   const headerProps = {
     t,
     language,
@@ -206,6 +214,7 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     onUsernameDraftChange: profile.setUsernameDraft,
     onSaveProfile: () => profile.saveProfile(user.id),
     onSignOut: signOutToLogin,
+    listProps: createdListProps as never,
   }
 
   const searchSectionProps = {

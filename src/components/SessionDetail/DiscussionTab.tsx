@@ -39,7 +39,7 @@ export function DiscussionTab({
 }: DiscussionTabProps) {
   if (!isMember) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '2rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '1rem' }}>
         <p className="subtle">{t.sessions.joinToDiscuss}</p>
       </div>
     )
