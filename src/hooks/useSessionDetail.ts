@@ -112,7 +112,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
     if (profileUserIds.length > 0) {
       const profilesResult = await supabase
         .from('profiles')
-        .select('id,display_name,avatar_url')
+        .select('id,username,avatar_url')
         .in('id', profileUserIds)
 
       if (profilesResult.error) {
@@ -270,7 +270,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
     try {
       const result = await supabase
         .from('profiles')
-        .select('id,display_name,avatar_url')
+        .select('id,username,avatar_url')
         .eq('id', userId)
         .maybeSingle()
 

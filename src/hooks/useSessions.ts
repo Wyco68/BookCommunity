@@ -447,13 +447,6 @@ export function useSessions(): UseSessionsReturn {
     setCreating(true)
     setError(null)
 
-    const profileUpsert = await supabase.from('profiles').upsert({ id: user.id }, { onConflict: 'id' })
-    if (profileUpsert.error) {
-      setError(profileUpsert.error.message)
-      setCreating(false)
-      return
-    }
-
     const createResult = await supabase.rpc('create_reading_session', {
       p_book_title: form.bookTitle.trim(),
       p_book_author: form.bookAuthor.trim(),

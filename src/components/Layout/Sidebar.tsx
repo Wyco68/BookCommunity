@@ -68,7 +68,7 @@ export function Sidebar({
         </div>
 
         <div className="mobile-sidebar-footer">
-          <Link to={APP_PATHS.profileEdit} className="header-identity-link" onClick={onClose}>
+          <Link to={APP_PATHS.account} className="header-identity-link" onClick={onClose}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="sm" />
               <span style={{ fontWeight: 460 }}>{myDisplayName}</span>

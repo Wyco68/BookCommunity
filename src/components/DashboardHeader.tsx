@@ -57,7 +57,7 @@ export function DashboardHeader({
                 {t.nav.createSession}
               </button>
             ) : null}
-            <Link to={APP_PATHS.profileEdit} className="header-identity-link top-nav-profile">
+            <Link to={APP_PATHS.account} className="header-identity-link top-nav-profile">
               <div className="identity-row">
                 <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="sm" />
                 <p style={{ margin: 0, fontWeight: 540, fontSize: '0.9rem' }}>{myDisplayName}</p>
@@ -120,7 +120,7 @@ export function DashboardHeader({
           <Link to={APP_PATHS.categories} className="sidebar-link" onClick={closeMobileMenu}>
             {t.nav.categories}
           </Link>
-          <Link to={APP_PATHS.profileEdit} className="sidebar-link" onClick={closeMobileMenu}>
+          <Link to={APP_PATHS.account} className="sidebar-link" onClick={closeMobileMenu}>
             {t.nav.profile}
           </Link>
           {onCreateClick ? (

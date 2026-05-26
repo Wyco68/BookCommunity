@@ -33,13 +33,9 @@ export interface ProgressUpdate {
 
 export interface Profile {
   id: string
-  display_name: string | null
+  username: string
+  username_updated_at: string | null
   avatar_url: string | null
-  bio: string | null
-  cover_url: string | null
-  location: string | null
-  website: string | null
-  is_private: boolean
   created_at: string
 }
 

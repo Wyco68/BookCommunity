@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
@@ -15,6 +16,7 @@ interface AuthViewProps {
   authPassword: string
   authError: string | null
   authBusy: boolean
+  submitBlockedUntil: number | null
   googleBusy: boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onAuthModeChange: (mode: AuthMode) => void
@@ -32,6 +34,7 @@ export function AuthView({
   authPassword,
   authError,
   authBusy,
+  submitBlockedUntil,
   googleBusy,
   onSubmit,
   onAuthModeChange,
@@ -40,7 +43,18 @@ export function AuthView({
   onLanguageChange,
   onGoogleSignIn,
 }: AuthViewProps) {
-  const disableEmailAuth = authBusy || googleBusy
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (submitBlockedUntil !== null) {
+      const timer = setInterval(() => setNow(Date.now()), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [submitBlockedUntil])
+
+  const rateLimited =
+    submitBlockedUntil !== null && now < submitBlockedUntil
+  const disableEmailAuth = authBusy || googleBusy || rateLimited
 
   return (
     <main className="shell">
@@ -89,6 +103,10 @@ export function AuthView({
             aria-label={t.auth.password}
             disabled={disableEmailAuth}
           />
+
+          {authMode === 'sign-up' ? (
+            <p className="subtle" style={{ margin: 0, fontSize: '0.8125rem' }}>{t.auth.passwordRequirements}</p>
+          ) : null}
 
           {authError ? <p className="error">{authError}</p> : null}
 

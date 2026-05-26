@@ -38,6 +38,38 @@ export async function uploadAvatarFile(
   return error ? { path: '', error: error.message } : { path, error: null }
 }
 
+/**
+ * Remove avatar objects under {userId}/ except an optional path to keep.
+ * Handles extension changes (e.g. avatar.jpg → avatar.png).
+ */
+export async function deleteUserAvatarFiles(
+  userId: string,
+  keepPath?: string | null,
+): Promise<string | null> {
+  const { data: listed, error: listError } = await supabase.storage
+    .from(PROFILE_AVATARS_BUCKET)
+    .list(userId, { limit: 100 })
+
+  if (listError) {
+    return listError.message
+  }
+
+  const toRemove = (listed ?? [])
+    .filter((obj) => obj?.name)
+    .map((obj) => `${userId}/${obj.name}`)
+    .filter((path) => path !== keepPath)
+
+  if (toRemove.length === 0) {
+    return null
+  }
+
+  const { error: removeError } = await supabase.storage
+    .from(PROFILE_AVATARS_BUCKET)
+    .remove(toRemove)
+
+  return removeError ? removeError.message : null
+}
+
 export async function uploadSessionMedia(
   sessionId: string,
   userId: string,

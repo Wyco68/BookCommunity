@@ -19,6 +19,7 @@ interface LoginPageProps {
   authPassword: string
   authError: string | null
   authBusy: boolean
+  submitBlockedUntil: number | null
   googleBusy: boolean
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onAuthModeChange: (mode: AuthMode) => void
@@ -37,6 +38,7 @@ export function LoginPage({
   authPassword,
   authError,
   authBusy,
+  submitBlockedUntil,
   googleBusy,
   onSubmit,
   onAuthModeChange,
@@ -79,6 +81,7 @@ export function LoginPage({
       authPassword={authPassword}
       authError={combinedError}
       authBusy={authBusy}
+      submitBlockedUntil={submitBlockedUntil}
       googleBusy={googleBusy}
       onSubmit={onSubmit}
       onAuthModeChange={onAuthModeChange}

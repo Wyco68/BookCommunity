@@ -175,22 +175,27 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     t,
     language,
     myAvatarImage: profile.avatarPreviewUrl,
-    myAvatarLabel: profile.profile?.display_name || user.email || t.auth.signedInAs,
-    myDisplayName: profile.profile?.display_name?.trim() || user.email || activeUserId.slice(0, 8),
+    myAvatarLabel: profile.profile?.username || user.email || t.auth.signedInAs,
+    myDisplayName: profile.profile?.username || user.email || activeUserId.slice(0, 8),
     onLanguageChange: setLanguage,
     onSignOut: signOutToLogin,
   }
 
   const profileEditProps = {
     t,
+    language,
+    userEmail: user.email ?? null,
+    currentUsername: profile.profile?.username ?? '',
+    usernameUpdatedAt: profile.profile?.username_updated_at ?? null,
     myAvatarImage: profile.avatarPreviewUrl,
-    myAvatarLabel: profile.profile?.display_name || user.email || t.auth.signedInAs,
+    myAvatarLabel: profile.profile?.username || user.email || t.auth.signedInAs,
     avatarInputKey: profile.avatarInputKey,
     avatarFile: profile.avatarFile,
     avatarUploadBusy: profile.uploading,
-    profileNameDraft: profile.nameDraft,
+    usernameDraft: profile.usernameDraft,
     profileSaving: profile.saving,
     profileNotice: profile.notice,
+    profileError: profile.error,
     onAvatarFileChange: (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
       if (file) {
@@ -198,7 +203,7 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
       }
     },
     onUploadAvatar: () => profile.uploadAvatar(user.id),
-    onProfileNameDraftChange: profile.setNameDraft,
+    onUsernameDraftChange: profile.setUsernameDraft,
     onSaveProfile: () => profile.saveProfile(user.id),
     onSignOut: signOutToLogin,
   }

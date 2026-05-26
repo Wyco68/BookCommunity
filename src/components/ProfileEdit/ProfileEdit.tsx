@@ -1,42 +1,70 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { Avatar } from '../Avatar'
+import { deleteAccount } from '../../lib/account'
 import { supabase } from '../../lib/supabase'
 import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
+import { validatePassword } from '../../lib/validation'
+import { getUsernameChangeStatus } from '../../lib/usernameCooldown'
 
 type Copy = (typeof translations)[Language]
 
 interface ProfileEditProps {
   t: Copy
+  language: Language
+  userEmail: string | null
+  currentUsername: string
+  usernameUpdatedAt: string | null
   myAvatarImage: string | null
   myAvatarLabel: string
   avatarInputKey: number
   avatarFile?: File | null
   avatarUploadBusy: boolean
-  profileNameDraft: string
+  usernameDraft: string
   profileSaving: boolean
   profileNotice: string | null
+  profileError: string | null
   onAvatarFileChange: (event: ChangeEvent<HTMLInputElement>) => void
   onUploadAvatar: () => Promise<void>
-  onProfileNameDraftChange: (value: string) => void
+  onUsernameDraftChange: (value: string) => void
   onSaveProfile: () => Promise<void>
   onSignOut: () => void
 }
 
+function formatProfileError(error: string | null, t: Copy): string | null {
+  if (!error) return null
+  const lower = error.toLowerCase()
+  if (lower.includes('already taken') || lower.includes('unique')) {
+    return t.profile.usernameTaken
+  }
+  if (lower.includes('30 days') || lower.includes('once every')) {
+    return error
+  }
+  if (lower.includes('invalid avatar path')) {
+    return t.profile.avatarPathInvalid
+  }
+  return error
+}
+
 export function ProfileEdit({
   t,
+  language,
+  userEmail,
+  currentUsername,
+  usernameUpdatedAt,
   myAvatarImage,
   myAvatarLabel,
   avatarInputKey,
   avatarFile,
   avatarUploadBusy,
-  profileNameDraft,
+  usernameDraft,
   profileSaving,
   profileNotice,
+  profileError,
   onAvatarFileChange,
   onUploadAvatar,
-  onProfileNameDraftChange,
+  onUsernameDraftChange,
   onSaveProfile,
   onSignOut,
 }: ProfileEditProps) {
@@ -47,6 +75,23 @@ export function ProfileEdit({
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const usernameStatus = useMemo(
+    () => getUsernameChangeStatus(usernameUpdatedAt),
+    [usernameUpdatedAt],
+  )
+
+  const usernameChanged = usernameDraft.trim().toLowerCase() !== currentUsername
+  const usernameLocked = usernameChanged && !usernameStatus.canChange
+
+  const nextChangeLabel = usernameStatus.nextChangeAt
+    ? usernameStatus.nextChangeAt.toLocaleDateString(language, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null
 
   async function handleChangePassword() {
     if (!oldPassword.trim()) {
@@ -54,8 +99,9 @@ export function ProfileEdit({
       return
     }
 
-    if (!newPassword.trim() || newPassword.length < 6) {
-      setPasswordNotice(t.profile.passwordMinLength)
+    const passwordCheck = validatePassword(newPassword)
+    if (!passwordCheck.valid) {
+      setPasswordNotice(t.profile.passwordRequirements)
       return
     }
 
@@ -98,19 +144,33 @@ export function ProfileEdit({
 
   async function handleDeleteAccount() {
     setDeleteBusy(true)
-    // Sign out and inform user — full account deletion requires admin/server-side action
-    await supabase.auth.signOut()
+    setDeleteError(null)
+
+    const { error } = await deleteAccount()
+    if (error) {
+      setDeleteError(
+        error === 'Account deletion failed.' || error === 'Failed to delete account'
+          ? t.profile.deleteFailed
+          : error,
+      )
+      setDeleteBusy(false)
+      return
+    }
+
+    await onSignOut()
     setDeleteBusy(false)
   }
+
+  const displayProfileError = formatProfileError(profileError, t)
 
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
       <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.75rem' }}>{t.profile.title}</h1>
+        <h1 style={{ margin: 0, fontSize: '1.75rem' }}>{t.profile.account}</h1>
+        <p className="subtle" style={{ margin: '0.5rem 0 0' }}>{t.profile.subtitle}</p>
       </header>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        {/* Profile Card */}
         <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
             <div style={{ flexShrink: 0, textAlign: 'center', margin: '0 auto', maxWidth: '100%' }}>
@@ -144,34 +204,77 @@ export function ProfileEdit({
               <form
                 onSubmit={(event) => {
                   event.preventDefault()
+                  if (usernameLocked) return
                   void onSaveProfile()
                 }}
                 style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
               >
                 <div>
-                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.displayName}</label>
+                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.emailLabel}</label>
+                  <input
+                    type="email"
+                    value={userEmail ?? ''}
+                    readOnly
+                    disabled
+                    autoComplete="email"
+                  />
+                  <p className="subtle" style={{ margin: '0.35rem 0 0', fontSize: '0.8125rem' }}>{t.profile.emailUniqueHelp}</p>
+                </div>
+
+                <div
+                  role="note"
+                  style={{
+                    padding: '0.75rem 1rem',
+                    borderRadius: '8px',
+                    background: 'var(--surface-elevated, rgba(255, 193, 7, 0.08))',
+                    border: '1px solid var(--border)',
+                    fontSize: '0.875rem',
+                  }}
+                >
+                  <p style={{ margin: 0 }}>{t.profile.usernameChangePolicy}</p>
+                  {!usernameStatus.canChange && nextChangeLabel ? (
+                    <p className="subtle" style={{ margin: '0.5rem 0 0', fontSize: '0.8125rem' }}>
+                      {t.profile.usernameChangeLocked(nextChangeLabel)}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div>
+                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.username}</label>
                   <input
                     type="text"
-                    value={profileNameDraft}
-                    onChange={(event) => onProfileNameDraftChange(event.target.value)}
-                    placeholder={t.profile.displayNamePlaceholder}
-                    maxLength={80}
+                    value={usernameDraft}
+                    onChange={(event) => onUsernameDraftChange(event.target.value)}
+                    placeholder={t.profile.usernamePlaceholder}
+                    autoComplete="username"
+                    spellCheck={false}
+                    maxLength={32}
+                    aria-describedby="username-help"
                   />
+                  <p id="username-help" className="subtle" style={{ margin: '0.35rem 0 0', fontSize: '0.8125rem' }}>
+                    {t.profile.usernameHelp}
+                  </p>
+                  {usernameLocked && nextChangeLabel ? (
+                    <p className="error" style={{ margin: '0.35rem 0 0', fontSize: '0.8125rem' }}>
+                      {t.profile.usernameChangeLocked(nextChangeLabel)}
+                    </p>
+                  ) : null}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <button type="submit" className="primary" disabled={profileSaving}>
+                  <button type="submit" className="primary" disabled={profileSaving || usernameLocked}>
                     {profileSaving ? t.common.saving : t.profile.saveProfile}
                   </button>
                   {profileNotice ? <span className="subtle" style={{ fontSize: '0.875rem' }}>{profileNotice}</span> : null}
                 </div>
+                {displayProfileError ? <p className="error" style={{ margin: 0 }}>{displayProfileError}</p> : null}
               </form>
             </div>
           </div>
         </section>
 
-        {/* Security Card */}
         <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
           <h3 style={{ margin: '0 0 1rem 0' }}>{t.profile.changePassword}</h3>
+          <p className="subtle" style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>{t.profile.passwordRequirements}</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
             <div>
               <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.oldPassword}</label>
@@ -190,7 +293,7 @@ export function ProfileEdit({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder={t.profile.newPasswordPlaceholder}
-                minLength={6}
+                minLength={8}
                 autoComplete="new-password"
               />
             </div>
@@ -208,10 +311,9 @@ export function ProfileEdit({
           </div>
         </section>
 
-        {/* Danger Zone */}
         <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <h3 style={{ margin: '0 0 1rem 0', color: '#ef4444' }}>Danger Zone</h3>
-          
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div>
               <button type="button" className="secondary" onClick={onSignOut}>
@@ -225,7 +327,10 @@ export function ProfileEdit({
                   type="button"
                   className="secondary"
                   style={{ color: '#ef4444', borderColor: '#ef4444' }}
-                  onClick={() => setDeleteConfirm(true)}
+                  onClick={() => {
+                    setDeleteConfirm(true)
+                    setDeleteError(null)
+                  }}
                 >
                   {t.profile.deleteAccount}
                 </button>
@@ -234,6 +339,9 @@ export function ProfileEdit({
                   <p className="subtle" style={{ margin: 0, color: '#ef4444' }}>
                     {t.profile.deleteConfirm}
                   </p>
+                  {deleteError ? (
+                    <p className="error" style={{ margin: 0 }}>{deleteError}</p>
+                  ) : null}
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                       type="button"

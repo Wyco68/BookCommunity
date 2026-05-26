@@ -117,7 +117,7 @@ export function ManageTab({
               {membersForMemberProgress.map((member) => {
                 const profile = sessionProfiles[member.user_id]
                 const chapter = memberLatestProgress[member.user_id] ?? 0
-                const displayName = profile?.display_name || member.user_id.slice(0, 8)
+                const displayName = profile?.username || member.user_id.slice(0, 8)
                 return (
                   <li key={member.user_id} className="member-item member-progress-row">
                     <div className="session-user-cols member-progress-cols" aria-label={t.sessions.memberProgress}>
@@ -245,10 +245,10 @@ export function ManageTab({
                     <div className="identity-row">
                       <Avatar
                         imageUrl={profile?.avatar_url ?? null}
-                        label={profile?.display_name || request.user_id.slice(0, 8)}
+                        label={profile?.username || request.user_id.slice(0, 8)}
                         size="sm"
                       />
-                      <strong>{profile?.display_name || request.user_id.slice(0, 8)}</strong>
+                      <strong>{profile?.username || request.user_id.slice(0, 8)}</strong>
                     </div>
                     <span className="subtle">{new Date(request.created_at).toLocaleString()}</span>
                   </div>
@@ -287,7 +287,7 @@ export function ManageTab({
             {membersForOwnerProgress.map((member) => {
               const profile = sessionProfiles[member.user_id]
               const chapter = memberLatestProgress[member.user_id] ?? 0
-              const displayName = profile?.display_name || member.user_id.slice(0, 8)
+              const displayName = profile?.username || member.user_id.slice(0, 8)
               return (
                 <li key={member.user_id} className="member-item member-progress-row">
                   <div className="session-user-cols member-progress-cols" aria-label={t.sessions.memberProgress}>

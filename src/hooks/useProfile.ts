@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Profile } from '../types'
-import { uploadAvatarFile } from '../lib/storage'
+import { deleteUserAvatarFiles, uploadAvatarFile } from '../lib/storage'
 import {
   ALLOWED_AVATAR_TYPES,
   MAX_AVATAR_BYTES,
   resolveAvatarUrl,
 } from '../lib/avatar'
-import { validateDisplayName } from '../lib/validation'
+import { mapAvatarUpdateError, mapProfileUpdateError } from '../lib/profileErrors'
+import { getUsernameChangeStatus } from '../lib/usernameCooldown'
 
 export interface UseProfileReturn {
   profile: Profile | null
@@ -16,13 +17,13 @@ export interface UseProfileReturn {
   avatarFile: File | null
   avatarPreviewUrl: string | null
   avatarInputKey: number
-  nameDraft: string
+  usernameDraft: string
   saving: boolean
   uploading: boolean
   notice: string | null
   loadProfile: (userId: string) => Promise<void>
   saveProfile: (userId: string) => Promise<void>
-  setNameDraft: (name: string) => void
+  setUsernameDraft: (username: string) => void
   handleAvatarFile: (file: File | null) => void
   uploadAvatar: (userId: string) => Promise<void>
   setNotice: (notice: string | null) => void
@@ -38,7 +39,7 @@ export function useProfile(): UseProfileReturn {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
   const [avatarInputKey, setAvatarInputKey] = useState(0)
-  const [nameDraft, setNameDraft] = useState('')
+  const [usernameDraft, setUsernameDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -47,10 +48,9 @@ export function useProfile(): UseProfileReturn {
     setLoading(true)
     setError(null)
 
-    // SELECT only — never upsert on load (upsert can overwrite avatar_url with null)
     const profileResult = await supabase
       .from('profiles')
-      .select('id,display_name,avatar_url,created_at')
+      .select('id,username,username_updated_at,avatar_url,created_at')
       .eq('id', userId)
       .maybeSingle()
 
@@ -60,36 +60,17 @@ export function useProfile(): UseProfileReturn {
       return
     }
 
-    // If the profile row is missing (shouldn't happen — handle_new_user trigger creates it),
-    // insert a minimal row so the rest of the app has something to work with.
     if (!profileResult.data) {
-      const { error: insertError } = await supabase
-        .from('profiles')
-        .insert({ id: userId })
-      if (insertError && !insertError.message.toLowerCase().includes('duplicate')) {
-        setError(insertError.message)
-        setLoading(false)
-        return
-      }
+      setError('Profile not found. Please sign out and sign in again.')
+      setLoading(false)
+      return
     }
 
-    const loadedProfile = (profileResult.data ?? {
-      id: userId,
-      display_name: null,
-      avatar_url: null,
-      bio: null,
-      cover_url: null,
-      location: null,
-      website: null,
-      is_private: false,
-      created_at: '',
-    }) as Profile
-
-    // avatar_url is stored as a storage path; generate a fresh signed URL on every load
+    const loadedProfile = profileResult.data as Profile
     const avatarUrl = await resolveAvatarUrl(loadedProfile.avatar_url)
 
     setProfile(loadedProfile)
-    setNameDraft(loadedProfile.display_name ?? '')
+    setUsernameDraft(loadedProfile.username)
     setAvatarPreviewUrl(avatarUrl)
     setLoading(false)
   }, [])
@@ -99,43 +80,57 @@ export function useProfile(): UseProfileReturn {
 
     setSaving(true)
     setNotice(null)
+    setError(null)
 
-    const trimmedName = nameDraft.trim()
+    const nextUsername = usernameDraft.trim().toLowerCase()
 
-    const nameCheck = validateDisplayName(nameDraft)
-    if (!nameCheck.valid) {
-      setError(nameCheck.error ?? 'Invalid display name')
+    if (profile?.username === nextUsername) {
+      setNotice('Profile saved')
       setSaving(false)
       return
     }
 
-    const { error } = await supabase
+    const cooldown = getUsernameChangeStatus(profile?.username_updated_at)
+    if (!cooldown.canChange) {
+      setError(
+        cooldown.nextChangeAt
+          ? `You can change your username again on ${cooldown.nextChangeAt.toLocaleDateString()}.`
+          : 'You can change your username once every 30 days.',
+      )
+      setSaving(false)
+      return
+    }
+
+    const { error: updateError } = await supabase
       .from('profiles')
-      .update({ display_name: trimmedName.length > 0 ? trimmedName : null })
+      .update({ username: nextUsername })
       .eq('id', userId)
 
-    if (error) {
-      setError(error.message)
+    if (updateError) {
+      setError(mapProfileUpdateError(updateError) ?? updateError.message)
       setSaving(false)
       return
     }
+
+    const { data: refreshed } = await supabase
+      .from('profiles')
+      .select('username_updated_at')
+      .eq('id', userId)
+      .single()
 
     const nextProfile: Profile = {
       id: userId,
-      display_name: trimmedName.length > 0 ? trimmedName : null,
+      username: nextUsername,
+      username_updated_at: refreshed?.username_updated_at ?? new Date().toISOString(),
       avatar_url: profile?.avatar_url ?? null,
-      bio: profile?.bio ?? null,
-      cover_url: profile?.cover_url ?? null,
-      location: profile?.location ?? null,
-      website: profile?.website ?? null,
-      is_private: profile?.is_private ?? false,
       created_at: profile?.created_at ?? '',
     }
 
     setProfile(nextProfile)
+    setUsernameDraft(nextProfile.username)
     setNotice('Profile saved')
     setSaving(false)
-  }, [nameDraft, profile, saving])
+  }, [usernameDraft, profile, saving])
 
   const handleAvatarFile = useCallback((file: File | null) => {
     if (!file) return
@@ -192,20 +187,24 @@ export function useProfile(): UseProfileReturn {
       .eq('id', userId)
 
     if (updateResult.error) {
-      setError(`Profile update failed: ${updateResult.error.message}`)
+      await deleteUserAvatarFiles(userId, profile?.avatar_url ?? null)
+      setError(mapAvatarUpdateError(updateResult.error.message) ?? `Profile update failed: ${updateResult.error.message}`)
+      setUploading(false)
+      return
+    }
+
+    const cleanupError = await deleteUserAvatarFiles(userId, nextPath)
+    if (cleanupError) {
+      setError(`Avatar updated but cleanup failed: ${cleanupError}`)
       setUploading(false)
       return
     }
 
     const updatedProfile: Profile = {
       id: userId,
-      display_name: profile?.display_name ?? null,
+      username: profile?.username ?? usernameDraft,
+      username_updated_at: profile?.username_updated_at ?? null,
       avatar_url: nextPath,
-      bio: profile?.bio ?? null,
-      cover_url: profile?.cover_url ?? null,
-      location: profile?.location ?? null,
-      website: profile?.website ?? null,
-      is_private: profile?.is_private ?? false,
       created_at: profile?.created_at ?? '',
     }
 
@@ -220,7 +219,7 @@ export function useProfile(): UseProfileReturn {
     setAvatarInputKey((current) => current + 1)
     setNotice('Avatar updated')
     setUploading(false)
-  }, [avatarFile, avatarPreviewUrl, profile, uploading])
+  }, [avatarFile, avatarPreviewUrl, profile, usernameDraft, uploading])
 
   return {
     profile,
@@ -229,13 +228,13 @@ export function useProfile(): UseProfileReturn {
     avatarFile,
     avatarPreviewUrl,
     avatarInputKey,
-    nameDraft,
+    usernameDraft,
     saving,
     uploading,
     notice,
     loadProfile,
     saveProfile,
-    setNameDraft,
+    setUsernameDraft,
     handleAvatarFile,
     uploadAvatar,
     setNotice,

@@ -32,11 +32,12 @@ BookCom is an authenticated social reading web app. Users create **reading sessi
 | Column | Notes |
 |--------|--------|
 | `id` | PK, FK → `auth.users(id)` |
-| `display_name` | Optional, max 100 chars |
-| `avatar_url` | Storage path or remote URL |
+| `username` | Required, unique (case-insensitive), 3–32 chars, `[a-z0-9_-]`, no spaces; auto-generated on signup; sole public display name |
+| `username_updated_at` | Set when username changes; 30-day cooldown between changes |
+| `avatar_url` | Storage path `{user_id}/avatar.{jpg\|jpeg\|png\|webp}` or remote `https://` URL (OAuth); enforced by `enforce_profiles_avatar_url` trigger |
 | `created_at`, `updated_at` | Timestamps |
 
-Created on signup via `handle_new_user()` trigger on `auth.users`.
+Created on signup via `handle_new_user()` trigger on `auth.users` (allocates unique username from email prefix). Clients cannot `INSERT` or `DELETE` profiles (`REVOKE INSERT`, no delete policy); only `SELECT`/`UPDATE` own row. Usernames are unique case-insensitively (`profiles_username_lower_unique`).
 
 ### 3.2 `public.categories`
 
@@ -114,6 +115,10 @@ Standard social/join flows; see `schema.sql` RLS section.
 | `enforce_session_media_file_path()` | Before insert/update on `session_media` |
 | `enforce_comments_immutable_session()` | `comments.session_id` immutable on update |
 | `enforce_reading_sessions_total_chapters_floor()` | Cannot lower `total_chapters` below uploaded/progress max |
+| `enforce_profiles_username()` | Required/format username; 30-day change cooldown |
+| `enforce_profiles_avatar_url()` | Storage avatar paths must belong to `profiles.id` |
+| `allocate_username(base, exclude_id?)` | Race-safe unique username allocation (signup/backfill) |
+| Edge Function `delete-account` | Storage cleanup + `auth.admin.deleteUser` (sole account-delete path) |
 
 ---
 
@@ -123,7 +128,7 @@ All application tables have RLS enabled. Deny-by-default except where policies a
 
 | Table | Select | Insert | Update | Delete |
 |-------|--------|--------|--------|--------|
-| `profiles` | All authenticated | Own row | Own row | — |
+| `profiles` | All authenticated | **Denied** | Own row | **Denied** |
 | `reading_sessions` | Public OR creator OR member | **Denied** (use RPC) | Creator | Creator |
 | `session_members` | `can_access_session` | Owner adds OR self-join if `join_policy = open` | — | Self or owner |
 | `session_media` | `can_access_session` | Creator only | — | Uploader or creator |
@@ -146,6 +151,10 @@ Storage buckets: `session-media`, `session-covers`, `profile-avatars` (private).
 | `profile-avatars` | Avatars | `{user_id}/avatar.{ext}` |
 
 Signed URL expiry (client): 15 minutes.
+
+**Account deletion:** The Edge Function `delete-account` removes the user's objects from `profile-avatars`, `session-media` (uploads and media on sessions they created), and `session-covers` (paths on created sessions + `{user_id}/` folder), then deletes the auth user. Postgres `ON DELETE CASCADE` removes `profiles`, sessions they created, memberships, comments, likes, progress, and media rows. Clients must not delete DB rows or storage manually for account removal.
+
+**Avatar upload:** Client uploads to `{user_id}/avatar.{ext}` only; after a successful profile update, stale files under `{user_id}/` are removed (handles extension changes).
 
 ---
 
@@ -196,6 +205,7 @@ No join through a link table.
 | Progress | `insert` `progress_updates` |
 | Media | Storage upload + `insert` `session_media` |
 | Realtime | Channels on comments, likes, progress, members, join requests, media |
+| Delete account | `functions.invoke('delete-account')` then sign out |
 
 ---
 
