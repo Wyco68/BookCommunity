@@ -8,6 +8,7 @@ interface NotificationItemProps {
   onRead: (id: string) => void
   onNavigate?: () => void
   getLabel: (type: string, actor: string, session: string) => string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tNotifications: any
 }
 
