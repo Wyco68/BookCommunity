@@ -1,27 +1,35 @@
-import type { UseNotificationsReturn } from '../../hooks/useNotifications'
+import { useNotificationStore } from '../../store/useNotificationStore'
 import { NotificationItem } from './NotificationItem'
 
 interface NotificationDropdownProps {
-  notifState: UseNotificationsReturn
+  userId: string
   onClose: () => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tNotifications: any
   getLabel: (type: string, actor: string, session: string) => string
 }
 
 export function NotificationDropdown({
-  notifState,
+  userId,
   onClose,
   tNotifications,
   getLabel,
 }: NotificationDropdownProps) {
-  const { notifications, unreadCount, loading, hasMore, loadMore, markRead, markAllRead } = notifState
+  const notifications = useNotificationStore(state => state.notifications)
+  const unreadCount = useNotificationStore(state => state.unreadCount)
+  const loading = useNotificationStore(state => state.loading)
+  const hasMore = useNotificationStore(state => state.hasMore)
+  
+  const fetchMore = useNotificationStore(state => state.fetchMore)
+  const markRead = useNotificationStore(state => state.markRead)
+  const markAllRead = useNotificationStore(state => state.markAllRead)
 
   const handleMarkAllRead = () => {
-    void markAllRead()
+    if (userId) void markAllRead(userId)
   }
 
   const handleLoadMore = () => {
-    void loadMore()
+    if (userId) void fetchMore(userId)
   }
 
   return (
@@ -56,7 +64,7 @@ export function NotificationDropdown({
             <NotificationItem
               key={n.id}
               notification={n}
-              onRead={(id) => { void markRead(id) }}
+              onRead={(id) => { if (userId) void markRead(id, userId) }}
               onNavigate={onClose}
               getLabel={getLabel}
               tNotifications={tNotifications}

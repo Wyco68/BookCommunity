@@ -1,19 +1,20 @@
 import { useEffect, useRef } from 'react'
 import { Bell } from 'lucide-react'
-import type { UseNotificationsReturn } from '../../hooks/useNotifications'
+import { useNotificationStore } from '../../store/useNotificationStore'
 import { NotificationDropdown } from './NotificationDropdown'
 
 interface NotificationBellProps {
-  notifState: UseNotificationsReturn
+  userId: string
   open: boolean
   onToggle: () => void
   onClose: () => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tNotifications: any
   getLabel: (type: string, actor: string, session: string) => string
 }
 
 export function NotificationBell({
-  notifState,
+  userId,
   open,
   onToggle,
   onClose,
@@ -21,6 +22,7 @@ export function NotificationBell({
   getLabel,
 }: NotificationBellProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const unreadCount = useNotificationStore(state => state.unreadCount)
 
   // Close on outside click
   useEffect(() => {
@@ -51,21 +53,21 @@ export function NotificationBell({
         type="button"
         className="notif-bell-btn"
         onClick={onToggle}
-        aria-label={tNotifications.bellAriaLabel(notifState.unreadCount)}
+        aria-label={tNotifications.bellAriaLabel(unreadCount)}
         aria-expanded={open}
         aria-haspopup="true"
       >
         <Bell size={20} />
-        {notifState.unreadCount > 0 && (
+        {unreadCount > 0 && (
           <span className="notif-badge" aria-hidden="true">
-            {notifState.unreadCount > 99 ? '99+' : notifState.unreadCount}
+            {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
         <NotificationDropdown
-          notifState={notifState}
+          userId={userId}
           onClose={onClose}
           tNotifications={tNotifications}
           getLabel={getLabel}

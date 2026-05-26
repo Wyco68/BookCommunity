@@ -6,7 +6,6 @@ import { APP_PATHS } from '../router/paths'
 import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import { NotificationBell } from './Notifications/NotificationBell'
-import { useNotifications } from '../hooks/useNotifications'
 
 type Copy = (typeof translations)[Language]
 
@@ -35,7 +34,6 @@ export function DashboardHeader({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const closeMobileMenu = () => setMobileMenuOpen(false)
   const [notifOpen, setNotifOpen] = useState(false)
-  const notifState = useNotifications(userId ?? null)
 
   const getNotifLabel = (type: string, actor: string, session: string): string => {
     const n = t.notifications
@@ -72,7 +70,7 @@ export function DashboardHeader({
 
           <div className="top-nav-actions flex-1 justify-end">
             <NotificationBell
-              notifState={notifState}
+              userId={userId ?? ''}
               open={notifOpen}
               onToggle={() => setNotifOpen((o) => !o)}
               onClose={() => setNotifOpen(false)}
