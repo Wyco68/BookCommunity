@@ -54,6 +54,10 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
 
   const [sessionSearch, setSessionSearch] = useState('')
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all')
+  const [sectionsSearch, setSectionsSearch] = useState('')
+  const [sectionsVisibility, setSectionsVisibility] = useState<'all' | 'public' | 'private'>('all')
+  const [createdSearch, setCreatedSearch] = useState('')
+  const [createdVisibility, setCreatedVisibility] = useState<'all' | 'public' | 'private'>('all')
   const [sessionForm, setSessionForm] = useState(defaultSessionForm)
 
   const activeUserId = user.id
@@ -90,12 +94,35 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
   )
 
   const joinedFilteredSessions = useMemo(
-    () =>
-      sessions.sessions.filter(
-        (session) =>
-          session.status_type === 'ongoing' && Boolean(sessions.memberships[session.id]),
-      ),
-    [sessions.sessions, sessions.memberships],
+    () => {
+      let result = sessions.sessions.filter(
+        (session) => session.status_type === 'ongoing' && Boolean(sessions.memberships[session.id]),
+      )
+      if (sectionsVisibility !== 'all') {
+        result = result.filter(s => s.visibility === sectionsVisibility)
+      }
+      const query = sectionsSearch.trim().toLowerCase()
+      if (query) {
+        result = result.filter(s => s.book_title.toLowerCase().includes(query) || s.book_author.toLowerCase().includes(query))
+      }
+      return result
+    },
+    [sessions.sessions, sessions.memberships, sectionsSearch, sectionsVisibility],
+  )
+
+  const createdFilteredSessions = useMemo(
+    () => {
+      let result = sessions.sessions.filter(s => s.creator_id === activeUserId)
+      if (createdVisibility !== 'all') {
+        result = result.filter(s => s.visibility === createdVisibility)
+      }
+      const query = createdSearch.trim().toLowerCase()
+      if (query) {
+        result = result.filter(s => s.book_title.toLowerCase().includes(query) || s.book_author.toLowerCase().includes(query))
+      }
+      return result
+    },
+    [sessions.sessions, activeUserId, createdSearch, createdVisibility],
   )
 
   useEffect(() => {
@@ -166,17 +193,19 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
   const sectionsListProps = {
     ...listPanelProps,
     filteredSessions: joinedFilteredSessions,
-    sessionSearch: '',
-    onSessionSearchChange: () => {},
-    onVisibilityFilterChange: () => {},
+    sessionSearch: sectionsSearch,
+    visibilityFilter: sectionsVisibility,
+    onSessionSearchChange: setSectionsSearch,
+    onVisibilityFilterChange: setSectionsVisibility,
   }
 
   const createdListProps = {
     ...listPanelProps,
-    filteredSessions: sessions.sessions.filter(s => s.creator_id === activeUserId),
-    sessionSearch: '',
-    onSessionSearchChange: () => {},
-    onVisibilityFilterChange: () => {},
+    filteredSessions: createdFilteredSessions,
+    sessionSearch: createdSearch,
+    visibilityFilter: createdVisibility,
+    onSessionSearchChange: setCreatedSearch,
+    onVisibilityFilterChange: setCreatedVisibility,
   }
 
   const headerProps = {
