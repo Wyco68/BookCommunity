@@ -487,7 +487,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
 
   if (loadingSession) {
     return (
-      <section className="stack">
+      <section className="max-w-5xl mx-auto px-4 mt-4 w-full flex flex-col gap-4">
         <PageSpinner label={t.sessions.loadingSession} />
       </section>
     )
@@ -495,8 +495,8 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
 
   if (!session) {
     return (
-      <section className="stack">
-        <article className="card stack" style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
+      <section className="max-w-5xl mx-auto px-4 mt-4 w-full flex flex-col gap-4">
+        <article className="card flex flex-col gap-4" style={{ textAlign: 'center', maxWidth: 420, margin: '0 auto' }}>
           <p className="eyebrow">404</p>
           <p className="subtle">{t.sessions.sessionNotFound}</p>
           <button
@@ -518,16 +518,16 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   if (!isOwner && !isMember) {
     const isPendingRequest = myJoinRequestStatus === 'pending'
     return (
-      <section className="stack">
-        <div className="detail-back-bar">
-          <div className="detail-back-bar-inner">
+      <section className="max-w-5xl mx-auto px-4 mt-4 w-full flex flex-col gap-4">
+        <div className="w-full">
+          <div className="flex items-center justify-between gap-4 w-full">
             <button type="button" className="btn-back-compact" onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center' }}>
               <ArrowLeft size={16} style={{ marginRight: '0.25rem' }} /> {t.common.back}
             </button>
           </div>
         </div>
 
-        <article className="card stack" style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
+        <article className="card flex flex-col gap-4" style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
           <h2 style={{ margin: 0 }}>{session.book_title}</h2>
           <p className="subtle">{t.sessions.byAuthor(session.book_author)}</p>
           {session.description ? <p className="muted">{session.description}</p> : null}
@@ -574,9 +574,9 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   ]
 
   return (
-    <section className="stack">
-      <div className="detail-back-bar">
-        <div className="detail-back-bar-inner">
+    <section className="max-w-5xl mx-auto px-4 mt-4 w-full flex flex-col gap-4">
+      <div className="w-full mb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
           <button type="button" className="btn-back-compact" onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center' }}>
             <ArrowLeft size={16} style={{ marginRight: '0.25rem' }} /> {t.common.back}
           </button>

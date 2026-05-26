@@ -7,6 +7,8 @@ import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import { validatePassword } from '../../lib/validation'
 import { getUsernameChangeStatus } from '../../lib/usernameCooldown'
+import { SessionListPanel } from '../SessionListPanel'
+import './ProfileEdit.css'
 
 type Copy = (typeof translations)[Language]
 
@@ -30,6 +32,7 @@ interface ProfileEditProps {
   onUsernameDraftChange: (value: string) => void
   onSaveProfile: () => Promise<void>
   onSignOut: () => void
+  listProps: any
 }
 
 function formatProfileError(error: string | null, t: Copy): string | null {
@@ -67,11 +70,17 @@ export function ProfileEdit({
   onUsernameDraftChange,
   onSaveProfile,
   onSignOut,
+  listProps,
 }: ProfileEditProps) {
+  const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile')
+  const [usernameFocused, setUsernameFocused] = useState(false)
+  const [passwordFocused, setPasswordFocused] = useState(false)
+
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordBusy, setPasswordBusy] = useState(false)
   const [passwordNotice, setPasswordNotice] = useState<string | null>(null)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
@@ -94,29 +103,31 @@ export function ProfileEdit({
     : null
 
   async function handleChangePassword() {
+    setPasswordError(null)
+    setPasswordNotice(null)
+
     if (!oldPassword.trim()) {
-      setPasswordNotice(t.profile.oldPasswordRequired)
+      setPasswordError(t.profile.oldPasswordRequired)
       return
     }
 
     const passwordCheck = validatePassword(newPassword)
     if (!passwordCheck.valid) {
-      setPasswordNotice(t.profile.passwordRequirements)
+      setPasswordError(t.profile.passwordMinLength)
       return
     }
 
     if (oldPassword === newPassword) {
-      setPasswordNotice(t.profile.passwordMustDiffer)
+      setPasswordError(t.profile.passwordMustDiffer)
       return
     }
 
     setPasswordBusy(true)
-    setPasswordNotice(null)
 
     const { data: userResult, error: userError } = await supabase.auth.getUser()
     const email = userResult.user?.email
     if (userError || !email) {
-      setPasswordNotice(userError?.message || t.profile.unableToVerifyUser)
+      setPasswordError(userError?.message || t.profile.unableToVerifyUser)
       setPasswordBusy(false)
       return
     }
@@ -126,14 +137,14 @@ export function ProfileEdit({
       password: oldPassword,
     })
     if (reauthError) {
-      setPasswordNotice(t.profile.oldPasswordIncorrect)
+      setPasswordError(t.profile.oldPasswordIncorrect)
       setPasswordBusy(false)
       return
     }
 
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     if (error) {
-      setPasswordNotice(error.message)
+      setPasswordError(error.message)
     } else {
       setPasswordNotice(t.profile.passwordUpdated)
       setOldPassword('')
@@ -164,169 +175,185 @@ export function ProfileEdit({
   const displayProfileError = formatProfileError(profileError, t)
 
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
-      <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ margin: 0, fontSize: '1.75rem' }}>{t.profile.account}</h1>
-        <p className="subtle" style={{ margin: '0.5rem 0 0' }}>{t.profile.subtitle}</p>
-      </header>
+    <div className="profile-page-container">
+      <div className="profile-tab-wrapper">
+        <div className="profile-tab-switch" role="tablist">
+          <button
+            type="button"
+            className={`profile-tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            {t.nav.profile}
+          </button>
+          <button
+            type="button"
+            className={`profile-tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            {t.profile.settings}
+          </button>
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-        <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1.5rem', flexWrap: 'wrap' }}>
-            <div style={{ flexShrink: 0, textAlign: 'center', margin: '0 auto', maxWidth: '100%' }}>
-              <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="xl" />
-              <div style={{ marginTop: '1rem', width: '100%' }}>
-                <label className="secondary" style={{ cursor: 'pointer', padding: '0.4rem 0.75rem', fontSize: '0.875rem', display: 'inline-block', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>
-                  {t.profile.avatarImage}
-                  <input
-                    key={avatarInputKey}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={onAvatarFileChange}
-                    style={{ display: 'none' }}
-                  />
-                </label>
+      {activeTab === 'profile' && (
+        <div className="profile-content-area">
+          <section className="profile-card">
+            <div className="profile-card-top-accent"></div>
+            
+            <div className="profile-avatar-col">
+              <div className="profile-avatar-wrap">
+                <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="xl" />
+                <div className="profile-avatar-ring"></div>
               </div>
+              <label className="profile-upload-label">
+                {t.profile.uploadAvatar}
+                <input
+                  key={avatarInputKey}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={onAvatarFileChange}
+                  className="hidden"
+                />
+              </label>
               {avatarFile && (
                 <button
                   type="button"
-                  className="primary"
-                  style={{ marginTop: '0.5rem', width: '100%', maxWidth: '200px' }}
+                  className="primary w-full"
                   disabled={avatarUploadBusy}
                   onClick={() => { void onUploadAvatar() }}
                 >
-                  {avatarUploadBusy ? t.common.uploading : t.profile.uploadAvatar}
+                  {avatarUploadBusy ? t.common.uploading : t.common.save}
                 </button>
               )}
             </div>
 
-            <div style={{ flex: 1, minWidth: '0', flexBasis: '250px' }}>
+            <div className="profile-form-col">
               <form
+                className="profile-form"
                 onSubmit={(event) => {
                   event.preventDefault()
                   if (usernameLocked) return
                   void onSaveProfile()
                 }}
-                style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}
               >
-                <div>
-                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.emailLabel}</label>
-                  <input
-                    type="email"
-                    value={userEmail ?? ''}
-                    readOnly
-                    disabled
-                    autoComplete="email"
-                  />
-                  <p className="subtle" style={{ margin: '0.35rem 0 0', fontSize: '0.8125rem' }}>{t.profile.emailUniqueHelp}</p>
-                </div>
-
-                <div
-                  role="note"
-                  style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: '8px',
-                    background: 'var(--surface-elevated, rgba(255, 193, 7, 0.08))',
-                    border: '1px solid var(--border)',
-                    fontSize: '0.875rem',
-                  }}
-                >
-                  <p style={{ margin: 0 }}>{t.profile.usernameChangePolicy}</p>
-                  {!usernameStatus.canChange && nextChangeLabel ? (
-                    <p className="subtle" style={{ margin: '0.5rem 0 0', fontSize: '0.8125rem' }}>
-                      {t.profile.usernameChangeLocked(nextChangeLabel)}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div>
-                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.username}</label>
+                <div className="profile-input-wrapper">
+                  <div className="profile-input-prefix">@</div>
                   <input
                     type="text"
                     value={usernameDraft}
                     onChange={(event) => onUsernameDraftChange(event.target.value)}
+                    onFocus={() => setUsernameFocused(true)}
+                    onBlur={() => setUsernameFocused(false)}
                     placeholder={t.profile.usernamePlaceholder}
                     autoComplete="username"
                     spellCheck={false}
                     maxLength={32}
-                    aria-describedby="username-help"
+                    className="profile-input with-prefix"
                   />
-                  <p id="username-help" className="subtle" style={{ margin: '0.35rem 0 0', fontSize: '0.8125rem' }}>
-                    {t.profile.usernameHelp}
-                  </p>
-                  {usernameLocked && nextChangeLabel ? (
-                    <p className="error" style={{ margin: '0.35rem 0 0', fontSize: '0.8125rem' }}>
+                  <div className={`profile-hint-wrap ${usernameFocused ? 'visible' : ''}`}>
+                    <p className="profile-hint-text">{t.profile.usernameHint}</p>
+                  </div>
+                  {usernameLocked && nextChangeLabel && !usernameFocused && (
+                    <p className="profile-hint-text error" style={{ color: '#f87171', marginTop: 'var(--space-2)' }}>
                       {t.profile.usernameChangeLocked(nextChangeLabel)}
                     </p>
-                  ) : null}
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <button type="submit" className="primary" disabled={profileSaving || usernameLocked}>
-                    {profileSaving ? t.common.saving : t.profile.saveProfile}
-                  </button>
-                  {profileNotice ? <span className="subtle" style={{ fontSize: '0.875rem' }}>{profileNotice}</span> : null}
-                </div>
-                {displayProfileError ? <p className="error" style={{ margin: 0 }}>{displayProfileError}</p> : null}
+                
+                <button type="submit" className="primary w-full" disabled={profileSaving || usernameLocked}>
+                  {profileSaving ? t.common.saving : t.common.save}
+                </button>
+                
+                {profileNotice && <p className="msg-success">{profileNotice}</p>}
+                {displayProfileError && <p className="msg-error">{displayProfileError}</p>}
               </form>
+              
+              <div className="profile-signout-wrap">
+                <button type="button" className="btn-secondary" onClick={onSignOut}>
+                  {t.auth.signOut}
+                </button>
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)' }}>
-          <h3 style={{ margin: '0 0 1rem 0' }}>{t.profile.changePassword}</h3>
-          <p className="subtle" style={{ margin: '0 0 1rem 0', fontSize: '0.875rem' }}>{t.profile.passwordRequirements}</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
-            <div>
-              <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.oldPassword}</label>
+          <section className="profile-sessions-section">
+            <div className="profile-sessions-header">
+              <div className="profile-sessions-header-accent"></div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 500, margin: 0 }}>{t.sessions.createdByYou}</h2>
+            </div>
+            <SessionListPanel {...listProps} />
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'settings' && (
+        <div className="profile-content-area">
+          <section className="profile-settings-card">
+            <div className="profile-settings-top-accent"></div>
+            
+            <div className="settings-group">
+              <h3 className="settings-group-title">{t.profile.account}</h3>
+              <input
+                type="email"
+                value={userEmail ?? ''}
+                readOnly
+                disabled
+                autoComplete="email"
+                placeholder={t.profile.emailLabel}
+                className="profile-input"
+              />
+            </div>
+
+            <div className="settings-section-divider">
+              <h3 className="settings-group-title">{t.profile.changePassword}</h3>
+              
               <input
                 type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
                 placeholder={t.profile.oldPasswordPlaceholder}
                 autoComplete="current-password"
+                className="profile-input"
               />
-            </div>
-            <div>
-              <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.profile.newPassword}</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder={t.profile.newPasswordPlaceholder}
-                minLength={8}
-                autoComplete="new-password"
-              />
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <button
-              type="button"
-              className="primary"
-              disabled={passwordBusy || !oldPassword.trim() || !newPassword.trim()}
-              onClick={() => { void handleChangePassword() }}
-            >
-              {passwordBusy ? t.common.saving : t.profile.updatePassword}
-            </button>
-            {passwordNotice ? <span className="subtle" style={{ fontSize: '0.875rem' }}>{passwordNotice}</span> : null}
-          </div>
-        </section>
-
-        <section className="card" style={{ padding: '1.5rem', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          <h3 style={{ margin: '0 0 1rem 0', color: '#ef4444' }}>Danger Zone</h3>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <button type="button" className="secondary" onClick={onSignOut}>
-                {t.auth.signOut}
+              
+              <div className="profile-input-wrapper">
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                  placeholder={t.profile.newPasswordPlaceholder}
+                  minLength={8}
+                  autoComplete="new-password"
+                  className="profile-input"
+                />
+                <div className={`profile-hint-wrap ${passwordFocused ? 'visible' : ''}`}>
+                  <p className="profile-hint-text">{t.profile.passwordHint}</p>
+                </div>
+              </div>
+              
+              <button
+                type="button"
+                className="primary w-full"
+                disabled={passwordBusy || !oldPassword.trim() || !newPassword.trim()}
+                onClick={() => { void handleChangePassword() }}
+                style={{ marginTop: 'var(--space-2)' }}
+              >
+                {passwordBusy ? t.common.saving : t.profile.updatePassword}
               </button>
+              
+              {passwordNotice && <p className="msg-success">{passwordNotice}</p>}
+              {passwordError && <p className="msg-error">{passwordError}</p>}
             </div>
 
-            <div style={{ paddingTop: '1rem', borderTop: '1px solid var(--border)' }}>
+            <div className="danger-zone-divider">
+              <h3 className="settings-group-title danger">Danger Zone</h3>
+              
               {!deleteConfirm ? (
                 <button
                   type="button"
-                  className="secondary"
-                  style={{ color: '#ef4444', borderColor: '#ef4444' }}
+                  className="btn-danger-outline"
                   onClick={() => {
                     setDeleteConfirm(true)
                     setDeleteError(null)
@@ -335,18 +362,15 @@ export function ProfileEdit({
                   {t.profile.deleteAccount}
                 </button>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <p className="subtle" style={{ margin: 0, color: '#ef4444' }}>
+                <div className="danger-confirm-box">
+                  <p className="danger-confirm-text">
                     {t.profile.deleteConfirm}
                   </p>
-                  {deleteError ? (
-                    <p className="error" style={{ margin: 0 }}>{deleteError}</p>
-                  ) : null}
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {deleteError && <p className="error m-0 text-sm">{deleteError}</p>}
+                  <div className="danger-actions-row">
                     <button
                       type="button"
-                      className="primary"
-                      style={{ background: '#ef4444' }}
+                      className="btn-danger"
                       disabled={deleteBusy}
                       onClick={() => { void handleDeleteAccount() }}
                     >
@@ -354,7 +378,7 @@ export function ProfileEdit({
                     </button>
                     <button
                       type="button"
-                      className="secondary"
+                      className="btn-cancel"
                       onClick={() => setDeleteConfirm(false)}
                     >
                       {t.common.cancel}
@@ -363,9 +387,9 @@ export function ProfileEdit({
                 </div>
               )}
             </div>
-          </div>
-        </section>
-      </div>
+          </section>
+        </div>
+      )}
     </div>
   )
 }

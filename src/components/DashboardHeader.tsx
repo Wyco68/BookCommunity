@@ -34,12 +34,14 @@ export function DashboardHeader({
   return (
     <>
       <header className="top-nav">
-        <div className="top-nav-inner">
-          <Link to={APP_PATHS.home} className="top-nav-brand">
-            BookCom
-          </Link>
+        <div className="top-nav-inner max-w-5xl mx-auto px-4 w-full flex justify-between items-center">
+          <div className="flex-1 flex justify-start">
+            <Link to={APP_PATHS.home} className="top-nav-brand">
+              BookCom
+            </Link>
+          </div>
 
-          <nav className="top-nav-links" aria-label="Main navigation">
+          <nav className="top-nav-links flex-1 justify-center" aria-label="Main navigation">
             <NavLink to={APP_PATHS.home} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
               {t.nav.home}
             </NavLink>
@@ -51,12 +53,7 @@ export function DashboardHeader({
             </NavLink>
           </nav>
 
-          <div className="top-nav-actions">
-            {onCreateClick ? (
-              <button type="button" className="sidebar-create-btn top-nav-create-btn" onClick={onCreateClick}>
-                {t.nav.createSession}
-              </button>
-            ) : null}
+          <div className="top-nav-actions flex-1 justify-end">
             <Link to={APP_PATHS.account} className="header-identity-link top-nav-profile">
               <div className="identity-row">
                 <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="sm" />
@@ -89,7 +86,7 @@ export function DashboardHeader({
           </div>
 
           <button
-            className="mobile-menu-toggle"
+            className="mobile-menu-toggle lg:hidden"
             onClick={() => setMobileMenuOpen((open) => !open)}
             aria-label={mobileMenuOpen ? t.nav.closeMenu : t.nav.openMenu}
             aria-expanded={mobileMenuOpen}

@@ -43,22 +43,22 @@ export function SessionCard({
         onClick()
       }}
     >
-      <div className="session-card-cols">
+      <div className="session-card-cols" style={{ gridTemplateColumns: '60% 40%' }}>
         <div className="session-card-col-cover" aria-hidden="true">
           {coverUrl ? (
             <img
-              className="session-card-cover-image"
+              className="session-card-cover-image w-full h-full object-cover aspect-[4/3]"
               src={coverUrl}
               alt={`${session.book_title} cover`}
               loading="lazy"
             />
           ) : (
             <img
-              className="session-card-cover-image"
+              className="session-card-cover-image w-full h-full object-cover aspect-[4/3]"
               src="/default-cover.png"
               alt="Default cover"
               loading="lazy"
-              style={{ objectFit: 'contain', background: '#222' }}
+              style={{ background: '#222' }}
             />
           )}
         </div>
