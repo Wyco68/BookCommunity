@@ -122,3 +122,43 @@ export interface PaginatedResult<T> {
   nextCursor: PaginationCursor | null
   hasMore: boolean
 }
+
+export type NotificationEventType =
+  | 'SESSION_JOINED'
+  | 'SESSION_DELETED'
+  | 'CHAPTER_UPDATED'
+  | 'COMMENT_CREATED'
+  | 'COMMENT_LIKED'
+  | 'JOIN_REQUESTED'
+
+export interface NotificationMetadata {
+  sessionTitle?: string
+  actorUsername?: string
+  commentId?: string
+  chapterId?: string
+  [key: string]: unknown
+}
+
+export interface Notification {
+  id: string
+  user_id: string
+  type: NotificationEventType
+  session_id: string | null
+  actor_id: string | null
+  metadata: NotificationMetadata
+  is_read: boolean
+  idempotency_key: string | null
+  created_at: string
+}
+
+export interface UserNotificationPreferences {
+  user_id: string
+  email_enabled: boolean
+  email_session_joined: boolean
+  email_chapter_updated: boolean
+  email_session_deleted: boolean
+  email_comment_created: boolean
+  email_comment_liked: boolean
+  email_join_requested: boolean
+  updated_at: string
+}

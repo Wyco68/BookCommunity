@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { notifyCreate } from '../../lib/notifications'
 import { useCategories } from '../../hooks/useCategories'
 import { getSignedMediaUrlMap, SESSION_COVERS_BUCKET } from '../../lib/storage'
 import { translations } from '../../i18n'
@@ -265,6 +266,7 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
       }
       setRequestStatuses((prev) => ({ ...prev, [joinTarget.id]: 'pending' }))
       setJoinTarget(null)
+      notifyCreate({ type: 'JOIN_REQUESTED', sessionId: joinTarget.id, actorId: userId })
       return
     }
 
@@ -283,6 +285,7 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
       [joinTarget.id]: { session_id: joinTarget.id, user_id: userId, role: 'member' },
     }))
     setJoinTarget(null)
+    notifyCreate({ type: 'SESSION_JOINED', sessionId: joinTarget.id, actorId: userId })
     navigate(`/session/${joinTarget.id}`)
   }, [joinTarget, userId, navigate])
 

@@ -17,9 +17,9 @@ export interface UseSessionDetailReturn {
   error: string | null
   loadDetail: (sessionId: string) => Promise<void>
   refreshDetail: () => Promise<void>
-  submitComment: (sessionId: string, userId: string, body: string) => Promise<void>
-  toggleLike: (sessionId: string, userId: string, commentId: string) => Promise<void>
-  approveRequest: (sessionId: string, request: SessionJoinRequest) => Promise<void>
+  submitComment: (sessionId: string, userId: string, body: string) => Promise<boolean>
+  toggleLike: (sessionId: string, userId: string, commentId: string) => Promise<boolean>
+  approveRequest: (sessionId: string, request: SessionJoinRequest) => Promise<boolean>
   rejectRequest: (sessionId: string, request: SessionJoinRequest) => Promise<void>
   clearDetail: () => void
   appendComment: (comment: Comment) => void
@@ -150,20 +150,20 @@ export function useSessionDetail(): UseSessionDetailReturn {
     await loadDetail(sessionId)
   }, [loadDetail])
 
-  const submitComment = useCallback(async (_sessionId: string, userId: string, body: string) => {
+  const submitComment = useCallback(async (_sessionId: string, userId: string, body: string): Promise<boolean> => {
     const trimmed = body.trim()
-    if (!trimmed) return
+    if (!trimmed) return false
 
     const commentCheck = validateComment(trimmed)
     if (!commentCheck.valid) {
       setError(commentCheck.error ?? 'Invalid comment')
-      return
+      return false
     }
 
     const rateCheck = checkRateLimit(`comment:${userId}`, COMMENT_RATE_LIMIT)
     if (!rateCheck.allowed) {
       setError(`Please wait ${Math.ceil(rateCheck.retryAfterMs / 1000)}s before commenting again`)
-      return
+      return false
     }
 
     const { error } = await supabase.from('comments').insert({
@@ -174,21 +174,22 @@ export function useSessionDetail(): UseSessionDetailReturn {
 
     if (error) {
       setError(error.message)
-    } else {
-      recordAction(`comment:${userId}`, COMMENT_RATE_LIMIT.windowMs)
-      lastLoadRef.current = { sessionId: _sessionId, time: 0 }
-      await loadDetail(_sessionId)
+      return false
     }
+    recordAction(`comment:${userId}`, COMMENT_RATE_LIMIT.windowMs)
+    lastLoadRef.current = { sessionId: _sessionId, time: 0 }
+    await loadDetail(_sessionId)
+    return true
   }, [loadDetail])
 
-  const toggleLike = useCallback(async (_sessionId: string, userId: string, commentId: string) => {
+  const toggleLike = useCallback(async (_sessionId: string, userId: string, commentId: string): Promise<boolean> => {
     const existingLike = likes.find((like) => like.comment_id === commentId && like.user_id === userId)
 
     if (existingLike) {
       const { error } = await supabase.from('comment_likes').delete().eq('id', existingLike.id)
       if (error) {
         setError(error.message)
-        return
+        return false
       }
     } else {
       const { error } = await supabase.from('comment_likes').insert({
@@ -197,11 +198,15 @@ export function useSessionDetail(): UseSessionDetailReturn {
       })
       if (error) {
         setError(error.message)
-        return
+        return false
       }
+      lastLoadRef.current = { sessionId: _sessionId, time: 0 }
+      await loadDetail(_sessionId)
+      return true
     }
     lastLoadRef.current = { sessionId: _sessionId, time: 0 }
     await loadDetail(_sessionId)
+    return false
   }, [likes, loadDetail])
 
   const approveRequest = useCallback(async (sessionId: string, request: SessionJoinRequest) => {
@@ -212,7 +217,7 @@ export function useSessionDetail(): UseSessionDetailReturn {
 
     if (updateResult.error) {
       setError(updateResult.error.message)
-      return
+      return false
     }
 
     const membershipResult = await supabase.from('session_members').insert({
@@ -223,10 +228,11 @@ export function useSessionDetail(): UseSessionDetailReturn {
 
     if (membershipResult.error && !membershipResult.error.message.toLowerCase().includes('duplicate')) {
       setError(membershipResult.error.message)
-      return
+      return false
     }
     lastLoadRef.current = { sessionId, time: 0 }
     await loadDetail(sessionId)
+    return true
   }, [loadDetail])
 
   const rejectRequest = useCallback(async (_sessionId: string, request: SessionJoinRequest) => {

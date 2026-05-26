@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import { notifyCreate } from '../lib/notifications'
 import { getSignedMediaUrlMap, SESSION_COVERS_BUCKET } from '../lib/storage'
 import type {
   Category,
@@ -486,6 +487,7 @@ export function useSessions(): UseSessionsReturn {
       if (error) {
         setError(error.message)
       } else {
+        notifyCreate({ type: 'JOIN_REQUESTED', sessionId, actorId: user.id })
         lastLoadedRef.current = 0
         void loadSessions(user)
       }
@@ -507,6 +509,8 @@ export function useSessions(): UseSessionsReturn {
       setBusySessionId(null)
       return
     }
+
+    notifyCreate({ type: 'SESSION_JOINED', sessionId, actorId: user.id })
 
     setBusySessionId(null)
     lastLoadedRef.current = 0
