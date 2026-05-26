@@ -7,7 +7,8 @@ import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import { validatePassword } from '../../lib/validation'
 import { getUsernameChangeStatus } from '../../lib/usernameCooldown'
-import { SessionListPanel } from '../SessionListPanel'
+import { SessionListPanel, type SessionListPanelProps } from '../SessionListPanel'
+import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
 import './ProfileEdit.css'
 
 type Copy = (typeof translations)[Language]
@@ -32,7 +33,8 @@ interface ProfileEditProps {
   onUsernameDraftChange: (value: string) => void
   onSaveProfile: () => Promise<void>
   onSignOut: () => void
-  listProps: any
+  listProps: SessionListPanelProps
+  userId?: string
 }
 
 function formatProfileError(error: string | null, t: Copy): string | null {
@@ -71,6 +73,7 @@ export function ProfileEdit({
   onSaveProfile,
   onSignOut,
   listProps,
+  userId,
 }: ProfileEditProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile')
   const [usernameFocused, setUsernameFocused] = useState(false)
@@ -85,6 +88,20 @@ export function ProfileEdit({
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const { prefs, saving: prefsSaving, error: prefsError, savePrefs, setPrefs: setLocalPrefs } =
+    useNotificationPreferences(userId)
+  const [prefsNotice, setPrefsNotice] = useState<string | null>(null)
+
+  async function handleSavePrefs(newPrefs: NonNullable<typeof prefs>) {
+    setPrefsNotice(null)
+    const ok = await savePrefs(newPrefs)
+    if (ok) {
+      setPrefsNotice(t.notifications.preferencesSaved)
+    } else {
+      setPrefsNotice(t.notifications.preferencesError)
+    }
+  }
 
   const usernameStatus = useMemo(
     () => getUsernameChangeStatus(usernameUpdatedAt),
@@ -345,6 +362,121 @@ export function ProfileEdit({
               
               {passwordNotice && <p className="msg-success">{passwordNotice}</p>}
               {passwordError && <p className="msg-error">{passwordError}</p>}
+            </div>
+
+            <div className="settings-section-divider">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 className="settings-group-title" style={{ margin: 0 }}>{t.notifications.title}</h3>
+                {prefsSaving && <span className="spinner spinner-sm" style={{ marginRight: '8px' }} />}
+              </div>
+
+              {!prefs ? (
+                <div style={{ padding: 'var(--space-2) 0' }}>
+                  <span className="spinner spinner-sm" />
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                  <div className="notif-pref-row">
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span className="notif-pref-label">{t.notifications.emailGlobalToggle}</span>
+                    </div>
+                    <label className="toggle-switch">
+                      <input
+                        type="checkbox"
+                        checked={prefs.email_enabled}
+                        onChange={(e) => {
+                          const newPrefs = { ...prefs, email_enabled: e.target.checked }
+                          setLocalPrefs(newPrefs)
+                          void handleSavePrefs(newPrefs)
+                        }}
+                      />
+                      <span className="toggle-track" />
+                    </label>
+                  </div>
+
+                  {prefs.email_enabled && (
+                    <div style={{ marginLeft: 'var(--space-4)', borderLeft: '1px solid var(--border)', paddingLeft: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                      <div className="notif-pref-row">
+                        <span className="notif-pref-sublabel">{t.notifications.emailSessionJoined}</span>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={prefs.email_session_joined}
+                            onChange={(e) => {
+                              const newPrefs = { ...prefs, email_session_joined: e.target.checked }
+                              setLocalPrefs(newPrefs)
+                              void handleSavePrefs(newPrefs)
+                            }}
+                          />
+                          <span className="toggle-track" />
+                        </label>
+                      </div>
+                      <div className="notif-pref-row">
+                        <span className="notif-pref-sublabel">{t.notifications.emailJoinRequested}</span>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={prefs.email_join_requested}
+                            onChange={(e) => {
+                              const newPrefs = { ...prefs, email_join_requested: e.target.checked }
+                              setLocalPrefs(newPrefs)
+                              void handleSavePrefs(newPrefs)
+                            }}
+                          />
+                          <span className="toggle-track" />
+                        </label>
+                      </div>
+                      <div className="notif-pref-row">
+                        <span className="notif-pref-sublabel">{t.notifications.emailChapterUpdated}</span>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={prefs.email_chapter_updated}
+                            onChange={(e) => {
+                              const newPrefs = { ...prefs, email_chapter_updated: e.target.checked }
+                              setLocalPrefs(newPrefs)
+                              void handleSavePrefs(newPrefs)
+                            }}
+                          />
+                          <span className="toggle-track" />
+                        </label>
+                      </div>
+                      <div className="notif-pref-row">
+                        <span className="notif-pref-sublabel">{t.notifications.emailCommentCreated}</span>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={prefs.email_comment_created}
+                            onChange={(e) => {
+                              const newPrefs = { ...prefs, email_comment_created: e.target.checked }
+                              setLocalPrefs(newPrefs)
+                              void handleSavePrefs(newPrefs)
+                            }}
+                          />
+                          <span className="toggle-track" />
+                        </label>
+                      </div>
+                      <div className="notif-pref-row">
+                        <span className="notif-pref-sublabel">{t.notifications.emailSessionDeleted}</span>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={prefs.email_session_deleted}
+                            onChange={(e) => {
+                              const newPrefs = { ...prefs, email_session_deleted: e.target.checked }
+                              setLocalPrefs(newPrefs)
+                              void handleSavePrefs(newPrefs)
+                            }}
+                          />
+                          <span className="toggle-track" />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                  {prefsNotice && <p className="msg-success">{prefsNotice}</p>}
+                  {prefsError && !prefsNotice && <p className="msg-error">{prefsError}</p>}
+                </div>
+              )}
             </div>
 
             <div className="danger-zone-divider">

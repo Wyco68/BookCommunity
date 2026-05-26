@@ -216,6 +216,7 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     myDisplayName: profile.profile?.username || user.email || activeUserId.slice(0, 8),
     onLanguageChange: setLanguage,
     onSignOut: signOutToLogin,
+    userId: activeUserId,
   }
 
   const profileEditProps = {
@@ -244,6 +245,7 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     onSaveProfile: () => profile.saveProfile(user.id),
     onSignOut: signOutToLogin,
     listProps: createdListProps as never,
+    userId: activeUserId,
   }
 
   const searchSectionProps = {

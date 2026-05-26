@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { notifyCreate } from '../lib/notifications'
 import { uploadSessionMedia, deleteSessionMedia } from '../lib/storage'
 import { validateMediaFile } from '../lib/validation'
 import { checkRateLimit, recordAction, MEDIA_UPLOAD_RATE_LIMIT } from '../lib/rateLimit'
@@ -134,12 +135,21 @@ export function useMediaUpload({
       }
 
       recordAction(`media-upload:${userId}`, MEDIA_UPLOAD_RATE_LIMIT.windowMs)
+      
+      notifyCreate({
+        type: 'CHAPTER_UPDATED',
+        sessionId,
+        actorId: userId,
+        metadata: { chapterId: nextChapterNum },
+      })
+
       await loadMediaMeta()
       setUploading(false)
       return true
     },
     [sessionId, userId, isOwner, totalMediaCount, totalChapters, loadMediaMeta],
   )
+
 
   return {
     uploading,

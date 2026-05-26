@@ -70,6 +70,21 @@ supabase functions deploy delete-account
 
 The function uses `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` from the project environment (set automatically when deployed). Account deletion in the app calls this function only — never delete auth users or profile rows from the client.
 
+### 3c. Notifications (database + Edge Functions)
+
+1. Run **`supabase/migrations/20260526053341_notifications_system.sql`** in the SQL Editor (or apply via CLI on a linked project).
+2. Run **`supabase/migrations/20260526120000_notification_fixes.sql`** (COMMENT_LIKED, session-delete persistence).
+3. Deploy notification functions:
+
+```bash
+supabase functions deploy create-notification
+supabase functions deploy send-email
+```
+
+4. Set Edge Function secrets: `RESEND_API_KEY`, `EMAIL_FROM`, `NOTIFICATION_INTERNAL_SECRET`, and optionally `APP_URL` (defaults to `https://bookcom.app`).
+
+`create-notification` requires a valid user JWT and verifies `actorId` matches the caller. `send-email` is internal-only (called from `create-notification`).
+
 ### 4. Run locally
 
 ```bash

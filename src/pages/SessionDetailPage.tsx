@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { notifyCreate } from '../lib/notifications'
 import {
   deleteSessionMediaForSession,
   deleteSessionCover,
@@ -255,8 +256,11 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault()
       if (!userId || !sessionId || !commentDraft.trim()) return
-      await detail.submitComment(sessionId, userId, commentDraft)
-      setCommentDraft('')
+      const result = await detail.submitComment(sessionId, userId, commentDraft)
+      if (result !== false) {
+        setCommentDraft('')
+        notifyCreate({ type: 'COMMENT_CREATED', sessionId, actorId: userId })
+      }
     },
     [userId, sessionId, commentDraft, detail],
   )
@@ -264,7 +268,15 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   const handleToggleLike = useCallback(
     async (commentId: string) => {
       if (!userId || !sessionId) return
-      await detail.toggleLike(sessionId, userId, commentId)
+      const liked = await detail.toggleLike(sessionId, userId, commentId)
+      if (liked) {
+        notifyCreate({
+          type: 'COMMENT_LIKED',
+          sessionId,
+          actorId: userId,
+          metadata: { commentId },
+        })
+      }
     },
     [userId, sessionId, detail],
   )
@@ -272,7 +284,14 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   const handleApproveJoinRequest = useCallback(
     async (request: SessionJoinRequest) => {
       if (!sessionId || !userId) return
-      await detail.approveRequest(sessionId, request)
+      const approved = await detail.approveRequest(sessionId, request)
+      if (approved) {
+        notifyCreate({
+          type: 'SESSION_JOINED',
+          sessionId,
+          actorId: request.user_id,
+        })
+      }
     },
     [sessionId, userId, detail],
   )
@@ -386,6 +405,10 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
       return
     }
 
+    if (userId) {
+      notifyCreate({ type: 'SESSION_DELETED', sessionId, actorId: userId })
+    }
+
     const { error } = await supabase.from('reading_sessions').delete().eq('id', sessionId)
     setDeletingSession(false)
     if (!error) {
@@ -394,7 +417,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
       return
     }
     setDeleteError(error.message)
-  }, [sessionId, isOwner, session, navigate, onSessionDeleted])
+  }, [sessionId, isOwner, session, navigate, onSessionDeleted, userId])
 
   const handleJoinFromGate = useCallback(async () => {
     if (!session || !userId) return
@@ -415,6 +438,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
       }
       setMyJoinRequestStatus('pending')
       setJoinModalOpen(false)
+      notifyCreate({ type: 'JOIN_REQUESTED', sessionId: session.id, actorId: userId })
       return
     }
 
@@ -430,6 +454,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
     }
     setMembership({ session_id: session.id, user_id: userId, role: 'member' })
     setJoinModalOpen(false)
+    notifyCreate({ type: 'SESSION_JOINED', sessionId: session.id, actorId: userId })
   }, [session, userId])
 
   // Per-chapter save progress.

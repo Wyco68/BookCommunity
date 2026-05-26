@@ -134,10 +134,17 @@
 }
 
 .top-nav-actions {
-  display: none;
+  display: flex;
   align-items: center;
   gap: var(--space-3);
   margin-left: auto;
+}
+
+@media (max-width: 1024px) {
+  .top-nav-profile,
+  .top-nav-language {
+    display: none !important;
+  }
 }
 
 .top-nav-create-btn {
@@ -628,7 +635,7 @@
 @media (max-width: 1024px) {
   .mobile-menu-toggle {
     display: inline-flex !important;
-    margin-left: auto;
+    margin-left: 0;
     position: static;
   }
 
