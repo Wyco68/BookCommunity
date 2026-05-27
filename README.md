@@ -1,106 +1,71 @@
 # BookCom
 
-Authenticated social reading groups: shared sessions, chapter media, member progress, and discussion — backed by Supabase and built with React.
+A dual-client (Web + Mobile) collaborative reading platform allowing users to create, join, and track progress on reading sessions. The platform supports open or request-based access, media uploads per chapter, and real-time notifications.
 
-## Overview
+## Core Features
+- **Authentication**: Email/Password and Google OAuth integration via Supabase.
+- **Reading Sessions**: Create public or private reading sessions with categorization and sequential chapter tracking.
+- **Access Control**: 'Open' or 'Request-based' join policies. Owners can approve/reject join requests.
+- **Media Uploads**: Upload images or book files (EPUB/PDF) per chapter with strict sequential enforcement.
+- **Progress Tracking**: Individual member chapter progress tracking, capped by the latest uploaded chapter.
+- **Collaboration**: Chapter-based commenting and comment liking system.
+- **Real-time Notifications**: Live updates for join requests, comments, and session activities.
+- **Dual Client**: Shared backend with both React (Web) and React Native/Expo (Mobile) frontends.
 
-BookCom lets signed-in users create reading sessions for books, discover public sessions by category, join open sessions or request access, and collaborate inside a session:
+## Tech Stack
+- **Web Frontend**: React 19, Vite, React Router DOM 7, Zustand, Vanilla CSS.
+- **Mobile Frontend**: React Native, Expo 52.
+- **Backend & Database**: Supabase (PostgreSQL, Auth, Storage, Realtime).
+- **Testing**: Vitest (Node environment) for core logic.
+- **Language**: TypeScript.
 
-- **Sessions** — title, author, chapters, visibility, join policy, single category tag
-- **Media** — owner uploads chapter images or book files (PDF/EPUB); sequential chapters only
-- **Progress** — members record current chapter (owners do not track reading progress)
-- **Discussion** — one thread per session with like-only reactions
-- **Realtime** — live updates for comments, likes, progress, members, and join requests
+## Setup Instructions
 
-Product and database contracts: **[docs/projectspec.md](docs/projectspec.md)**  
-UI design system: **[docs/DESIGN.md](docs/DESIGN.md)**
+1. Clone the repository and install dependencies in the root (for web) and `mobile-app/` (for mobile).
+2. Start the Supabase local environment or link your remote Supabase project.
+3. Apply the database schema by running `supabase/schema.sql` in the SQL Editor.
+4. Set up your environment variables.
 
-## Tech stack
+## Environment Variables
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 19, TypeScript, Vite, React Router |
-| Backend | Supabase (PostgreSQL, Auth, Realtime, Storage) |
-| Security | Row Level Security, triggers, `security definer` helpers |
+**Web (`.env.local`)**
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-## Prerequisites
+**Mobile (`mobile-app/.env`)**
+```env
+EXPO_PUBLIC_SUPABASE_URL=your_supabase_url
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
 
-- Node.js 20+
-- npm
-- A [Supabase](https://supabase.com) project with Email auth enabled (Google OAuth optional for web)
+## Development Commands
 
-## Setup
+**Web (Root directory)**
+- `npm run dev` — Start Vite development server.
+- `npm run build` — Run TypeScript compiler (`tsc -b`) and build for production.
+- `npm run lint` — Run ESLint.
+- `npm run test` — Run Vitest tests (runs in Node environment, no DOM).
+- `npm run test:coverage` — Run tests with coverage reports.
 
-### 1. Clone and install
+**Mobile (`mobile-app/` directory)**
+- `npm run start` — Start Expo development server.
+- `npm run typecheck` — Run TypeScript compiler without emitting files.
 
+## Production Build
+To build the web client for production:
 ```bash
-git clone <repository-url>
-cd Bookcom
-npm install
+npm run build
 ```
+This correctly sequences the TypeScript compilation before the Vite build to ensure strict type checking.
 
-### 2. Environment variables
+## Deployment Notes
+- The web app is configured for Vercel deployment (as per `vercel.json` existing in root).
+- Ensure that `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured in the deployment environment variables.
+- Supabase edge functions (e.g., `delete-account`, `create-notification`, `send-email`) must be deployed manually via Supabase CLI.
 
-Create `.env.local` in the project root:
-
-```bash
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your_anon_or_publishable_key
-```
-
-For Google sign-in, add your site URL and `http://localhost:5173/auth/callback` (or your dev origin + `/auth/callback`) under **Authentication → URL configuration** in the Supabase dashboard.
-
-### 3. Database
-
-1. Open the Supabase **SQL Editor**.
-2. Paste and run the full contents of **`supabase/schema.sql`** (drop + create).
-3. Confirm seeded categories and RLS policies exist.
-
-For an existing database that still has `session_categories` / `category_members`, run **`supabase/migrations/one_category_per_session.sql`** first, then reconcile with `schema.sql` as needed.
-
-On an existing project with profiles already in place, also run **`supabase/migrations/20260526_identity_and_account_delete.sql`** once (deduplicates usernames, avatar path trigger, revokes profile INSERT).
-
-### 3b. Account deletion (Edge Function)
-
-Deploy the `delete-account` function (requires [Supabase CLI](https://supabase.com/docs/guides/cli)):
-
-```bash
-supabase functions deploy delete-account
-```
-
-The function uses `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` from the project environment (set automatically when deployed). Account deletion in the app calls this function only — never delete auth users or profile rows from the client.
-
-### 4. Run locally
-
-```bash
-npm run dev
-```
-
-Open the URL Vite prints (typically `http://localhost:5173`).
-
-## Scripts
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Typecheck (`tsc -b`) + production build |
-| `npm run preview` | Preview production build |
-| `npm run lint` | ESLint |
-| `npm run test` | Vitest (node environment) |
-
-## Project layout
-
-```
-src/                 React app (pages, components, hooks, i18n)
-supabase/
-  schema.sql         Database source of truth (full recreate)
-  migrations/        Incremental upgrades for existing DBs
-  functions/         Edge Functions (e.g. delete-account)
-docs/
-  projectspec.md     Product + schema contract
-  DESIGN.md          Visual design system
-```
-
-## Documentation
-
-- [Project specification](docs/projectspec.md) — domain model, RLS, triggers, API patterns
+## Security Considerations
+- **Row Level Security (RLS)**: Enforced comprehensively across all tables. Users can only access sessions they are members of, or public sessions. Insert/Update/Delete operations are strictly guarded by membership roles (owner vs member).
+- **Database Triggers**: Critical business logic (e.g., sequential chapter uploads, progress limit bounds, immutable comment relationships) is enforced at the DB level to prevent frontend bypasses.
+- **Storage Security**: Direct storage object access is restricted using RLS policies linked to session membership and ownership. Cover images and media files are stored securely.

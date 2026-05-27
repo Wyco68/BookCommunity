@@ -8,6 +8,7 @@ import { useSessionDerivedState } from './hooks/useSessionDerivedState'
 import { filterSessions } from './lib/sessionState'
 import { useSessions, defaultSessionForm } from './hooks/useSessions'
 import { useProfile } from './hooks/useProfile'
+import { useNotificationRealtime } from './hooks/useNotificationRealtime'
 import { buildAuthenticatedBranch } from './router/AppRouter'
 import { supabase } from './lib/supabase'
 import { APP_PATHS } from './router/paths'
@@ -23,6 +24,7 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
   const navigate = useNavigate()
   const sessions = useSessions()
   const profile = useProfile()
+  useNotificationRealtime(user.id)
   const t = translations[language]
 
   const {
@@ -216,6 +218,7 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     myDisplayName: profile.profile?.username || user.email || activeUserId.slice(0, 8),
     onLanguageChange: setLanguage,
     onSignOut: signOutToLogin,
+    userId: activeUserId,
   }
 
   const profileEditProps = {
@@ -244,6 +247,7 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     onSaveProfile: () => profile.saveProfile(user.id),
     onSignOut: signOutToLogin,
     listProps: createdListProps as never,
+    userId: activeUserId,
   }
 
   const searchSectionProps = {

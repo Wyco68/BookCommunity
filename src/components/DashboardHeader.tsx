@@ -5,6 +5,7 @@ import { Avatar } from './Avatar'
 import { APP_PATHS } from '../router/paths'
 import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
+import { NotificationBell } from './Notifications/NotificationBell'
 
 type Copy = (typeof translations)[Language]
 
@@ -17,6 +18,7 @@ export interface DashboardHeaderProps {
   onLanguageChange: (language: Language) => void
   onSignOut: () => void
   onCreateClick?: () => void
+  userId?: string
 }
 
 export function DashboardHeader({
@@ -27,9 +29,22 @@ export function DashboardHeader({
   myDisplayName,
   onLanguageChange,
   onCreateClick,
+  userId,
 }: DashboardHeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const closeMobileMenu = () => setMobileMenuOpen(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+
+  const getNotifLabel = (type: string, actor: string, session: string): string => {
+    const n = t.notifications
+    if (type === 'SESSION_JOINED') return n.SESSION_JOINED(actor, session)
+    if (type === 'JOIN_REQUESTED') return n.JOIN_REQUESTED(actor, session)
+    if (type === 'SESSION_DELETED') return n.SESSION_DELETED('', session)
+    if (type === 'CHAPTER_UPDATED') return n.CHAPTER_UPDATED('', session)
+    if (type === 'COMMENT_CREATED') return n.COMMENT_CREATED(actor, session)
+    if (type === 'COMMENT_LIKED') return n.COMMENT_LIKED(actor, session)
+    return session
+  }
 
   return (
     <>
@@ -54,6 +69,14 @@ export function DashboardHeader({
           </nav>
 
           <div className="top-nav-actions flex-1 justify-end">
+            <NotificationBell
+              userId={userId ?? ''}
+              open={notifOpen}
+              onToggle={() => setNotifOpen((o) => !o)}
+              onClose={() => setNotifOpen(false)}
+              tNotifications={t.notifications}
+              getLabel={getNotifLabel}
+            />
             <Link to={APP_PATHS.account} className="header-identity-link top-nav-profile">
               <div className="identity-row">
                 <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="sm" />
@@ -83,16 +106,15 @@ export function DashboardHeader({
                 MY
               </button>
             </div>
+            <button
+              className="mobile-menu-toggle lg:hidden"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              aria-label={mobileMenuOpen ? t.nav.closeMenu : t.nav.openMenu}
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
           </div>
-
-          <button
-            className="mobile-menu-toggle lg:hidden"
-            onClick={() => setMobileMenuOpen((open) => !open)}
-            aria-label={mobileMenuOpen ? t.nav.closeMenu : t.nav.openMenu}
-            aria-expanded={mobileMenuOpen}
-          >
-            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
         </div>
       </header>
 

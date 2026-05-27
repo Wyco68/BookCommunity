@@ -21,6 +21,16 @@ drop function if exists public.create_reading_session(text, text, integer[], tex
 drop type if exists public.session_status_type cascade;
 create type public.session_status_type as enum ('ongoing', 'completed');
 
+drop type if exists public.notification_event_type cascade;
+create type public.notification_event_type as enum (
+  'SESSION_JOINED',
+  'SESSION_DELETED',
+  'CHAPTER_UPDATED',
+  'COMMENT_CREATED',
+  'COMMENT_LIKED',
+  'JOIN_REQUESTED'
+);
+
 -- ── Username helpers (before profiles table CHECK) ────────────────────────────
 create or replace function public.is_valid_username(p_username text)
 returns boolean
@@ -58,6 +68,8 @@ end;
 $$;
 
 -- ── Tables (dependency order) ───────────────────────────────────────────────
+drop table if exists public.notifications cascade;
+drop table if exists public.user_notification_preferences cascade;
 drop table if exists public.comment_likes cascade;
 drop table if exists public.comments cascade;
 drop table if exists public.progress_updates cascade;
@@ -217,6 +229,31 @@ create table public.progress_updates (
   created_at timestamptz not null default now()
 );
 
+create table public.user_notification_preferences (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  email_enabled boolean not null default false,
+  email_session_joined boolean not null default true,
+  email_chapter_updated boolean not null default true,
+  email_session_deleted boolean not null default true,
+  email_comment_created boolean not null default true,
+  email_comment_liked boolean not null default true,
+  email_join_requested boolean not null default true,
+  updated_at timestamptz not null default now()
+);
+
+create table public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  type public.notification_event_type not null,
+  session_id uuid references public.reading_sessions(id) on delete set null,
+  actor_id uuid references public.profiles(id) on delete set null,
+  metadata jsonb not null default '{}'::jsonb,
+  is_read boolean not null default false,
+  idempotency_key text not null,
+  created_at timestamptz not null default now(),
+  constraint notifications_idempotency_key_unique unique (idempotency_key)
+);
+
 insert into public.categories (name)
 values ('Action'), ('Adventure'), ('Romance'), ('Drama'), ('Comedy'), ('Study')
 on conflict (name) do nothing;
@@ -289,6 +326,10 @@ begin
         continue;
     end;
   end loop;
+
+  insert into public.user_notification_preferences (user_id)
+  values (new.id)
+  on conflict (user_id) do nothing;
 
   return new;
 end;
@@ -755,6 +796,13 @@ create index if not exists idx_session_join_requests_session
 create index if not exists idx_session_join_requests_user
   on public.session_join_requests(user_id);
 
+create index if not exists idx_notifications_user_created
+  on public.notifications (user_id, created_at desc);
+
+create index if not exists idx_notifications_user_unread
+  on public.notifications (user_id)
+  where not is_read;
+
 alter table public.profiles enable row level security;
 alter table public.reading_sessions enable row level security;
 alter table public.session_members enable row level security;
@@ -764,6 +812,8 @@ alter table public.comment_likes enable row level security;
 alter table public.session_join_requests enable row level security;
 alter table public.categories enable row level security;
 alter table public.session_media enable row level security;
+alter table public.notifications enable row level security;
+alter table public.user_notification_preferences enable row level security;
 
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select
@@ -957,6 +1007,49 @@ on public.comment_likes
 for delete
 to authenticated
 using (user_id = auth.uid());
+
+drop policy if exists notifications_select on public.notifications;
+create policy notifications_select
+on public.notifications
+for select
+to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists notifications_update on public.notifications;
+create policy notifications_update
+on public.notifications
+for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+revoke insert, delete on public.notifications from authenticated;
+revoke insert, delete on public.notifications from anon;
+
+drop policy if exists notification_prefs_select on public.user_notification_preferences;
+create policy notification_prefs_select
+on public.user_notification_preferences
+for select
+to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists notification_prefs_insert on public.user_notification_preferences;
+create policy notification_prefs_insert
+on public.user_notification_preferences
+for insert
+to authenticated
+with check (user_id = auth.uid());
+
+drop policy if exists notification_prefs_update on public.user_notification_preferences;
+create policy notification_prefs_update
+on public.user_notification_preferences
+for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+revoke delete on public.user_notification_preferences from authenticated;
+revoke delete on public.user_notification_preferences from anon;
 
 drop policy if exists session_join_requests_select on public.session_join_requests;
 create policy session_join_requests_select
@@ -1253,3 +1346,5 @@ using (
   bucket_id = 'profile-avatars'
   and split_part(name, '/', 1) = auth.uid()::text
 );
+
+alter publication supabase_realtime add table public.notifications;
