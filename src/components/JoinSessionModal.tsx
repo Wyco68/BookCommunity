@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReadingSession } from '../types'
 import { Spinner } from './Spinner'
+import { useMotion } from '../hooks/useMotion'
 
 interface JoinSessionModalProps {
   session: ReadingSession
@@ -27,6 +28,7 @@ export function JoinSessionModal({
   descRequest,
 }: JoinSessionModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null)
+  const canAnimate = useMotion()
 
   useEffect(() => {
     confirmRef.current?.focus()
@@ -41,10 +43,10 @@ export function JoinSessionModal({
 
   return createPortal(
     <div
-      className="modal-overlay"
+      className={`modal-overlay ${canAnimate ? 'animate-fade-in' : ''}`}
       onClick={(e) => { if (e.target === e.currentTarget) onCancel() }}
     >
-      <div className="modal-content join-modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`modal-content join-modal ${canAnimate ? 'animate-scale-up' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="join-modal-header">
           <p className="eyebrow">{titleLabel}</p>
           <h3 className="join-modal-title">{session.book_title}</h3>

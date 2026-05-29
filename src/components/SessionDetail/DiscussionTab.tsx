@@ -3,6 +3,7 @@ import type { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import type { Comment, Profile } from '../../types'
 import { CommentThread } from './CommentThread'
+import { soundManager } from '../../lib/soundManager'
 
 type Copy = (typeof translations)[Language]
 
@@ -45,6 +46,14 @@ export function DiscussionTab({
     )
   }
 
+  const handleToggleLike = async (commentId: string) => {
+    const isLiked = !!commentMeta.likedByMe[commentId]
+    if (!isLiked) {
+      soundManager.play('pop')
+    }
+    await onToggleLike(commentId)
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
@@ -65,7 +74,7 @@ export function DiscussionTab({
               }
             ])
           )}
-          onToggleLike={onToggleLike}
+          onToggleLike={handleToggleLike}
           draft={commentDraft}
           onDraftChange={onCommentDraftChange}
           onSubmit={onSubmitComment}

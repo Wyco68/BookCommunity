@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import { Spinner } from './Spinner'
+import { useMotion } from '../hooks/useMotion'
+import { useSlidingPill } from '../hooks/useSlidingPill'
 
 type Copy = (typeof translations)[Language]
 
@@ -44,6 +46,9 @@ export function AuthView({
   onGoogleSignIn,
 }: AuthViewProps) {
   const [now, setNow] = useState(() => Date.now())
+  const canAnimate = useMotion()
+  const { containerRef: tabRef, pillStyle: tabPill } = useSlidingPill<HTMLDivElement>('.auth-switch-option-active', [language])
+  const { containerRef: langRef, pillStyle: langPill } = useSlidingPill<HTMLDivElement>('.auth-switch-option-active', [language])
 
   useEffect(() => {
     if (submitBlockedUntil !== null) {
@@ -57,7 +62,7 @@ export function AuthView({
   const disableEmailAuth = authBusy || googleBusy || rateLimited
 
   return (
-    <main className="shell">
+    <main className={`shell ${canAnimate ? 'animate-fade-in' : ''}`}>
       <section className="card auth-card">
         <div>
           <p className="eyebrow">BookCom</p>
@@ -65,7 +70,8 @@ export function AuthView({
         </div>
 
         <form className="stack" onSubmit={onSubmit}>
-          <div className="auth-switch" role="tablist" aria-label={t.auth.modeAriaLabel}>
+          <div className={`auth-switch ${canAnimate ? 'animated-pill-container' : ''}`} role="tablist" aria-label={t.auth.modeAriaLabel} ref={tabRef}>
+            {canAnimate && <div className="animated-pill" style={{ ...tabPill, borderRadius: 'var(--radius-xs)' }} />}
             <button
               type="button"
               className={`auth-switch-option ${authMode === 'sign-in' ? 'auth-switch-option-active' : ''}`}
@@ -131,7 +137,8 @@ export function AuthView({
           </button>
         </div>
 
-        <div className="auth-switch auth-switch-corner" role="tablist" aria-label={t.language.switchLabel}>
+        <div className={`auth-switch auth-switch-corner ${canAnimate ? 'animated-pill-container' : ''}`} role="tablist" aria-label={t.language.switchLabel} ref={langRef}>
+          {canAnimate && <div className="animated-pill" style={{ ...langPill, borderRadius: 'var(--radius-xs)' }} />}
           <button
             type="button"
             className={`auth-switch-option auth-switch-option-mini ${language === 'en' ? 'auth-switch-option-active' : ''}`}
@@ -164,8 +171,9 @@ interface AuthLoadingViewProps {
 }
 
 export function AuthLoadingView({ message }: AuthLoadingViewProps) {
+  const canAnimate = useMotion()
   return (
-    <main className="shell">
+    <main className={`shell ${canAnimate ? 'animate-fade-in' : ''}`}>
       <section className="centered">
         <h1 style={{ marginBottom: 'var(--space-4)' }}>BookCom</h1>
         <Spinner size="md" showLabel label={message} />

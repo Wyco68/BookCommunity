@@ -1,0 +1,241 @@
+{
+    "ui_map": {
+        "pages": [
+            "LoginPage",
+            "AuthCallbackPage",
+            "CategoriesRoutePage",
+            "NotFoundPage",
+            "ProfileEditPage",
+            "SearchSectionPage",
+            "SectionsAndDetailsPage",
+            "SessionDetailPage"
+        ],
+        "components": [
+            "AuthView",
+            "Avatar",
+            "ConfirmModal",
+            "DashboardHeader",
+            "ErrorBoundary",
+            "HorizontalSessionCarousel",
+            "JoinSessionModal",
+            "NotificationBell",
+            "NotificationDropdown",
+            "NotificationItem",
+            "SessionCard",
+            "SessionDetailPanel",
+            "SessionListPanel",
+            "Spinner"
+        ],
+        "interactive_elements": [
+            "auth-switch-option",
+            "mobile-menu-toggle",
+            "notif-bell-btn",
+            "session-card-clickable",
+            "sidebar-create-btn",
+            "sidebar-link",
+            "top-nav-brand",
+            "carousel-item"
+        ],
+        "stateful_components": [
+            "App",
+            "AuthenticatedApp",
+            "DashboardHeader",
+            "HorizontalSessionCarousel",
+            "NotificationBell",
+            "NotificationDropdown"
+        ]
+    },
+    "interaction_map": [
+        {
+            "element": "notif-bell-btn",
+            "interaction": "click",
+            "trigger": "User taps bell to view notifications",
+            "current_feedback": "Instant dropdown render",
+            "missing_feedback": true
+        },
+        {
+            "element": "session-card-clickable",
+            "interaction": "press / hover",
+            "trigger": "User interacts with reading session card",
+            "current_feedback": "None / Basic CSS pointer cursor",
+            "missing_feedback": true
+        },
+        {
+            "element": "horizontal-carousel-wrapper",
+            "interaction": "drag",
+            "trigger": "User swipes feed horizontally",
+            "current_feedback": "Native scroll snapping with manual mouse drag mapping",
+            "missing_feedback": true
+        },
+        {
+            "element": "auth-switch-option",
+            "interaction": "click",
+            "trigger": "Language switch",
+            "current_feedback": "Instant color and class change",
+            "missing_feedback": true
+        },
+        {
+            "element": "mobile-menu-toggle",
+            "interaction": "click",
+            "trigger": "Opens mobile navigation",
+            "current_feedback": "DOM class toggle with CSS transition overlay",
+            "missing_feedback": false
+        }
+    ],
+    "animation_opportunities": [
+        {
+            "component": "NotificationBell",
+            "location": "DashboardHeader",
+            "animation_type": "micro-interaction",
+            "description": "Badge scales from 0 to 1 with spring physics when new notification arrives. Bell icon wiggles on unread increment.",
+            "trigger": "Real-time state update from Supabase via useNotificationRealtime",
+            "duration_ms": "300",
+            "easing": "spring(damping: 12, stiffness: 200)",
+            "priority": "high",
+            "reasoning": "Draws user attention to social interactions without being overly intrusive."
+        },
+        {
+            "component": "NotificationDropdown",
+            "location": "NotificationBell",
+            "animation_type": "transition",
+            "description": "Slide down and fade in from top-right origin.",
+            "trigger": "User clicks bell",
+            "duration_ms": "200",
+            "easing": "cubic-bezier(0.16, 1, 0.3, 1)",
+            "priority": "medium",
+            "reasoning": "Softens the UI entry, making it feel native and premium rather than abrupt."
+        },
+        {
+            "component": "SessionCard",
+            "location": "Feed / SectionsListPanel",
+            "animation_type": "micro-interaction",
+            "description": "Scale down to 0.97 on press (Active state), lift up and slight shadow on hover.",
+            "trigger": "Mouse hover / Touch start",
+            "duration_ms": "150",
+            "easing": "ease-out",
+            "priority": "high",
+            "reasoning": "Provides tactile feedback that the card is interactable, vital for primary navigation elements."
+        },
+        {
+            "component": "JoinSessionModal",
+            "location": "SessionCard actions",
+            "animation_type": "transition",
+            "description": "Modal backdrop fade in, content scale-up from 0.95 to 1.0.",
+            "trigger": "Click 'Join Session' / 'Request to Join'",
+            "duration_ms": "250",
+            "easing": "cubic-bezier(0.16, 1, 0.3, 1)",
+            "priority": "high",
+            "reasoning": "Creates focus on the joining decision, preventing jarring pop-ins."
+        },
+        {
+            "component": "AuthView",
+            "location": "App Route Transitions",
+            "animation_type": "transition",
+            "description": "Crossfade between Login and AuthenticatedApp loading states.",
+            "trigger": "Auth state resolution",
+            "duration_ms": "400",
+            "easing": "ease-in-out",
+            "priority": "medium",
+            "reasoning": "Currently auth state drops the loading spinner instantly, causing a harsh flash before the dashboard renders."
+        }
+    ],
+    "motion_system": {
+        "style": "premium",
+        "timing_scale": {
+            "fast": "150ms",
+            "normal": "250ms",
+            "slow": "400ms"
+        },
+        "easing_curves": [
+            "standard: cubic-bezier(0.4, 0.0, 0.2, 1)",
+            "decelerate: cubic-bezier(0.0, 0.0, 0.2, 1)",
+            "accelerate: cubic-bezier(0.4, 0.0, 1, 1)",
+            "spring: spring(damping: 20, stiffness: 300)"
+        ],
+        "guidelines": [
+            "Always provide immediate interaction feedback on touch/click.",
+            "Use spring physics for scale/position micro-interactions to mimic physical mass.",
+            "Entrance transitions should decelerate; exits should accelerate.",
+            "Stagger list items appearing (e.g., horizontal feed sessions) by 30-50ms."
+        ]
+    },
+    "sound_opportunities": [
+        {
+            "event": "COMMENT_LIKED",
+            "component": "SessionDetailPanel (Comments)",
+            "sound_type": "Feedback",
+            "description": "Subtle organic 'pop' or light tap sound.",
+            "priority": "medium",
+            "intrusiveness": "low",
+            "reasoning": "Enhances satisfaction of social engagement."
+        },
+        {
+            "event": "SESSION_JOIN_APPROVED",
+            "component": "Notifications / Global",
+            "sound_type": "System",
+            "description": "Soft melodic chime (success).",
+            "priority": "high",
+            "intrusiveness": "medium",
+            "reasoning": "Alerts the user they can now access a gated reading session."
+        },
+        {
+            "event": "CHAPTER_UPDATED",
+            "component": "Notifications",
+            "sound_type": "System",
+            "description": "Page turn or subtle paper rustle.",
+            "priority": "medium",
+            "intrusiveness": "low",
+            "reasoning": "Thematic sound that fits the BookCom brand when new reading material drops."
+        }
+    ],
+    "ux_gaps": [
+        {
+            "issue": "Abrupt Notification Dropdown",
+            "location": "DashboardHeader > NotificationBell",
+            "impact": "Reduces perceived UI quality during common interactions",
+            "suggested_motion_or_sound": "Add entrance animation with transform-origin top right."
+        },
+        {
+            "issue": "Missing Loading Skeletons",
+            "location": "SessionListPanel / AuthenticatedApp",
+            "impact": "Layout shifting when fetching sessions from Supabase",
+            "suggested_motion_or_sound": "Implement shimmering skeletons instead of blank space or simple spinners."
+        },
+        {
+            "issue": "Language Switcher lacks context",
+            "location": "DashboardHeader",
+            "impact": "Hard to tell visually which state was active before clicking",
+            "suggested_motion_or_sound": "Add a sliding background pill that translates to the active language index."
+        }
+    ],
+    "performance_risks": [
+        {
+            "component": "HorizontalSessionCarousel",
+            "risk": "Scroll jank on low-end devices",
+            "reason": "Mouse drag event listener updates scrollLeft rapidly, potentially causing layout thrashing if item renders are expensive.",
+            "recommended_constraint": "Use CSS scroll-snap strictly for touch, and consider pointer-events: none on children while 'carousel-active' is present to avoid paint invalidations."
+        },
+        {
+            "component": "NotificationRealtime",
+            "risk": "Frequent React re-renders",
+            "reason": "Global state update on every Supabase insert event could re-render large application branches.",
+            "recommended_constraint": "Throttle/batch incoming realtime updates before updating the store, and memoize NotificationItem aggressively."
+        }
+    ],
+    "execution_priority": {
+        "high_impact_low_cost": [
+            "SessionCard hover/press scale animations",
+            "NotificationDropdown slide/fade entrance",
+            "NotificationBell badge spring pop"
+        ],
+        "high_impact_high_cost": [
+            "Route transition crossfades (Auth -> Dashboard -> Session Detail)",
+            "Sound design implementation with user preference toggles",
+            "List item staggering in SessionListPanel"
+        ],
+        "low_impact": [
+            "Language switcher sliding pill",
+            "Custom drag physics for HorizontalSessionCarousel (native CSS is usually fine)"
+        ]
+    }
+}

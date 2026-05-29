@@ -6,6 +6,8 @@ import { APP_PATHS } from '../router/paths'
 import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import { NotificationBell } from './Notifications/NotificationBell'
+import { useMotion } from '../hooks/useMotion'
+import { useSlidingPill } from '../hooks/useSlidingPill'
 
 type Copy = (typeof translations)[Language]
 
@@ -34,6 +36,9 @@ export function DashboardHeader({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const closeMobileMenu = () => setMobileMenuOpen(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const canAnimate = useMotion()
+  const { containerRef: navRef, pillStyle: navPill } = useSlidingPill<HTMLDivElement>('.sidebar-link.active', [language])
+  const { containerRef: langRef, pillStyle: langPill } = useSlidingPill<HTMLDivElement>('.auth-switch-option-active', [language])
 
   const getNotifLabel = (type: string, actor: string, session: string): string => {
     const n = t.notifications
@@ -56,7 +61,8 @@ export function DashboardHeader({
             </Link>
           </div>
 
-          <nav className="top-nav-links flex-1 justify-center" aria-label="Main navigation">
+          <nav className={`top-nav-links flex-1 justify-center ${canAnimate ? 'animated-pill-container' : ''}`} aria-label="Main navigation" ref={navRef}>
+            {canAnimate && <div className="animated-pill" style={navPill} />}
             <NavLink to={APP_PATHS.home} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}>
               {t.nav.home}
             </NavLink>
@@ -83,7 +89,8 @@ export function DashboardHeader({
                 <p style={{ margin: 0, fontWeight: 540, fontSize: '0.9rem' }}>{myDisplayName}</p>
               </div>
             </Link>
-            <div className="auth-switch top-nav-language" role="tablist" aria-label={t.language.switchLabel}>
+            <div className={`auth-switch top-nav-language ${canAnimate ? 'animated-pill-container' : ''}`} role="tablist" aria-label={t.language.switchLabel} ref={langRef}>
+              {canAnimate && <div className="animated-pill" style={{ ...langPill, borderRadius: 'var(--radius-xs)' }} />}
               <button
                 type="button"
                 className={`auth-switch-option ${language === 'en' ? 'auth-switch-option-active' : ''}`}
@@ -160,24 +167,41 @@ export function DashboardHeader({
             <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="sm" />
             <span style={{ fontWeight: 460 }}>{myDisplayName}</span>
           </div>
-          <div className="auth-switch" role="tablist" aria-label={t.language.switchLabel}>
+          <div className="auth-switch" role="tablist" aria-label={t.language.switchLabel} style={{ position: 'relative', zIndex: 0 }}>
+              {canAnimate && (
+                <div style={{
+                  position: 'absolute',
+                  top: '3px',
+                  bottom: '3px',
+                  left: '3px',
+                  width: 'calc(33.33% - 2px)',
+                  backgroundColor: 'var(--electric-blue)',
+                  borderRadius: 'var(--radius-xs)',
+                  transform: `translateX(${['en', 'de', 'my'].indexOf(language) * 100}%)`,
+                  transition: 'transform var(--timing-normal) var(--easing-spring)',
+                  zIndex: -1
+                }} />
+              )}
             <button
               type="button"
-              className={`auth-switch-option ${language === 'en' ? 'auth-switch-option-active' : ''}`}
+              className={`auth-switch-option ${language === 'en' ? (canAnimate ? '' : 'auth-switch-option-active') : ''}`}
+              style={canAnimate && language === 'en' ? { color: '#fff' } : {}}
               onClick={() => onLanguageChange('en')}
             >
               EN
             </button>
             <button
               type="button"
-              className={`auth-switch-option ${language === 'de' ? 'auth-switch-option-active' : ''}`}
+              className={`auth-switch-option ${language === 'de' ? (canAnimate ? '' : 'auth-switch-option-active') : ''}`}
+              style={canAnimate && language === 'de' ? { color: '#fff' } : {}}
               onClick={() => onLanguageChange('de')}
             >
               DE
             </button>
             <button
               type="button"
-              className={`auth-switch-option ${language === 'my' ? 'auth-switch-option-active' : ''}`}
+              className={`auth-switch-option ${language === 'my' ? (canAnimate ? '' : 'auth-switch-option-active') : ''}`}
+              style={canAnimate && language === 'my' ? { color: '#fff' } : {}}
               onClick={() => onLanguageChange('my')}
             >
               MY

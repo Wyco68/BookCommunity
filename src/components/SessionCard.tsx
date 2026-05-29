@@ -17,6 +17,8 @@ export interface SessionCardProps {
   busy?: boolean
   onClick: () => void
   onJoinClick?: () => void
+  className?: string
+  style?: React.CSSProperties
 }
 
 export function SessionCard({
@@ -31,6 +33,8 @@ export function SessionCard({
   busy = false,
   onClick,
   onJoinClick,
+  className = '',
+  style,
 }: SessionCardProps) {
   const isOwner = membership?.role === 'owner'
   const isMember = Boolean(membership)
@@ -38,7 +42,8 @@ export function SessionCard({
 
   return (
     <li
-      className="session-item session-card session-card-fixed session-card-clickable"
+      className={`session-item session-card session-card-fixed session-card-clickable ${className}`}
+      style={style}
       onClick={(e) => {
         if ((e.target as HTMLElement).closest('button, input, select, textarea, a')) return
         onClick()

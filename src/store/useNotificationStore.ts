@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabase'
 import type { Notification } from '../types'
+import { soundManager } from '../lib/soundManager'
 
 const PAGE_SIZE = 20
 
@@ -153,6 +154,13 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   addRealtimeNotification: (notification: Notification) => {
     set((state) => {
       if (state.notifications.some((n) => n.id === notification.id)) return state;
+
+      if (notification.type === 'SESSION_JOINED' || notification.type === 'JOIN_REQUESTED') {
+        soundManager.play('success');
+      } else if (notification.type === 'CHAPTER_UPDATED') {
+        soundManager.play('notification');
+      }
+
       return {
         notifications: [notification, ...state.notifications],
         unreadCount: notification.is_read ? state.unreadCount : state.unreadCount + 1,

@@ -1,11 +1,11 @@
 import { memo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Spinner } from './Spinner'
 import { JoinSessionModal } from './JoinSessionModal'
 import { SessionCard } from './SessionCard'
 import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import type { ReadingSession, SessionCardMediaPreview, SessionJoinRequest, SessionMembership } from '../types'
+import { useMotion } from '../hooks/useMotion'
 
 type Copy = (typeof translations)[Language]
 
@@ -60,6 +60,7 @@ export const SessionListPanel = memo(function SessionListPanel({
   onLoadMore,
 }: SessionListPanelProps) {
   const navigate = useNavigate()
+  const canAnimate = useMotion()
   const [joinTarget, setJoinTarget] = useState<ReadingSession | null>(null)
 
   const handleConfirmJoin = useCallback(async () => {
@@ -98,14 +99,16 @@ export const SessionListPanel = memo(function SessionListPanel({
 
       {screenError ? <p className="error">{screenError}</p> : null}
       {loadingSessions ? (
-        <div style={{ minHeight: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Spinner size="sm" showLabel label={t.sessions.loading} />
-        </div>
+        <ul className="session-list session-grid">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <li key={i} className="session-item session-card session-card-fixed skeleton-shimmer" style={{ height: '240px' }} />
+          ))}
+        </ul>
       ) : null}
       {!loadingSessions && filteredSessions.length === 0 ? <p className="subtle">{t.sessions.noResults}</p> : null}
 
       <ul className="session-list session-grid">
-        {filteredSessions.map((session) => {
+        {filteredSessions.map((session, index) => {
           const membership = memberships[session.id]
           const requestStatus = myJoinRequestStatus[session.id]
           const categories = sessionCategoryNames[session.id] ?? []
@@ -117,6 +120,8 @@ export const SessionListPanel = memo(function SessionListPanel({
           return (
             <SessionCard
               key={session.id}
+              className={canAnimate ? 'animate-fade-in' : ''}
+              style={canAnimate ? { animationDelay: `${index * 50}ms`, opacity: 0 } : undefined}
               t={t}
               session={session}
               membership={membership}

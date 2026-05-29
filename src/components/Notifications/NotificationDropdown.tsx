@@ -1,5 +1,6 @@
 import { useNotificationStore } from '../../store/useNotificationStore'
 import { NotificationItem } from './NotificationItem'
+import { useMotion } from '../../hooks/useMotion'
 
 interface NotificationDropdownProps {
   userId: string
@@ -15,6 +16,7 @@ export function NotificationDropdown({
   tNotifications,
   getLabel,
 }: NotificationDropdownProps) {
+  const canAnimate = useMotion()
   const notifications = useNotificationStore(state => state.notifications)
   const unreadCount = useNotificationStore(state => state.unreadCount)
   const loading = useNotificationStore(state => state.loading)
@@ -35,7 +37,7 @@ export function NotificationDropdown({
   return (
     <div
       id="notification-dropdown"
-      className="notif-dropdown"
+      className={`notif-dropdown ${canAnimate ? 'animate-dropdown' : ''}`}
       role="dialog"
       aria-label={tNotifications.panelAriaLabel}
     >

@@ -9,6 +9,9 @@ import { validatePassword } from '../../lib/validation'
 import { getUsernameChangeStatus } from '../../lib/usernameCooldown'
 import { SessionListPanel, type SessionListPanelProps } from '../SessionListPanel'
 import { useNotificationPreferences } from '../../hooks/useNotificationPreferences'
+import { useSettingsStore } from '../../store/useSettingsStore'
+import { useMotion } from '../../hooks/useMotion'
+import { useSlidingPill } from '../../hooks/useSlidingPill'
 import './ProfileEdit.css'
 
 type Copy = (typeof translations)[Language]
@@ -77,6 +80,13 @@ export function ProfileEdit({
 }: ProfileEditProps) {
   const [activeTab, setActiveTab] = useState<'profile' | 'settings'>('profile')
   const [usernameFocused, setUsernameFocused] = useState(false)
+  const canAnimate = useMotion()
+  const { containerRef: tabRef, pillStyle: tabPill } = useSlidingPill<HTMLDivElement>('.active')
+  
+  const motionEnabled = useSettingsStore(state => state.motionEnabled)
+  const setMotionEnabled = useSettingsStore(state => state.setMotionEnabled)
+  const soundEnabled = useSettingsStore(state => state.soundEnabled)
+  const setSoundEnabled = useSettingsStore(state => state.setSoundEnabled)
   const [passwordFocused, setPasswordFocused] = useState(false)
 
   const [oldPassword, setOldPassword] = useState('')
@@ -194,7 +204,8 @@ export function ProfileEdit({
   return (
     <div className="profile-page-container">
       <div className="profile-tab-wrapper">
-        <div className="profile-tab-switch" role="tablist">
+        <div className={`profile-tab-switch ${canAnimate ? 'animated-pill-container' : ''}`} role="tablist" ref={tabRef}>
+          {canAnimate && <div className="animated-pill" style={{ ...tabPill, borderRadius: 'var(--radius-full)' }} />}
           <button
             type="button"
             className={`profile-tab-btn ${activeTab === 'profile' ? 'active' : ''}`}
@@ -362,6 +373,42 @@ export function ProfileEdit({
               
               {passwordNotice && <p className="msg-success">{passwordNotice}</p>}
               {passwordError && <p className="msg-error">{passwordError}</p>}
+            </div>
+
+            <div className="settings-section-divider">
+              <h3 className="settings-group-title">App Experience</h3>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div className="notif-pref-row">
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span className="notif-pref-label">Enable Motion</span>
+                    <span className="notif-pref-sublabel" style={{ opacity: 0.7 }}>Allow UI animations and transitions</span>
+                  </div>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={motionEnabled}
+                      onChange={(e) => setMotionEnabled(e.target.checked)}
+                    />
+                    <span className="toggle-track" />
+                  </label>
+                </div>
+
+                <div className="notif-pref-row">
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span className="notif-pref-label">Enable Sound</span>
+                    <span className="notif-pref-sublabel" style={{ opacity: 0.7 }}>Allow subtle feedback sounds</span>
+                  </div>
+                  <label className="toggle-switch">
+                    <input
+                      type="checkbox"
+                      checked={soundEnabled}
+                      onChange={(e) => setSoundEnabled(e.target.checked)}
+                    />
+                    <span className="toggle-track" />
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div className="settings-section-divider">

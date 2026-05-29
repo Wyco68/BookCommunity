@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react'
 import { Bell } from 'lucide-react'
 import { useNotificationStore } from '../../store/useNotificationStore'
 import { NotificationDropdown } from './NotificationDropdown'
+import { useMotion } from '../../hooks/useMotion'
+import { useState } from 'react'
 
 interface NotificationBellProps {
   userId: string
@@ -23,6 +25,18 @@ export function NotificationBell({
 }: NotificationBellProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const unreadCount = useNotificationStore(state => state.unreadCount)
+  const canAnimate = useMotion()
+  const [wiggle, setWiggle] = useState(false)
+  const prevCount = useRef(unreadCount)
+
+  useEffect(() => {
+    if (unreadCount > prevCount.current && canAnimate) {
+      setWiggle(true)
+      const t = setTimeout(() => setWiggle(false), 300)
+      return () => clearTimeout(t)
+    }
+    prevCount.current = unreadCount
+  }, [unreadCount, canAnimate])
 
   // Close on outside click
   useEffect(() => {
@@ -57,9 +71,13 @@ export function NotificationBell({
         aria-expanded={open}
         aria-haspopup="true"
       >
-        <Bell size={20} />
+        <Bell size={20} style={wiggle ? { animation: 'wiggle 300ms var(--easing-spring)' } : undefined} />
         {unreadCount > 0 && (
-          <span className="notif-badge" aria-hidden="true">
+          <span 
+            className="notif-badge" 
+            aria-hidden="true" 
+            style={canAnimate ? { animation: 'badgeScale var(--timing-fast) var(--easing-spring)' } : undefined}
+          >
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}

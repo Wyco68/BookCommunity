@@ -19,6 +19,8 @@ import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import type { Comment, ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
 import { ArrowLeft } from 'lucide-react'
+import { useMotion } from '../hooks/useMotion'
+import { useSlidingPill } from '../hooks/useSlidingPill'
 
 const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
@@ -67,6 +69,9 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   const [joiningSession, setJoiningSession] = useState(false)
   const [joinError, setJoinError] = useState<string | null>(null)
   const [myJoinRequestStatus, setMyJoinRequestStatus] = useState<SessionJoinRequest['status'] | null>(null)
+  
+  const canAnimate = useMotion()
+  const { containerRef: tabRef, pillStyle: tabPill } = useSlidingPill<HTMLDivElement>('.auth-switch-option-active')
 
   const detail = useSessionDetail()
   const sessionMedia = useMediaUpload({
@@ -605,7 +610,8 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
           <button type="button" className="btn-back-compact" onClick={() => navigate(-1)} style={{ display: 'flex', alignItems: 'center' }}>
             <ArrowLeft size={16} style={{ marginRight: '0.25rem' }} /> {t.common.back}
           </button>
-          <div className="auth-switch detail-tab-switch" role="tablist" aria-label="Session tabs">
+          <div className={`auth-switch detail-tab-switch ${canAnimate ? 'animated-pill-container' : ''}`} role="tablist" aria-label="Session tabs" ref={tabRef}>
+            {canAnimate && <div className="animated-pill" style={{ ...tabPill, borderRadius: 'var(--radius-xs)' }} />}
             {tabs.map((tab) => (
               <button
                 key={tab.key}

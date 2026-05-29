@@ -9,6 +9,8 @@ import type { Language } from '../../i18n'
 import type { ReadingSession, SessionJoinRequest, SessionMembership } from '../../types'
 import { SessionCard } from '../SessionCard'
 import { JoinSessionModal } from '../JoinSessionModal'
+import { useMotion } from '../../hooks/useMotion'
+import { useSlidingPill } from '../../hooks/useSlidingPill'
 
 const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
@@ -46,6 +48,9 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
   const sessionsRequestIdRef = useRef(0)
   const autoSelectedRef = useRef(false)
   const cursorRef = useRef<{ created_at: string; id: string } | null>(null)
+  
+  const canAnimate = useMotion()
+  const { containerRef: tabRef, pillStyle: tabPill } = useSlidingPill<HTMLDivElement>('.category-tab-active')
 
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId) ?? null
 
@@ -302,7 +307,8 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
         ) : null}
 
         {categories.length > 0 ? (
-          <div className="category-tab-bar page-tight-tabs" role="tablist" aria-label={t.categories.categoryFilter}>
+          <div className={`category-tab-bar page-tight-tabs ${canAnimate ? 'animated-pill-container' : ''}`} role="tablist" aria-label={t.categories.categoryFilter} ref={tabRef}>
+            {canAnimate && <div className="animated-pill" style={{ ...tabPill, borderRadius: 'var(--radius-full)' }} />}
             {categories.map((cat) => (
               <button
                 key={cat.id}

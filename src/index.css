@@ -60,6 +60,136 @@
 
   /* Motion — DESIGN.md: 0.33s for all interactive states */
   --transition: 0.33s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* New Motion System (animation-audit.json) */
+  --timing-fast: 150ms;
+  --timing-normal: 250ms;
+  --timing-slow: 400ms;
+
+  --easing-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+  --easing-decelerate: cubic-bezier(0.0, 0.0, 0.2, 1);
+  --easing-accelerate: cubic-bezier(0.4, 0.0, 1, 1);
+  --easing-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275); /* CSS approximation of spring */
+}
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition: 0ms !important;
+    --timing-fast: 0ms !important;
+    --timing-normal: 0ms !important;
+    --timing-slow: 0ms !important;
+  }
+  * {
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Motion Utilities */
+.animate-fade-in {
+  animation: fadeIn var(--timing-normal) var(--easing-standard) forwards;
+}
+
+.animate-slide-down {
+  animation: slideDown var(--timing-normal) var(--easing-decelerate) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideDownFade {
+  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.animate-dropdown {
+  transform-origin: top right;
+  animation: slideDownFade var(--timing-normal) var(--easing-spring) forwards;
+}
+
+/* Sliding Pill Animation Classes */
+.animated-pill-container {
+  position: relative;
+}
+
+.animated-pill {
+  position: absolute;
+  background-color: var(--brand-soft);
+  border-radius: var(--radius-sm);
+  transition: left var(--timing-normal) var(--easing-spring),
+              top var(--timing-normal) var(--easing-spring),
+              width var(--timing-normal) var(--easing-spring),
+              height var(--timing-normal) var(--easing-spring),
+              opacity 0.2s ease;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Ensure all buttons stay on top of the pill */
+.animated-pill-container > button,
+.animated-pill-container > a,
+.animated-pill-container .auth-switch-option,
+.animated-pill-container .category-tab,
+.animated-pill-container .profile-tab-btn,
+.animated-pill-container .sidebar-link {
+  position: relative;
+  z-index: 1;
+}
+
+/* Active state: go transparent so the soft pill shows through.
+   Text is electric blue to contrast with the soft pill. */
+.animated-pill-container .auth-switch-option-active,
+.animated-pill-container .category-tab-active,
+.animated-pill-container .profile-tab-btn.active,
+.animated-pill-container .sidebar-link.active {
+  background: transparent !important;
+  color: var(--electric-blue) !important;
+  transition: color 0.15s ease;
+}
+
+.animated-pill-container .sidebar-link.active::after {
+  display: none !important;
+}
+
+@keyframes scaleUpFade {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-scale-up {
+  animation: scaleUpFade var(--timing-normal) var(--easing-spring) forwards;
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-15deg); }
+  75% { transform: rotate(15deg); }
+}
+
+@keyframes badgeScale {
+  0% { transform: scale(0); }
+  100% { transform: scale(1); }
+}
+
+@keyframes skeletonShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--surface-raised) 25%, var(--border) 50%, var(--surface-raised) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.5s infinite linear;
 }
 
 [data-theme='light'] {
@@ -760,6 +890,9 @@ select option { background: var(--surface); color: var(--text-primary); }
   border-color: var(--electric-blue);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+.session-card-clickable:active {
+  transform: scale(0.97);
 }
 
 .session-categories {

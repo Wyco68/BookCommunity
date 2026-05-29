@@ -55,12 +55,16 @@ export function HorizontalSessionCarousel({
       isDown = false
       el.classList.remove('carousel-active')
     }
+    let animationFrameId: number
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDown) return
       e.preventDefault()
       const x = e.pageX - el.offsetLeft
       const walk = (x - startX) * 2
-      el.scrollLeft = scrollLeft - walk
+      if (animationFrameId) cancelAnimationFrame(animationFrameId)
+      animationFrameId = requestAnimationFrame(() => {
+        el.scrollLeft = scrollLeft - walk
+      })
     }
 
     el.addEventListener('mousedown', handleMouseDown)
@@ -127,6 +131,9 @@ export function HorizontalSessionCarousel({
         .horizontal-carousel.carousel-active {
           scroll-snap-type: none;
           cursor: grabbing;
+        }
+        .horizontal-carousel.carousel-active * {
+          pointer-events: none;
         }
         .carousel-item {
           flex: 0 0 calc(100vw - var(--space-8));
