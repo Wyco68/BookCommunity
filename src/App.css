@@ -142,7 +142,8 @@
 
 @media (max-width: 1024px) {
   .top-nav-profile,
-  .top-nav-language {
+  .top-nav-language,
+  .top-nav-create-btn {
     display: none !important;
   }
 }

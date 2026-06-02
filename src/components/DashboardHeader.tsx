@@ -75,6 +75,15 @@ export function DashboardHeader({
           </nav>
 
           <div className="top-nav-actions flex-1 justify-end">
+            {onCreateClick ? (
+              <button
+                type="button"
+                className="sidebar-create-btn top-nav-create-btn"
+                onClick={onCreateClick}
+              >
+                {t.nav.createSession}
+              </button>
+            ) : null}
             <NotificationBell
               userId={userId ?? ''}
               open={notifOpen}
