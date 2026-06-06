@@ -619,6 +619,24 @@
     overflow-x: clip;
   }
 
+  .auth-shell {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .auth-premium-layout {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .auth-premium-hero {
+    min-height: auto;
+    gap: var(--space-3);
+  }
+
+  .auth-premium-highlights {
+    grid-template-columns: 1fr;
+  }
+
   .auth-card {
     margin: 3vh auto;
     padding: var(--space-5);
@@ -634,6 +652,16 @@
 
 /* ─── Tablet ≤1024 ──────────────────────────────────────────────── */
 @media (max-width: 1024px) {
+  .auth-premium-layout {
+    grid-template-columns: 1fr;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+
+  .auth-premium-hero {
+    min-height: auto;
+  }
+
   .mobile-menu-toggle {
     display: inline-flex !important;
     margin-left: 0;
