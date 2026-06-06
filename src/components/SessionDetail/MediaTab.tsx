@@ -117,10 +117,9 @@ export function MediaTab({
                   />
                 ) : activeChapterMedia.mime_type === 'application/pdf' ? (
                   <div className="chapter-viewer-pdf-wrap">
-                    <embed
+                    <iframe
                       className="chapter-viewer-pdf"
                       src={activeChapterUrl}
-                      type="application/pdf"
                       title={activeChapterMedia.file_name}
                     />
                     <a
