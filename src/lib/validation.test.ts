@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { validateEmail, validatePassword } from './validation'
+import { validateEmail, validatePassword, sniffMimeFromBytes } from './validation'
+
+describe('sniffMimeFromBytes', () => {
+  it('detects JPEG magic bytes', () => {
+    expect(sniffMimeFromBytes(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toBe('image/jpeg')
+  })
+
+  it('detects PNG magic bytes', () => {
+    expect(sniffMimeFromBytes(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))).toBe(
+      'image/png',
+    )
+  })
+
+  it('detects PDF magic bytes', () => {
+    expect(sniffMimeFromBytes(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]))).toBe('application/pdf')
+  })
+
+  it('returns null for unknown content', () => {
+    expect(sniffMimeFromBytes(new Uint8Array([0x00, 0x01, 0x02]))).toBeNull()
+  })
+})
 
 describe('validatePassword', () => {
   it('accepts a password with upper, lower, number, and symbol', () => {

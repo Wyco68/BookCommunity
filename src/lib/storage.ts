@@ -4,7 +4,7 @@ import type { MediaType } from '../types'
 export const SESSION_MEDIA_BUCKET = 'session-media'
 export const SESSION_COVERS_BUCKET = 'session-covers'
 export const PROFILE_AVATARS_BUCKET = 'profile-avatars'
-const SIGNED_URL_EXPIRY_SECONDS = 15 * 60
+const SIGNED_URL_EXPIRY_SECONDS = 5 * 60
 
 const AVATAR_MIME_TO_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -75,8 +75,9 @@ export async function uploadSessionMedia(
   userId: string,
   file: File,
   mediaType: MediaType,
+  contentType: string = file.type,
 ): Promise<{ path: string; error: string | null }> {
-  const extension = SESSION_MEDIA_MIME_TO_EXT[file.type] ?? 'bin'
+  const extension = SESSION_MEDIA_MIME_TO_EXT[contentType] ?? 'bin'
   const path = `${sessionId}/${userId}/${crypto.randomUUID()}.${extension}`
 
   let uploadFile = file
@@ -94,7 +95,7 @@ export async function uploadSessionMedia(
     .upload(path, uploadFile, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type,
+      contentType,
     })
 
   if (error) {

@@ -12,6 +12,7 @@ import {
   validateDescription,
   validateTotalChapters,
 } from '../../lib/validation'
+import { checkRateLimit, recordAction, SESSION_CREATE_RATE_LIMIT } from '../../lib/rateLimit'
 
 const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
@@ -93,6 +94,16 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
       if (coverFile.size > 10 * 1024 * 1024) { setError(t.sessionForm.coverImageTooLarge); return }
     }
 
+    const { data: userData } = await supabase.auth.getUser()
+    const userId = userData.user?.id
+    if (!userId) { setError(t.sessionForm.mustBeSignedIn); return }
+
+    const rateCheck = checkRateLimit(`session-create:${userId}`, SESSION_CREATE_RATE_LIMIT)
+    if (!rateCheck.allowed) {
+      setError(`Please wait ${Math.ceil(rateCheck.retryAfterMs / 1000)}s before creating another session`)
+      return
+    }
+
     setCreating(true)
 
     const { data: sessionData, error: sessionError } = await supabase.rpc(
@@ -116,9 +127,7 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
 
     const session = sessionData as ReadingSession
 
-    const { data: userData } = await supabase.auth.getUser()
-    const userId = userData.user?.id
-    if (!userId) { setError(t.sessionForm.mustBeSignedIn); setCreating(false); return }
+    recordAction(`session-create:${userId}`, SESSION_CREATE_RATE_LIMIT.windowMs)
 
     if (coverFile) {
       const ext = getAvatarExtension(coverFile)

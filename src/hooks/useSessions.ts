@@ -25,6 +25,7 @@ import {
   validateTotalChapters,
   validateVisibility,
 } from '../lib/validation'
+import { checkRateLimit, recordAction, JOIN_REQUEST_RATE_LIMIT } from '../lib/rateLimit'
 
 export interface SessionFormState {
   bookTitle: string
@@ -474,6 +475,12 @@ export function useSessions(): UseSessionsReturn {
     if (!targetSession) return
 
     if (targetSession.join_policy === 'request') {
+      const rateCheck = checkRateLimit(`join-request:${user.id}`, JOIN_REQUEST_RATE_LIMIT)
+      if (!rateCheck.allowed) {
+        setError(`Please wait ${Math.ceil(rateCheck.retryAfterMs / 1000)}s before sending another join request`)
+        return
+      }
+
       setBusySessionId(sessionId)
       const { error } = await supabase.from('session_join_requests').upsert(
         {
@@ -487,6 +494,7 @@ export function useSessions(): UseSessionsReturn {
       if (error) {
         setError(error.message)
       } else {
+        recordAction(`join-request:${user.id}`, JOIN_REQUEST_RATE_LIMIT.windowMs)
         notifyCreate({ type: 'JOIN_REQUESTED', sessionId, actorId: user.id })
         lastLoadedRef.current = 0
         void loadSessions(user)

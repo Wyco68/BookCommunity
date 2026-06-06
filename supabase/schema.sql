@@ -377,7 +377,7 @@ begin
 end;
 $$;
 
-create or replace function public.can_access_session(
+create or replace function public.can_discover_session(
   p_session_id uuid,
   p_user_id uuid
 )
@@ -398,6 +398,44 @@ begin
         or public.is_session_member(p_session_id, p_user_id)
       )
   );
+end;
+$$;
+
+create or replace function public.can_view_session_content(
+  p_session_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform set_config('row_security', 'off', true);
+  return exists (
+    select 1
+    from public.reading_sessions rs
+    where rs.id = p_session_id
+      and (
+        rs.creator_id = p_user_id
+        or public.is_session_member(p_session_id, p_user_id)
+      )
+  );
+end;
+$$;
+
+-- Backward-compatible alias for discover/listing access.
+create or replace function public.can_access_session(
+  p_session_id uuid,
+  p_user_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  return public.can_discover_session(p_session_id, p_user_id);
 end;
 $$;
 
@@ -449,6 +487,8 @@ begin
   if v_user_id is null then
     raise exception 'Not authenticated';
   end if;
+
+  perform public.enforce_rate_limit(v_user_id, 'session-create', 3, 60, 0);
 
   v_title := trim(p_book_title);
   v_author := trim(p_book_author);
@@ -703,6 +743,179 @@ before update on public.reading_sessions
 for each row
 execute function public.enforce_reading_sessions_total_chapters_floor();
 
+-- ── Server-side rate limiting ───────────────────────────────────────────────
+create table if not exists public.rate_limit_events (
+  id bigserial primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  action text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_rate_limit_events_user_action_created
+  on public.rate_limit_events (user_id, action, created_at desc);
+
+create or replace function public.enforce_rate_limit(
+  p_user_id uuid,
+  p_action text,
+  p_max_actions int,
+  p_window_seconds int,
+  p_cooldown_seconds int default 0
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_count int;
+  v_last timestamptz;
+  v_window_start timestamptz;
+begin
+  perform set_config('row_security', 'off', true);
+
+  if p_user_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  v_window_start := now() - make_interval(secs => p_window_seconds);
+
+  delete from public.rate_limit_events
+  where user_id = p_user_id
+    and action = p_action
+    and created_at < v_window_start;
+
+  if p_cooldown_seconds > 0 then
+    select max(created_at) into v_last
+    from public.rate_limit_events
+    where user_id = p_user_id
+      and action = p_action
+      and created_at >= v_window_start;
+
+    if v_last is not null and v_last + make_interval(secs => p_cooldown_seconds) > now() then
+      raise exception 'Rate limit exceeded: please wait % seconds before trying again',
+        ceil(extract(epoch from (v_last + make_interval(secs => p_cooldown_seconds) - now())));
+    end if;
+  end if;
+
+  select count(*) into v_count
+  from public.rate_limit_events
+  where user_id = p_user_id
+    and action = p_action
+    and created_at >= v_window_start;
+
+  if v_count >= p_max_actions then
+    raise exception 'Rate limit exceeded: too many requests, try again later';
+  end if;
+
+  insert into public.rate_limit_events (user_id, action) values (p_user_id, p_action);
+end;
+$$;
+
+create or replace function public.trg_rate_limit_comments()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.enforce_rate_limit(new.user_id, 'comment', 10, 60, 3);
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_rate_limit_comments on public.comments;
+create trigger trg_rate_limit_comments
+before insert on public.comments
+for each row
+execute function public.trg_rate_limit_comments();
+
+create or replace function public.trg_rate_limit_session_media()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.enforce_rate_limit(new.uploader_id, 'media-upload', 5, 60, 5);
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_rate_limit_session_media on public.session_media;
+create trigger trg_rate_limit_session_media
+before insert on public.session_media
+for each row
+execute function public.trg_rate_limit_session_media();
+
+create or replace function public.trg_rate_limit_join_requests()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  perform public.enforce_rate_limit(new.user_id, 'join-request', 10, 60, 0);
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_rate_limit_join_requests on public.session_join_requests;
+create trigger trg_rate_limit_join_requests
+before insert on public.session_join_requests
+for each row
+execute function public.trg_rate_limit_join_requests();
+
+create or replace function public.enforce_session_media_mime_consistency()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ext text;
+begin
+  perform set_config('row_security', 'off', true);
+
+  if new.media_type = 'image' and new.mime_type not in ('image/jpeg', 'image/png', 'image/webp') then
+    raise exception 'mime_type % is not allowed for media_type image', new.mime_type;
+  end if;
+
+  if new.media_type = 'book_file' and new.mime_type not in ('application/pdf', 'application/epub+zip') then
+    raise exception 'mime_type % is not allowed for media_type book_file', new.mime_type;
+  end if;
+
+  v_ext := lower(substring(new.file_path from '\.([^.]+)$'));
+
+  if new.mime_type = 'image/jpeg' and v_ext not in ('jpg', 'jpeg') then
+    raise exception 'file_path extension must match mime_type image/jpeg';
+  end if;
+
+  if new.mime_type = 'image/png' and v_ext <> 'png' then
+    raise exception 'file_path extension must match mime_type image/png';
+  end if;
+
+  if new.mime_type = 'image/webp' and v_ext <> 'webp' then
+    raise exception 'file_path extension must match mime_type image/webp';
+  end if;
+
+  if new.mime_type = 'application/pdf' and v_ext <> 'pdf' then
+    raise exception 'file_path extension must match mime_type application/pdf';
+  end if;
+
+  if new.mime_type = 'application/epub+zip' and v_ext <> 'epub' then
+    raise exception 'file_path extension must match mime_type application/epub+zip';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_enforce_session_media_mime_consistency on public.session_media;
+create trigger trg_enforce_session_media_mime_consistency
+before insert on public.session_media
+for each row
+execute function public.enforce_session_media_mime_consistency();
+
 -- Backfill profiles for auth users without a row (same allocator as handle_new_user)
 do $$
 declare
@@ -742,11 +955,20 @@ grant execute on function public.create_reading_session(text, text, int, text, t
 revoke all on function public.is_session_member(uuid, uuid) from public;
 grant execute on function public.is_session_member(uuid, uuid) to authenticated;
 
+revoke all on function public.can_discover_session(uuid, uuid) from public;
+grant execute on function public.can_discover_session(uuid, uuid) to authenticated;
+
+revoke all on function public.can_view_session_content(uuid, uuid) from public;
+grant execute on function public.can_view_session_content(uuid, uuid) to authenticated;
+
 revoke all on function public.can_access_session(uuid, uuid) from public;
 grant execute on function public.can_access_session(uuid, uuid) to authenticated;
 
 revoke all on function public.max_uploaded_chapter(uuid) from public;
 grant execute on function public.max_uploaded_chapter(uuid) to authenticated;
+
+revoke all on function public.enforce_rate_limit(uuid, text, int, int, int) from public;
+grant execute on function public.enforce_rate_limit(uuid, text, int, int, int) to authenticated;
 
 revoke all on function public.is_valid_username(text) from public;
 grant execute on function public.is_valid_username(text) to authenticated;
@@ -814,6 +1036,7 @@ alter table public.categories enable row level security;
 alter table public.session_media enable row level security;
 alter table public.notifications enable row level security;
 alter table public.user_notification_preferences enable row level security;
+alter table public.rate_limit_events enable row level security;
 
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select
@@ -880,7 +1103,7 @@ create policy session_members_select
 on public.session_members
 for select
 to authenticated
-using (public.can_access_session(session_id, auth.uid()));
+using (public.can_view_session_content(session_id, auth.uid()));
 
 drop policy if exists session_members_insert on public.session_members;
 create policy session_members_insert
@@ -945,7 +1168,7 @@ create policy comments_select
 on public.comments
 for select
 to authenticated
-using (public.can_access_session(session_id, auth.uid()));
+using (public.can_view_session_content(session_id, auth.uid()));
 
 drop policy if exists comments_insert on public.comments;
 create policy comments_insert
@@ -982,7 +1205,7 @@ using (
     select 1
     from public.comments c
     where c.id = comment_likes.comment_id
-      and public.can_access_session(c.session_id, auth.uid())
+      and public.can_view_session_content(c.session_id, auth.uid())
   )
 );
 
@@ -1050,6 +1273,14 @@ with check (user_id = auth.uid());
 
 revoke delete on public.user_notification_preferences from authenticated;
 revoke delete on public.user_notification_preferences from anon;
+
+drop policy if exists rate_limit_events_no_client on public.rate_limit_events;
+create policy rate_limit_events_no_client
+on public.rate_limit_events
+for all
+to authenticated
+using (false)
+with check (false);
 
 drop policy if exists session_join_requests_select on public.session_join_requests;
 create policy session_join_requests_select
@@ -1146,7 +1377,7 @@ create policy session_media_select
 on public.session_media
 for select
 to authenticated
-using (public.can_access_session(session_id, auth.uid()));
+using (public.can_view_session_content(session_id, auth.uid()));
 
 drop policy if exists session_media_insert on public.session_media;
 create policy session_media_insert
@@ -1202,7 +1433,7 @@ using (
     select 1
     from public.session_media sm
     where sm.file_path = name
-      and public.can_access_session(sm.session_id, auth.uid())
+      and public.can_view_session_content(sm.session_id, auth.uid())
   )
 );
 
@@ -1245,7 +1476,7 @@ to authenticated
 using (
   bucket_id = 'session-covers'
   and split_part(name, '/', 2) <> ''
-  and public.can_access_session(split_part(name, '/', 2)::uuid, auth.uid())
+  and public.can_discover_session(split_part(name, '/', 2)::uuid, auth.uid())
 );
 
 drop policy if exists storage_session_covers_insert on storage.objects;

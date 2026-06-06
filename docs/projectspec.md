@@ -21,7 +21,7 @@ BookCom is an authenticated social reading web app. Users create **reading sessi
 - Critical rules live in Postgres: constraints, triggers, RLS, and `security definer` helpers.
 - Never trust the client for authorization or chapter progression.
 - Protected media uses **private** buckets; clients use short-lived signed URLs only.
-- Session access is centralized in `public.can_access_session(session_id, user_id)`.
+- Session access is centralized in `public.can_discover_session` (listing) and `public.can_view_session_content` (member content).
 
 ---
 
@@ -107,12 +107,16 @@ Standard social/join flows; see `schema.sql` RLS section.
 |------|------|
 | `handle_new_user()` | After insert on `auth.users` → create `profiles` row |
 | `is_session_member(session_id, user_id)` | RLS helper; `security definer`, RLS off inside |
-| `can_access_session(session_id, user_id)` | Public session OR creator OR member |
+| `can_discover_session(session_id, user_id)` | Public session OR creator OR member (listing/covers) |
+| `can_view_session_content(session_id, user_id)` | Creator OR member (chapter media, comments, member list) |
+| `can_access_session(session_id, user_id)` | Alias of `can_discover_session` |
 | `max_uploaded_chapter(session_id)` | Max `session_media.chapter_number` for session |
 | `create_reading_session(...)` | Validated session create + owner membership |
 | `enforce_sequential_session_media()` | Before insert on `session_media` |
 | `enforce_progress_uploaded_limit()` | Before insert on `progress_updates` |
 | `enforce_session_media_file_path()` | Before insert/update on `session_media` |
+| `enforce_session_media_mime_consistency()` | Validates mime_type ↔ media_type ↔ file extension |
+| `enforce_rate_limit(...)` | Server-side rate limiting for inserts and RPCs |
 | `enforce_comments_immutable_session()` | `comments.session_id` immutable on update |
 | `enforce_reading_sessions_total_chapters_floor()` | Cannot lower `total_chapters` below uploaded/progress max |
 | `enforce_profiles_username()` | Required/format username; 30-day change cooldown |
@@ -130,15 +134,15 @@ All application tables have RLS enabled. Deny-by-default except where policies a
 |-------|--------|--------|--------|--------|
 | `profiles` | All authenticated | **Denied** | Own row | **Denied** |
 | `reading_sessions` | Public OR creator OR member | **Denied** (use RPC) | Creator | Creator |
-| `session_members` | `can_access_session` | Owner adds OR self-join if `join_policy = open` | — | Self or owner |
-| `session_media` | `can_access_session` | Creator only | — | Uploader or creator |
+| `session_members` | `can_view_session_content` | Owner adds OR self-join if `join_policy = open` | — | Self or owner |
+| `session_media` | `can_view_session_content` | Creator only | — | Uploader or creator |
 | `progress_updates` | Members | Member, own row, chapter ≤ max uploaded | — | — |
-| `comments` | `can_access_session` | Members | Own row | Own row |
+| `comments` | `can_view_session_content` | Members | Own row | Own row |
 | `comment_likes` | Via comment access | Members | — | Own row |
 | `session_join_requests` | Self or session creator | Self, `request` policy | Creator | Self |
 | `categories` | All authenticated | **Denied** | **Denied** | **Denied** |
 
-Storage buckets: `session-media`, `session-covers`, `profile-avatars` (private). Policies tie object paths to `can_access_session` or ownership. See `schema.sql` for full policy SQL.
+Storage buckets: `session-media`, `session-covers`, `profile-avatars` (private). Chapter media uses `can_view_session_content`; session covers use `can_discover_session`. See `schema.sql` for full policy SQL.
 
 ---
 
@@ -150,7 +154,7 @@ Storage buckets: `session-media`, `session-covers`, `profile-avatars` (private).
 | `session-covers` | Cover images | `{user_id}/{session_id}/cover.{ext}` |
 | `profile-avatars` | Avatars | `{user_id}/avatar.{ext}` |
 
-Signed URL expiry (client): 15 minutes.
+Signed URL expiry (client): 5 minutes.
 
 **Account deletion:** The Edge Function `delete-account` removes the user's objects from `profile-avatars`, `session-media` (uploads and media on sessions they created), and `session-covers` (paths on created sessions + `{user_id}/` folder), then deletes the auth user. Postgres `ON DELETE CASCADE` removes `profiles`, sessions they created, memberships, comments, likes, progress, and media rows. Clients must not delete DB rows or storage manually for account removal.
 
@@ -249,4 +253,4 @@ Defined in `schema.sql`, including:
 - One media file per chapter.
 - Categories cannot be created or edited by users.
 - Authenticated-only product (no guest browsing).
-- Client rate limits are in-memory (`rateLimit.ts`); not server-enforced yet.
+- Client rate limits (`rateLimit.ts`) provide UX feedback; server enforces via `enforce_rate_limit` triggers and `create_reading_session` RPC.

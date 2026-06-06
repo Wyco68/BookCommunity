@@ -82,11 +82,12 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   })
 
   // Stable refs for exhaustive-deps compliance
-  const { loadDetail, ensureProfile, appendComment } = detail
+  const { loadDetail, ensureProfile, appendComment, clearDetail } = detail
   const { loadMediaMeta } = sessionMedia
 
   const isMember = Boolean(membership)
   const isOwner = Boolean(session && session.creator_id === userId)
+  const canAccessSessionContent = !loadingSession && (isMember || isOwner)
 
   useEffect(() => {
     return () => {
@@ -141,12 +142,19 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
 
   useEffect(() => {
     if (!sessionId) return
+    if (!canAccessSessionContent) {
+      clearDetail()
+      setActiveChapterMedia(null)
+      setActiveChapterUrl(null)
+      setActiveChapter(1)
+      return
+    }
     void loadDetail(sessionId)
     void loadMediaMeta()
-  }, [sessionId, loadDetail, loadMediaMeta])
+  }, [sessionId, canAccessSessionContent, loadDetail, loadMediaMeta, clearDetail])
 
   useEffect(() => {
-    if (!userId || !sessionId) return
+    if (!userId || !sessionId || !canAccessSessionContent) return
 
     const channel = supabase
       .channel(`session-detail-${sessionId}`)
@@ -206,7 +214,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
 
     channel.subscribe()
     return () => { void supabase.removeChannel(channel) }
-  }, [userId, sessionId, loadDetail, ensureProfile, appendComment, loadMediaMeta])
+  }, [userId, sessionId, canAccessSessionContent, loadDetail, ensureProfile, appendComment, loadMediaMeta])
 
   const memberLatestProgress = useMemo(() => buildLatestChapterByUser(detail.progress), [detail.progress])
   const commentMeta = useMemo(() => buildCommentMeta(detail.likes, userId), [detail.likes, userId])
@@ -252,10 +260,10 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   )
 
   useEffect(() => {
-    if (!sessionId || sessionMedia.maxUploadedChapter < 1) return
+    if (!sessionId || !canAccessSessionContent || sessionMedia.maxUploadedChapter < 1) return
     setActiveChapter(1)
     void loadChapterMedia(1)
-  }, [sessionId, sessionMedia.maxUploadedChapter, loadChapterMedia])
+  }, [sessionId, canAccessSessionContent, sessionMedia.maxUploadedChapter, loadChapterMedia])
 
   const handleSubmitComment = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {

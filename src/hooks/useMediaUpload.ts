@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { notifyCreate } from '../lib/notifications'
 import { uploadSessionMedia, deleteSessionMedia } from '../lib/storage'
-import { validateMediaFile } from '../lib/validation'
+import { validateMediaFileAsync } from '../lib/validation'
 import { checkRateLimit, recordAction, MEDIA_UPLOAD_RATE_LIMIT } from '../lib/rateLimit'
 import type { MediaType } from '../types'
 
@@ -75,7 +75,7 @@ export function useMediaUpload({
         return false
       }
 
-      const fileValidation = validateMediaFile(file, mediaType)
+      const fileValidation = await validateMediaFileAsync(file, mediaType)
       if (!fileValidation.valid) {
         setError(fileValidation.error)
         return false
@@ -108,7 +108,13 @@ export function useMediaUpload({
         return false
       }
 
-      const { path, error: uploadError } = await uploadSessionMedia(sessionId, userId, file, mediaType)
+      const { path, error: uploadError } = await uploadSessionMedia(
+        sessionId,
+        userId,
+        file,
+        mediaType,
+        fileValidation.detectedMime ?? file.type,
+      )
       if (uploadError) {
         setError(uploadError)
         setUploading(false)
@@ -123,7 +129,7 @@ export function useMediaUpload({
         file_path: path,
         file_name: file.name,
         file_size_bytes: file.size,
-        mime_type: file.type,
+        mime_type: fileValidation.detectedMime ?? file.type,
         description: description?.trim() || null,
       })
 

@@ -123,6 +123,7 @@ export function MediaTab({
                     className="chapter-viewer-pdf"
                     src={activeChapterUrl}
                     title={activeChapterMedia.file_name}
+                    sandbox=""
                   />
                 ) : (
                   <div className="chapter-viewer-file">
