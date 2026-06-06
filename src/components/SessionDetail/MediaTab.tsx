@@ -2,7 +2,6 @@ import type { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import type { MediaType, ReadingSession } from '../../types'
 import { MediaUpload } from '../Media/MediaComponents'
-import { ArrowLeft, ArrowRight } from 'lucide-react'
 
 type Copy = (typeof translations)[Language]
 
@@ -89,9 +88,8 @@ export function MediaTab({
               className="secondary"
               disabled={!onPrevChapter || activeChapter <= 1 || loadingChapter}
               onClick={() => { void onPrevChapter?.() }}
-              style={{ display: 'flex', alignItems: 'center' }}
             >
-              <ArrowLeft size={16} style={{ marginRight: '0.25rem' }} /> {t.media.prev}
+              {t.media.prev}
             </button>
             <span className="chapter-viewer-label">
               {t.media.chapter(activeChapter)} <span className="subtle">/ {maxChapter}</span>
@@ -101,9 +99,8 @@ export function MediaTab({
               className="secondary"
               disabled={!onNextChapter || activeChapter >= maxChapter || loadingChapter}
               onClick={() => { void onNextChapter?.() }}
-              style={{ display: 'flex', alignItems: 'center' }}
             >
-              {t.media.next} <ArrowRight size={16} style={{ marginLeft: '0.25rem' }} />
+              {t.media.next}
             </button>
           </div>
 
@@ -119,12 +116,22 @@ export function MediaTab({
                     alt={activeChapterMedia.file_name}
                   />
                 ) : activeChapterMedia.mime_type === 'application/pdf' ? (
-                  <iframe
-                    className="chapter-viewer-pdf"
-                    src={activeChapterUrl}
-                    title={activeChapterMedia.file_name}
-                    sandbox=""
-                  />
+                  <div className="chapter-viewer-pdf-wrap">
+                    <embed
+                      className="chapter-viewer-pdf"
+                      src={activeChapterUrl}
+                      type="application/pdf"
+                      title={activeChapterMedia.file_name}
+                    />
+                    <a
+                      href={activeChapterUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="secondary chapter-viewer-pdf-fallback"
+                    >
+                      {t.media.openDownload}
+                    </a>
+                  </div>
                 ) : (
                   <div className="chapter-viewer-file">
                     <p className="muted">{activeChapterMedia.file_name}</p>

@@ -417,10 +417,25 @@
   display: block;
 }
 
-.chapter-viewer-body .chapter-viewer-pdf {
+.chapter-viewer-body .chapter-viewer-pdf-wrap {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.chapter-viewer-body .chapter-viewer-pdf {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
   border: none;
+}
+
+.chapter-viewer-body .chapter-viewer-pdf-fallback {
+  align-self: center;
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: 0.8125rem;
 }
 
 .chapter-viewer-body .chapter-viewer-loading,

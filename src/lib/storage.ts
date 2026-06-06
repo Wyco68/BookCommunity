@@ -105,6 +105,31 @@ export async function uploadSessionMedia(
   return { path, error: null }
 }
 
+/**
+ * Fetch signed storage content into a same-origin blob URL so privacy browsers
+ * (e.g. Brave Shields) do not block cross-origin iframe/embed loads.
+ */
+export async function fetchBlobUrlFromSignedUrl(
+  signedUrl: string,
+  mimeType: string,
+): Promise<{ url: string; revoke: () => void } | null> {
+  try {
+    const response = await fetch(signedUrl)
+    if (!response.ok) {
+      return null
+    }
+
+    const blob = await response.blob()
+    const typedBlob =
+      mimeType && blob.type !== mimeType ? new Blob([blob], { type: mimeType }) : blob
+    const url = URL.createObjectURL(typedBlob)
+
+    return { url, revoke: () => URL.revokeObjectURL(url) }
+  } catch {
+    return null
+  }
+}
+
 export async function getSignedMediaUrl(
   filePath: string,
   bucket: string = SESSION_MEDIA_BUCKET,

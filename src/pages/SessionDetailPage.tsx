@@ -6,6 +6,7 @@ import { notifyCreate } from '../lib/notifications'
 import {
   deleteSessionMediaForSession,
   deleteSessionCover,
+  fetchBlobUrlFromSignedUrl,
   getSignedMediaUrl,
 } from '../lib/storage'
 import { useSessionDetail } from '../hooks/useSessionDetail'
@@ -61,6 +62,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
   const [removeMemberConfirmId, setRemoveMemberConfirmId] = useState<string | null>(null)
   const settingsNoticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const chapterBlobRevokeRef = useRef<(() => void) | null>(null)
   const [savingSettings, setSavingSettings] = useState(false)
   const [settingsNotice, setSettingsNotice] = useState<string | null>(null)
   const [progressError, setProgressError] = useState<string | null>(null)
@@ -95,6 +97,8 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
         clearTimeout(settingsNoticeTimeoutRef.current)
         settingsNoticeTimeoutRef.current = null
       }
+      chapterBlobRevokeRef.current?.()
+      chapterBlobRevokeRef.current = null
     }
   }, [])
 
@@ -144,6 +148,8 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
     if (!sessionId) return
     if (!canAccessSessionContent) {
       clearDetail()
+      chapterBlobRevokeRef.current?.()
+      chapterBlobRevokeRef.current = null
       setActiveChapterMedia(null)
       setActiveChapterUrl(null)
       setActiveChapter(1)
@@ -231,6 +237,9 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
       if (!sessionId) return
       setLoadingChapter(true)
 
+      chapterBlobRevokeRef.current?.()
+      chapterBlobRevokeRef.current = null
+
       const { data } = await supabase
         .from('session_media')
         .select('file_name,mime_type,media_type,file_path')
@@ -248,12 +257,28 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
       }
 
       const signed = await getSignedMediaUrl(data.file_path)
+      if (!signed) {
+        setActiveChapterMedia(null)
+        setActiveChapterUrl(null)
+        setLoadingChapter(false)
+        return
+      }
+
+      let displayUrl = signed
+      if (data.mime_type === 'application/pdf') {
+        const blobResult = await fetchBlobUrlFromSignedUrl(signed, data.mime_type)
+        if (blobResult) {
+          displayUrl = blobResult.url
+          chapterBlobRevokeRef.current = blobResult.revoke
+        }
+      }
+
       setActiveChapterMedia({
         file_name: data.file_name,
         mime_type: data.mime_type,
         media_type: data.media_type,
       })
-      setActiveChapterUrl(signed)
+      setActiveChapterUrl(displayUrl)
       setLoadingChapter(false)
     },
     [sessionId],
