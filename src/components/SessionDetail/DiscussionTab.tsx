@@ -9,6 +9,7 @@ type Copy = (typeof translations)[Language]
 
 export interface DiscussionTabProps {
   t: Copy
+  language: Language
   isMember: boolean
 
   commentDraft: string
@@ -28,6 +29,7 @@ export interface DiscussionTabProps {
 
 export function DiscussionTab({
   t,
+  language,
   isMember,
   commentDraft,
   postingComment,
@@ -40,7 +42,7 @@ export function DiscussionTab({
 }: DiscussionTabProps) {
   if (!isMember) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', padding: '1rem' }}>
+      <div className="discussion-tab-empty">
         <p className="subtle">{t.sessions.joinToDiscuss}</p>
       </div>
     )
@@ -55,14 +57,14 @@ export function DiscussionTab({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: '1rem', borderBottom: '1px solid var(--border)', background: 'var(--surface)', flexShrink: 0 }}>
-        <h3 style={{ margin: 0, fontSize: '1.06rem' }}>{t.sessions.discussion}</h3>
+    <div className="discussion-tab">
+      <div className="discussion-tab-header">
+        <h3>{t.sessions.discussion}</h3>
       </div>
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div className="discussion-tab-thread">
         <CommentThread
           t={t}
-          language="en"
+          language={language}
           comments={sessionComments}
           profiles={sessionProfiles}
           commentMeta={Object.fromEntries(

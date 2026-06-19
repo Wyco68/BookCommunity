@@ -41,11 +41,8 @@ export function CommentThread({
   }, [comments.length])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div 
-        ref={scrollRef}
-        style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0' }}
-      >
+    <div className="comment-thread">
+      <div ref={scrollRef} className="comment-thread-scroll">
         {comments.length === 0 ? (
           <div className="empty">
             <p className="subtle">{t.sessions.noComments}</p>
@@ -71,21 +68,14 @@ export function CommentThread({
         )}
       </div>
       
-      <div style={{ padding: '1rem', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
-        <form onSubmit={onSubmit} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+      <div className="comment-composer">
+        <form onSubmit={onSubmit} className="comment-composer-form">
           <textarea
             value={draft}
             onChange={(e) => onDraftChange(e.target.value)}
             placeholder={t.sessions.commentPlaceholder}
             disabled={posting}
-            style={{ 
-              flex: 1, 
-              minHeight: '44px', 
-              maxHeight: '120px', 
-              resize: 'none', 
-              padding: '0.5rem 0.75rem', 
-              borderRadius: 'var(--radius-md)'
-            }}
+            className="comment-composer-input"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
@@ -94,11 +84,10 @@ export function CommentThread({
               }
             }}
           />
-          <button 
-            type="submit" 
-            className="primary" 
+          <button
+            type="submit"
+            className="primary comment-composer-submit"
             disabled={posting || !draft.trim()}
-            style={{ minHeight: '44px', borderRadius: 'var(--radius-md)' }}
           >
             {posting ? t.common.working : t.sessions.commentSubmit}
           </button>

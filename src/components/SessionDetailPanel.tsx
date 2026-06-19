@@ -23,6 +23,7 @@ export type SessionDetailTab = 'media' | 'manage' | 'discussion'
 
 export interface SessionDetailPanelProps {
   t: Copy
+  language: Language
   activeTab: SessionDetailTab
   selectedSession: ReadingSession | null
   selectedIsOwner: boolean
@@ -142,6 +143,7 @@ export const SessionDetailPanel = memo(function SessionDetailPanel(props: Sessio
       {activeTab === 'discussion' ? (
         <DiscussionTab
           t={t}
+          language={props.language}
           isMember={props.selectedIsMember}
           commentDraft={props.commentDraft}
           postingComment={props.postingComment}

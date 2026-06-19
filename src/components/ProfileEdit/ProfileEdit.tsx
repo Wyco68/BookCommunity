@@ -376,7 +376,7 @@ export function ProfileEdit({
             </div>
 
             <div className="settings-section-divider">
-              <h3 className="settings-group-title">App Experience</h3>
+              <h3 className="settings-group-title">{t.profile.appExperience}</h3>
               
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 <div className="notif-pref-row">
@@ -527,7 +527,7 @@ export function ProfileEdit({
             </div>
 
             <div className="danger-zone-divider">
-              <h3 className="settings-group-title danger">Danger Zone</h3>
+              <h3 className="settings-group-title danger">{t.profile.dangerZone}</h3>
               
               {!deleteConfirm ? (
                 <button

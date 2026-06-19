@@ -4,6 +4,7 @@ import { useMotion } from '../../hooks/useMotion'
 
 interface NotificationDropdownProps {
   userId: string
+  language: string
   onClose: () => void
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tNotifications: any
@@ -12,6 +13,7 @@ interface NotificationDropdownProps {
 
 export function NotificationDropdown({
   userId,
+  language,
   onClose,
   tNotifications,
   getLabel,
@@ -66,6 +68,7 @@ export function NotificationDropdown({
             <NotificationItem
               key={n.id}
               notification={n}
+              language={language}
               onRead={(id) => { if (userId) void markRead(id, userId) }}
               onNavigate={onClose}
               getLabel={getLabel}

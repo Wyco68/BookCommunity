@@ -94,6 +94,8 @@ export const en = {
     passwordUpdated: 'Password updated successfully.',
     unableToVerifyUser: 'Unable to verify current user.',
     account: 'Account',
+    appExperience: 'App Experience',
+    dangerZone: 'Danger Zone',
     deleteAccount: 'Delete Account',
     deleteConfirm: 'Are you sure? This action cannot be undone.',
     yesDelete: 'Yes, Delete',

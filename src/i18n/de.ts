@@ -94,6 +94,8 @@ export const de = {
     passwordUpdated: 'Passwort erfolgreich aktualisiert.',
     unableToVerifyUser: 'Benutzer konnte nicht verifiziert werden.',
     account: 'Konto',
+    appExperience: 'App-Erlebnis',
+    dangerZone: 'Gefahrenzone',
     deleteAccount: 'Konto löschen',
     deleteConfirm: 'Sind Sie sicher? Diese Aktion kann nicht rückgängig gemacht werden.',
     yesDelete: 'Ja, unwiderruflich löschen',

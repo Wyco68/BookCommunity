@@ -255,18 +255,14 @@ export function CreateSessionModal({ onClose }: CreateSessionModalProps) {
 
               {categories.length > 0 ? (
                 <div>
-                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>Category</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <label className="field-label" style={{ display: 'block', marginBottom: '0.5rem' }}>{t.sessionForm.category}</label>
+                  <div className="search-toolbar-pills">
                     {categories.map((cat) => (
                       <button
                         key={cat.id}
                         type="button"
-                        className={`pill ${selectedCategoryId === cat.id ? 'pill-active' : ''}`}
+                        className={`pill ${selectedCategoryId === cat.id ? 'pill-selected' : ''}`}
                         onClick={() => setSelectedCategoryId(cat.id)}
-                        style={{
-                          background: selectedCategoryId === cat.id ? 'var(--electric-blue)' : 'var(--surface-raised)',
-                          color: selectedCategoryId === cat.id ? '#fff' : 'var(--text-primary)'
-                        }}
                       >
                         {cat.name}
                       </button>

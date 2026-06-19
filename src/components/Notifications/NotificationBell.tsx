@@ -7,6 +7,7 @@ import { useState } from 'react'
 
 interface NotificationBellProps {
   userId: string
+  language: string
   open: boolean
   onToggle: () => void
   onClose: () => void
@@ -17,6 +18,7 @@ interface NotificationBellProps {
 
 export function NotificationBell({
   userId,
+  language,
   open,
   onToggle,
   onClose,
@@ -86,6 +88,7 @@ export function NotificationBell({
       {open && (
         <NotificationDropdown
           userId={userId}
+          language={language}
           onClose={onClose}
           tNotifications={tNotifications}
           getLabel={getLabel}

@@ -91,7 +91,7 @@ export function ManageTab({
     return (
       <div className="stack">
         <section className="detail-pane stack">
-          <h3 style={{ margin: 0 }}>{t.sessions.yourReading}</h3>
+          <h3>{t.sessions.yourReading}</h3>
           <p className="subtle">
             {myLatestChapter > 0
               ? t.sessions.progressSummary(myLatestChapter, session.total_chapters)
@@ -109,7 +109,7 @@ export function ManageTab({
 
         {/* Members + their progress (read-only for non-owner members). */}
         <section className="detail-pane stack">
-          <h3 style={{ margin: 0 }}>{t.sessions.memberProgress}</h3>
+          <h3>{t.sessions.memberProgress}</h3>
           {membersForMemberProgress.length === 0 ? (
             <p className="subtle">{t.manage.noOtherMembers}</p>
           ) : (
@@ -232,7 +232,7 @@ export function ManageTab({
 
       {/* Join Requests */}
       <section className="detail-pane stack">
-        <h3 style={{ margin: 0 }}>{t.sessions.joinRequests}</h3>
+        <h3>{t.sessions.joinRequests}</h3>
         {pendingRequests.length === 0 ? (
           <p className="subtle">{t.sessions.noPendingRequests}</p>
         ) : (
@@ -279,7 +279,7 @@ export function ManageTab({
 
       {/* Members + progress: everyone except the session creator (owners do not track reading). */}
       <section className="detail-pane stack">
-        <h3 style={{ margin: 0 }}>{t.sessions.memberProgress}</h3>
+        <h3>{t.sessions.memberProgress}</h3>
         {membersForOwnerProgress.length === 0 ? (
           <p className="subtle">{t.manage.noOtherMembers}</p>
         ) : (
@@ -301,7 +301,7 @@ export function ManageTab({
                         {t.sessions.chapterProgress(chapter, session.total_chapters)}
                       </span>
                     </div>
-                    <div className="session-user-col" style={{ alignItems: 'flex-end' }}>
+                    <div className="session-user-col session-user-col-end">
                       {member.user_id !== currentUserId && onRemoveMember ? (
                         <button
                           type="button"

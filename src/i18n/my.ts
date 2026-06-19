@@ -94,6 +94,8 @@ export const my = {
     passwordUpdated: 'စကားဝှက် အောင်မြင်စွာ ပြောင်းလဲပြီးပါပြီ။',
     unableToVerifyUser: 'အသုံးပြုသူကို အတည်ပြု၍မရပါ။',
     account: 'အကောင့်',
+    appExperience: 'အက်ပ်အသုံးပြုမှု',
+    dangerZone: 'အန္တရာယ်ရှိသော ဇုန်',
     deleteAccount: 'အကောင့်ဖျက်မည်',
     deleteConfirm: 'သေချာပါသလား? ဤလုပ်ဆောင်ချက်ကို ပြန်ပြင်၍ မရနိုင်ပါ။',
     yesDelete: 'ဟုတ်ကဲ့၊ ဖျက်မည်',

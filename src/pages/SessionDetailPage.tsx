@@ -665,6 +665,7 @@ export function SessionDetailPage({ userId, onSessionDeleted }: SessionDetailPag
 
       <SessionDetailPanel
         t={t}
+        language={getLanguage()}
         activeTab={activeTab}
         selectedSession={session}
         selectedIsOwner={isOwner}

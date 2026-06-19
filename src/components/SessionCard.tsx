@@ -49,7 +49,7 @@ export function SessionCard({
         onClick()
       }}
     >
-      <div className="session-card-cols" style={{ gridTemplateColumns: '60% 40%' }}>
+      <div className="session-card-cols">
         <div className="session-card-col-cover" aria-hidden="true">
           {coverUrl ? (
             <img

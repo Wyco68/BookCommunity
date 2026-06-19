@@ -86,6 +86,7 @@ export function DashboardHeader({
             ) : null}
             <NotificationBell
               userId={userId ?? ''}
+              language={language}
               open={notifOpen}
               onToggle={() => setNotifOpen((o) => !o)}
               onClose={() => setNotifOpen(false)}
