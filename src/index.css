@@ -1127,6 +1127,61 @@ select option { background: var(--surface); color: var(--text-primary); }
   align-items: end;
 }
 
+.search-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.search-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--surface);
+  padding: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.search-page-header h2 {
+  margin-bottom: var(--space-4);
+}
+
+.search-toolbar-row {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.search-toolbar-input {
+  flex: 1 1 300px;
+}
+
+.search-toolbar-pills {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.search-toolbar-pills .pill {
+  cursor: pointer;
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.search-toolbar-pills .pill-selected {
+  background: var(--electric-blue);
+  color: #fff;
+  border-color: var(--electric-blue);
+}
+
+.search-page-content {
+  padding: var(--space-5);
+  flex: 1;
+  overflow-y: auto;
+}
+
 /* ─── 23. Danger Zone ───────────────────────────────────────────── */
 .danger-zone {
   border-top: 1px solid var(--border);
