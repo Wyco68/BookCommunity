@@ -6,6 +6,7 @@ import { translations } from '../i18n'
 import type { Language } from '../i18n'
 import type { ReadingSession, SessionCardMediaPreview, SessionJoinRequest, SessionMembership } from '../types'
 import { useMotion } from '../hooks/useMotion'
+import { getCardEntranceProps } from '../lib/cardMotion'
 
 type Copy = (typeof translations)[Language]
 
@@ -116,12 +117,13 @@ export const SessionListPanel = memo(function SessionListPanel({
           const myProgress = latestProgress[session.id] ?? 0
           const uploadedCount = sessionUploadedChapterCount[session.id] ?? 0
           const coverUrl = firstMedia?.is_image ? firstMedia.signed_url : null
+          const motionProps = getCardEntranceProps(index, canAnimate)
 
           return (
             <SessionCard
               key={session.id}
-              className={canAnimate ? 'animate-fade-in' : ''}
-              style={canAnimate ? { animationDelay: `${index * 50}ms`, opacity: 0 } : undefined}
+              className={motionProps.className}
+              style={motionProps.style}
               t={t}
               session={session}
               membership={membership}

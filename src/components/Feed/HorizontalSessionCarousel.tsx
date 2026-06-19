@@ -3,6 +3,8 @@ import type { ReadingSession, SessionJoinRequest, SessionMembership } from '../.
 import type { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import { SessionCard } from '../SessionCard'
+import { useMotion } from '../../hooks/useMotion'
+import { getCardEntranceProps } from '../../lib/cardMotion'
 
 type Copy = (typeof translations)[Language]
 
@@ -32,6 +34,7 @@ export function HorizontalSessionCarousel({
   busySessionId,
 }: HorizontalSessionCarouselProps) {
   const scrollRef = useRef<HTMLUListElement>(null)
+  const canAnimate = useMotion()
 
   useEffect(() => {
     const el = scrollRef.current
@@ -85,22 +88,27 @@ export function HorizontalSessionCarousel({
   return (
     <div className="horizontal-carousel-wrapper">
       <ul className="horizontal-carousel" ref={scrollRef}>
-        {sessions.map((session) => (
-          <div key={session.id} className="carousel-item">
-            <SessionCard
-              t={t}
-              session={session}
-              membership={memberships[session.id]}
-              requestStatus={joinRequests[session.id]}
-              coverUrl={coverUrls[session.id]}
-              myProgress={myProgress[session.id] ?? 0}
-              uploadedCount={uploadedCounts[session.id] ?? 0}
-              busy={busySessionId === session.id}
-              onClick={() => onSelectSession(session.id)}
-              onJoinClick={() => onJoinSession(session.id)}
-            />
-          </div>
-        ))}
+        {sessions.map((session, index) => {
+          const motionProps = getCardEntranceProps(index, canAnimate)
+          return (
+            <div key={session.id} className="carousel-item">
+              <SessionCard
+                t={t}
+                session={session}
+                membership={memberships[session.id]}
+                requestStatus={joinRequests[session.id]}
+                coverUrl={coverUrls[session.id]}
+                myProgress={myProgress[session.id] ?? 0}
+                uploadedCount={uploadedCounts[session.id] ?? 0}
+                busy={busySessionId === session.id}
+                className={motionProps.className}
+                style={motionProps.style}
+                onClick={() => onSelectSession(session.id)}
+                onJoinClick={() => onJoinSession(session.id)}
+              />
+            </div>
+          )
+        })}
       </ul>
 
       <style>{`

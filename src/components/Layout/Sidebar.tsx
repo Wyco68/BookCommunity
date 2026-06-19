@@ -3,6 +3,8 @@ import { APP_PATHS } from '../../router/paths'
 import { translations } from '../../i18n'
 import type { Language } from '../../i18n'
 import { Avatar } from '../Avatar'
+import { useMotion } from '../../hooks/useMotion'
+import { useSlidingPill } from '../../hooks/useSlidingPill'
 
 type Copy = (typeof translations)[Language]
 
@@ -30,9 +32,13 @@ export function Sidebar({
   isOpen,
   onClose,
 }: SidebarProps) {
+  const canAnimate = useMotion()
+  const { containerRef: navRef, pillStyle: navPill } = useSlidingPill<HTMLDivElement>('.sidebar-link.active', [language])
+  const { containerRef: langRef, pillStyle: langPill } = useSlidingPill<HTMLDivElement>('.auth-switch-option-active', [language])
+
   return (
     <>
-      <aside className={`saas-sidebar ${isOpen ? 'open' : ''}`}>
+      <aside className={`app-shell-sidebar saas-sidebar ${isOpen ? 'open' : ''}`}>
         <div className="mobile-sidebar-header">
           <Link to={APP_PATHS.home} className="top-nav-brand" onClick={onClose}>
             BookCom
@@ -41,18 +47,16 @@ export function Sidebar({
             ✕
           </button>
         </div>
-        
-        <div className="sidebar-nav" style={{ flex: 1, paddingTop: '1.5rem' }}>
+
+        <div className={`sidebar-nav ${canAnimate ? 'animated-pill-container' : ''}`} style={{ flex: 1, paddingTop: 'var(--space-5)', position: 'relative' }} ref={navRef}>
+          {canAnimate && <div className="animated-pill" style={navPill} />}
           <NavLink to={APP_PATHS.home} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} onClick={onClose}>
             {t.nav.home}
-          </NavLink>
-          <NavLink to={APP_PATHS.search} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} onClick={onClose}>
-            {t.nav.search}
           </NavLink>
           <NavLink to={APP_PATHS.categories} className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`} onClick={onClose}>
             {t.nav.categories}
           </NavLink>
-          
+
           {onCreateClick ? (
             <button
               type="button"
@@ -69,12 +73,13 @@ export function Sidebar({
 
         <div className="mobile-sidebar-footer">
           <Link to={APP_PATHS.account} className="header-identity-link" onClick={onClose}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <Avatar imageUrl={myAvatarImage} label={myAvatarLabel} size="sm" />
               <span style={{ fontWeight: 460 }}>{myDisplayName}</span>
             </div>
           </Link>
-          <div className="auth-switch" role="tablist" aria-label={t.language.switchLabel}>
+          <div className={`auth-switch ${canAnimate ? 'animated-pill-container' : ''}`} role="tablist" aria-label={t.language.switchLabel} ref={langRef} style={{ position: 'relative' }}>
+            {canAnimate && <div className="animated-pill" style={{ ...langPill, borderRadius: 'var(--radius-xs)' }} />}
             <button
               type="button"
               className={`auth-switch-option ${language === 'en' ? 'auth-switch-option-active' : ''}`}

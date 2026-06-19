@@ -3,33 +3,78 @@
    Uses design tokens from index.css
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ─── App Shell ─────────────────────────────────────────────────── */
-.shell.dashboard-shell {
-  display: flex;
-  flex-direction: column;
+/* ─── App Shell — responsive CSS Grid (mobile 1col / tablet+desktop sidebar+feed) ── */
+.app-shell {
+  display: grid;
+  grid-template-columns: 1fr;
   min-height: 100vh;
 }
 
-.app-container {
-  width: 100%;
-  min-width: 0;
-  margin: 0;
-  padding: 0 var(--space-5);
+.app-shell-main {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  min-width: 0;
 }
 
-@media (min-width: 768px) {
-  .app-container { padding: 0 var(--space-8); }
-}
-
-.layout-content {
+.app-shell-feed {
   display: grid;
   gap: var(--space-4);
   min-width: 0;
-  padding: var(--space-4) 0 var(--space-6);
+  width: 100%;
+  padding: var(--space-4) var(--space-5) var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .app-shell { grid-template-columns: 260px minmax(0, 1fr); }
+  .app-shell-feed { padding: var(--space-4) var(--space-8) var(--space-6); }
+}
+
+@media (min-width: 1024px) {
+  .app-shell-feed {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: var(--space-5) var(--space-5) var(--space-6);
+  }
+}
+
+/* ─── Home Search Bar — spans the full feed column width ───────── */
+.home-search-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.home-search-bar .search-toolbar-input {
+  width: 100%;
+  flex: none;
+}
+
+@media (max-width: 767px) {
+  .app-shell-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    transform: translateX(-100%);
+    z-index: 100;
+  }
+  .app-shell-sidebar.open {
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 768px) {
+  .app-shell-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    align-self: start;
+    transform: none;
+  }
+  .app-shell-sidebar .sidebar-close-btn {
+    display: none;
+  }
 }
 
 /* ─── Page Tight (Search, Categories) ───────────────────────────── */
@@ -76,28 +121,7 @@
 .session-panel-embedded { gap: 0; }
 .session-panel-embedded .session-list { gap: var(--space-2); }
 
-/* ─── Top Navigation ────────────────────────────────────────────── */
-.top-nav {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface);
-  backdrop-filter: blur(12px);
-}
-
-.top-nav-inner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-3) 0;
-  min-height: 52px;
-}
-
-@media (min-width: 768px) {
-  .top-nav-inner { padding: var(--space-4) 0; }
-}
-
+/* ─── Brand & Sidebar Links ──────────────────────────────────────── */
 .top-nav-brand {
   text-decoration: none;
   color: var(--text-primary);
@@ -107,63 +131,10 @@
   padding-left: var(--space-2);
 }
 
-.top-nav-links {
-  display: none;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.top-nav-links .sidebar-link {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-xs);
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition: color var(--transition), background var(--transition);
-}
-
-.top-nav-links .sidebar-link:hover {
-  color: var(--text-primary);
-  background: var(--brand-soft);
-}
-
-.top-nav-links .sidebar-link.active {
-  color: var(--electric-blue);
-  background: var(--brand-soft);
-}
-
-.top-nav-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-left: auto;
-}
-
-@media (max-width: 1024px) {
-  .top-nav-profile,
-  .top-nav-language,
-  .top-nav-create-btn {
-    display: none !important;
-  }
-}
-
-.top-nav-create-btn {
-  margin-top: 0;
-  width: auto;
-  padding: var(--space-2) var(--space-3);
-  font-size: 0.82rem;
-  min-height: 32px;
-}
-
 .top-nav-profile .identity-row {
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   gap: var(--space-2);
-}
-
-.top-nav-language {
-  min-width: 100px;
 }
 
 /* ─── Sidebar Links ─────────────────────────────────────────────── */
@@ -262,8 +233,6 @@
   background: rgba(0, 0, 0, 0.5);
   z-index: 90;
 }
-
-.top-nav-mobile-menu { display: none; }
 
 /* ─── Modal ─────────────────────────────────────────────────────── */
 .modal-overlay {
@@ -629,8 +598,8 @@
 
 /* ─── Mobile ≤640 ───────────────────────────────────────────────── */
 @media (max-width: 640px) {
-  .app-container {
-    padding: 0 var(--space-3);
+  .app-shell-feed {
+    padding: var(--space-4) var(--space-3) var(--space-6);
     overflow-x: clip;
   }
 
@@ -676,38 +645,6 @@
   .auth-premium-hero {
     min-height: auto;
   }
-
-  .mobile-menu-toggle {
-    display: inline-flex !important;
-    margin-left: 0;
-    position: static;
-  }
-
-  .top-nav-mobile-menu {
-    position: fixed;
-    top: 0;
-    right: -280px;
-    width: 280px;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    background: var(--surface);
-    border-left: 1px solid var(--border);
-    z-index: 100;
-    transition: right 0.25s ease;
-  }
-
-  .top-nav-mobile-menu.open { right: 0; }
-}
-
-/* ─── Desktop ≥1025 ─────────────────────────────────────────────── */
-@media (min-width: 1025px) {
-  .mobile-menu-toggle,
-  .top-nav-mobile-menu,
-  .mobile-overlay { display: none !important; }
-
-  .top-nav-links { display: flex; }
-  .top-nav-actions { display: flex; }
 }
 
 @media (min-width: 900px) {

@@ -5,6 +5,7 @@ import type { Notification, NotificationEventType } from '../../types'
 
 interface NotificationItemProps {
   notification: Notification
+  language: string
   onRead: (id: string) => void
   onNavigate?: () => void
   getLabel: (type: string, actor: string, session: string) => string
@@ -36,7 +37,7 @@ function getIconColor(type: NotificationEventType): string {
   }
 }
 
-export function NotificationItem({ notification, onRead, onNavigate, getLabel, tNotifications }: NotificationItemProps) {
+export function NotificationItem({ notification, language, onRead, onNavigate, getLabel, tNotifications }: NotificationItemProps) {
   const navigate = useNavigate()
   const { id, type, session_id, metadata, is_read, created_at } = notification
   const actor = metadata.actorUsername ?? tNotifications.someone
@@ -71,7 +72,7 @@ export function NotificationItem({ notification, onRead, onNavigate, getLabel, t
       </span>
       <span className="notif-item-body">
         <span className="notif-item-text">{label}</span>
-        <span className="notif-item-time">{formatTimeAgo(new Date(created_at))}</span>
+        <span className="notif-item-time">{formatTimeAgo(new Date(created_at), language)}</span>
       </span>
       {!is_read && <span className="notif-item-dot" aria-hidden="true" />}
     </li>

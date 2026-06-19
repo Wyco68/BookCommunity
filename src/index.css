@@ -107,6 +107,16 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Feed card entrance — scoped separately from .animate-fade-in so modals/auth shells stay untouched */
+.card-motion-enter {
+  animation: cardMotionEnter var(--timing-normal) var(--easing-standard) forwards;
+}
+
+@keyframes cardMotionEnter {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes slideDownFade {
   from { opacity: 0; transform: scale(0.95) translateY(-10px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
@@ -1004,15 +1014,18 @@ select option { background: var(--surface); color: var(--text-primary); }
 
 .session-card-clickable {
   cursor: pointer;
-  transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+  transform: translateZ(0);
+  transition: transform var(--timing-fast) var(--easing-standard),
+    border-color var(--timing-fast) var(--easing-standard),
+    box-shadow var(--timing-fast) var(--easing-standard);
 }
 .session-card-clickable:hover {
   border-color: var(--electric-blue);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--brand-soft);
 }
 .session-card-clickable:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .session-categories {

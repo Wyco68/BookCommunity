@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import type { ChangeEvent } from 'react'
 import { Routes, useNavigate } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
 import { translations } from './i18n'
 import type { Language } from './i18n'
 import { useSessionDerivedState } from './hooks/useSessionDerivedState'
 import { filterSessions } from './lib/sessionState'
-import { useSessions, defaultSessionForm } from './hooks/useSessions'
+import { useSessions } from './hooks/useSessions'
 import { useProfile } from './hooks/useProfile'
 import { useNotificationRealtime } from './hooks/useNotificationRealtime'
 import { buildAuthenticatedBranch } from './router/AppRouter'
@@ -30,7 +30,6 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
   const {
     loadSessions,
     refreshSessions,
-    createSession,
     removeSession,
   } = sessions
   const { loadProfile } = profile
@@ -56,11 +55,8 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
 
   const [sessionSearch, setSessionSearch] = useState('')
   const [visibilityFilter, setVisibilityFilter] = useState<'all' | 'public' | 'private'>('all')
-  const [sectionsSearch, setSectionsSearch] = useState('')
-  const [sectionsVisibility, setSectionsVisibility] = useState<'all' | 'public' | 'private'>('all')
   const [createdSearch, setCreatedSearch] = useState('')
   const [createdVisibility, setCreatedVisibility] = useState<'all' | 'public' | 'private'>('all')
-  const [sessionForm, setSessionForm] = useState(defaultSessionForm)
 
   const activeUserId = user.id
 
@@ -96,20 +92,10 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
   )
 
   const joinedFilteredSessions = useMemo(
-    () => {
-      let result = sessions.sessions.filter(
-        (session) => session.status_type === 'ongoing' && Boolean(sessions.memberships[session.id]),
-      )
-      if (sectionsVisibility !== 'all') {
-        result = result.filter(s => s.visibility === sectionsVisibility)
-      }
-      const query = sectionsSearch.trim().toLowerCase()
-      if (query) {
-        result = result.filter(s => s.book_title.toLowerCase().includes(query) || s.book_author.toLowerCase().includes(query))
-      }
-      return result
-    },
-    [sessions.sessions, sessions.memberships, sectionsSearch, sectionsVisibility],
+    () => sessions.sessions.filter(
+      (session) => session.status_type === 'ongoing' && Boolean(sessions.memberships[session.id]),
+    ),
+    [sessions.sessions, sessions.memberships],
   )
 
   const createdFilteredSessions = useMemo(
@@ -146,13 +132,6 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
       window.removeEventListener('focus', handleVisibility)
     }
   }, [refreshSessions])
-
-  const handleCreateSession = useCallback((event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    return createSession(user, sessionForm).then(() => {
-      setSessionForm(defaultSessionForm)
-    })
-  }, [user, sessionForm, createSession])
 
   const handleJoinSession = useCallback(
     async (sessionId: string) => {
@@ -192,13 +171,9 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     onLoadMore: sessions.loadMoreSessions,
   }
 
-  const sectionsListProps = {
+  const joinedListProps = {
     ...listPanelProps,
     filteredSessions: joinedFilteredSessions,
-    sessionSearch: sectionsSearch,
-    visibilityFilter: sectionsVisibility,
-    onSessionSearchChange: setSectionsSearch,
-    onVisibilityFilterChange: setSectionsVisibility,
   }
 
   const createdListProps = {
@@ -250,18 +225,10 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
     userId: activeUserId,
   }
 
-  const searchSectionProps = {
-    t,
-    listProps: searchListProps as never,
-    sessionForm,
-    creatingSession: sessions.creating,
-    onSessionFormChange: setSessionForm,
-    onCreateSession: handleCreateSession,
-  }
-
   const sectionsAndDetailsProps = {
     t,
-    listProps: sectionsListProps as never,
+    searchListProps: searchListProps as never,
+    joinedListProps: joinedListProps as never,
     allSessions: sessions.sessions,
   }
 
@@ -271,7 +238,6 @@ export default function AuthenticatedApp({ user, language, setLanguage }: Authen
         {buildAuthenticatedBranch({
           headerProps,
           profileEditProps,
-          searchSectionProps,
           sectionsAndDetailsProps,
           userId: activeUserId,
           onSessionDeleted: removeSession,

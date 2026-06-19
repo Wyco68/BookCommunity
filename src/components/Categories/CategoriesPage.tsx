@@ -11,6 +11,7 @@ import { SessionCard } from '../SessionCard'
 import { JoinSessionModal } from '../JoinSessionModal'
 import { useMotion } from '../../hooks/useMotion'
 import { useSlidingPill } from '../../hooks/useSlidingPill'
+import { getCardEntranceProps } from '../../lib/cardMotion'
 
 const LANGUAGE_STORAGE_KEY = 'bookcom-language'
 
@@ -343,10 +344,11 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
             {!loadingSessions && categorySessions.length > 0 ? (
               <>
                 <ul className="session-list session-grid page-tight-session-list">
-                  {categorySessions.map((session) => {
+                  {categorySessions.map((session, index) => {
                   const membership = memberships[session.id]
                   const requestStatus = requestStatuses[session.id]
                   const isMember = Boolean(membership)
+                  const motionProps = getCardEntranceProps(index, canAnimate)
                   return (
                     <SessionCard
                       key={session.id}
@@ -357,6 +359,8 @@ export function CategoriesPage({ userId }: CategoriesPageProps) {
                       categories={selectedCategory ? [selectedCategory.name] : []}
                       coverUrl={session.coverSignedUrl ?? null}
                       busy={joinBusy && joinTarget?.id === session.id}
+                      className={motionProps.className}
+                      style={motionProps.style}
                       onClick={() => {
                         if (isMember) {
                           navigate(`/session/${session.id}`)

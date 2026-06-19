@@ -1,17 +1,15 @@
 import type { ReactElement } from 'react'
 import { Navigate, Route } from 'react-router-dom'
 import { AppLayout } from '../components/Layout/AppLayout'
+import type { AppShellHeaderProps } from '../components/Layout/AppLayout'
 import { ErrorBoundary } from '../components/ErrorBoundary'
-import type { DashboardHeaderProps } from '../components/DashboardHeader'
 import type { ProfileEditProps } from '../components/ProfileEdit/ProfileEdit'
-import type { SearchSectionProps } from '../components/SearchSection/SearchSection'
 import type { SectionsLayoutProps } from '../components/Sections/SectionsLayout'
 import { APP_PATHS } from './paths'
 import {
   CategoriesRoutePage,
   NotFoundPage,
   ProfileEditPage,
-  SearchSectionPage,
   SectionsAndDetailsPage,
   SessionDetailPage,
 } from './lazyPages'
@@ -22,9 +20,8 @@ function nestPath(absolute: string): string {
 }
 
 interface AppRouterProps {
-  headerProps: DashboardHeaderProps
+  headerProps: AppShellHeaderProps
   profileEditProps: ProfileEditProps
-  searchSectionProps: SearchSectionProps
   sectionsAndDetailsProps: SectionsLayoutProps
   userId: string
   onSessionDeleted: (sessionId: string) => void
@@ -33,7 +30,6 @@ interface AppRouterProps {
 export function buildAuthenticatedBranch({
   headerProps,
   profileEditProps,
-  searchSectionProps,
   sectionsAndDetailsProps,
   userId,
   onSessionDeleted,
@@ -59,7 +55,7 @@ export function buildAuthenticatedBranch({
       />
       <Route
         path={nestPath(APP_PATHS.search)}
-        element={<ErrorBoundary><SearchSectionPage {...searchSectionProps} /></ErrorBoundary>}
+        element={<Navigate to={APP_PATHS.home} replace />}
       />
       <Route
         path={nestPath(APP_PATHS.categories)}

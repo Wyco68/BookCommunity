@@ -1,26 +1,51 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
-import type { DashboardHeaderProps } from '../DashboardHeader'
-import { DashboardHeader } from '../DashboardHeader'
+import { translations } from '../../i18n'
+import type { Language } from '../../i18n'
+import { Sidebar } from './Sidebar'
+import { TopBar } from './TopBar'
 import { CreateSessionModal } from '../CreateSession/CreateSessionModal'
 
+type Copy = (typeof translations)[Language]
+
+export interface AppShellHeaderProps {
+  t: Copy
+  language: Language
+  myAvatarImage: string | null
+  myAvatarLabel: string
+  myDisplayName: string
+  onLanguageChange: (language: Language) => void
+  onSignOut: () => void
+  onCreateClick?: () => void
+  userId?: string
+}
+
 interface AppLayoutProps {
-  headerProps: DashboardHeaderProps
+  headerProps: AppShellHeaderProps
 }
 
 export function AppLayout({ headerProps }: AppLayoutProps) {
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
   return (
-    <>
-      <DashboardHeader 
-        {...headerProps} 
-        onCreateClick={() => setShowCreateModal(true)} 
+    <div className="app-shell">
+      <Sidebar
+        {...headerProps}
+        isOpen={mobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
+        onCreateClick={() => setShowCreateModal(true)}
       />
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '1.5rem', width: '100%', minWidth: 0 }}>
-        <Outlet />
-      </main>
+      <div className="app-shell-main">
+        <TopBar
+          {...headerProps}
+          onOpenSidebar={() => setMobileSidebarOpen(true)}
+        />
+        <main className="app-shell-feed">
+          <Outlet />
+        </main>
+      </div>
       {showCreateModal ? <CreateSessionModal onClose={() => setShowCreateModal(false)} /> : null}
-    </>
+    </div>
   )
-}
+}
