@@ -1,4 +1,4 @@
-import type { ProgressUpdate, SessionJoinRequest, SessionMembership } from '../types'
+import type { ProgressUpdate, ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
 
 export function buildMembershipLookup(memberships: SessionMembership[]): Record<string, SessionMembership> {
   const lookup: Record<string, SessionMembership> = {}
@@ -26,4 +26,11 @@ export function buildJoinRequestStatusLookup(
     lookup[request.session_id] = request.status
   }
   return lookup
+}
+
+export function filterDiscoverSessions(
+  sessions: ReadingSession[],
+  memberships: Record<string, SessionMembership>,
+): ReadingSession[] {
+  return sessions.filter((session) => !(session.id in memberships))
 }

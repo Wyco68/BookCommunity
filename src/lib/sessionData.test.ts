@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { ProgressUpdate, SessionJoinRequest, SessionMembership } from '../types'
+import type { ProgressUpdate, ReadingSession, SessionJoinRequest, SessionMembership } from '../types'
 import {
   buildJoinRequestStatusLookup,
   buildLatestProgressBySession,
   buildMembershipLookup,
+  filterDiscoverSessions,
 } from './sessionData'
 
 describe('buildMembershipLookup', () => {
@@ -52,5 +53,46 @@ describe('buildJoinRequestStatusLookup', () => {
 
   it('returns empty lookup for empty requests', () => {
     expect(buildJoinRequestStatusLookup([])).toEqual({})
+  })
+})
+
+describe('filterDiscoverSessions', () => {
+  const baseSession: Omit<ReadingSession, 'id'> = {
+    creator_id: 'u1',
+    book_title: 'Title',
+    book_author: 'Author',
+    total_chapters: 10,
+    description: null,
+    visibility: 'public',
+    join_policy: 'open',
+    status: 'active',
+    status_type: 'ongoing',
+    cover_image_path: null,
+    category_id: 1,
+    created_at: '2026-01-01',
+  }
+
+  it('excludes sessions the user already has a membership for', () => {
+    const sessions: ReadingSession[] = [
+      { ...baseSession, id: 's1' },
+      { ...baseSession, id: 's2' },
+    ]
+    const memberships: Record<string, SessionMembership> = {
+      s1: { session_id: 's1', user_id: 'u1', role: 'owner' },
+    }
+
+    expect(filterDiscoverSessions(sessions, memberships)).toEqual([
+      { ...baseSession, id: 's2' },
+    ])
+  })
+
+  it('returns all sessions when there are no memberships', () => {
+    const sessions: ReadingSession[] = [{ ...baseSession, id: 's1' }]
+
+    expect(filterDiscoverSessions(sessions, {})).toEqual(sessions)
+  })
+
+  it('returns empty array for empty sessions', () => {
+    expect(filterDiscoverSessions([], {})).toEqual([])
   })
 })
